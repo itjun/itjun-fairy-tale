@@ -5,6 +5,9 @@ on:
     tags: ['v*']
 permissions:
   contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   package:
     strategy:
@@ -63,5 +66,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "花园王国 $GITHUB_REF_NAME" --notes-file docs/release-notes.md release/GardenKingdom-* release/garden-update.json release/SHA256SUMS.txt
+          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft > /tmp/garden-release-draft; then
+            if [ "$(cat /tmp/garden-release-draft)" != "true" ]; then
+              echo "This version is already published; refusing to replace public binaries."
+              exit 0
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "花园王国 $GITHUB_REF_NAME" --notes-file docs/release-notes.md
+          fi
+          gh release upload "$GITHUB_REF_NAME" release/GardenKingdom-* release/garden-update.json release/SHA256SUMS.txt --clobber
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

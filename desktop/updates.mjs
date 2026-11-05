@@ -10,10 +10,11 @@ const exec = promisify(execFile);
 // Node fetch is intentionally separate from the renderer's blocked network session.
 export async function fetchRelease(url) {
   let target = url;
+  const timeout = /\.(zip|exe)$/.test(new URL(url).pathname) ? 15 * 60 * 1000 : 30000;
   for (let i = 0; i < 6; i++) {
     const u = new URL(target);
     if (u.protocol !== 'https:' || !['api.github.com', 'github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'].includes(u.hostname) || u.username || u.password) throw new Error('更新下载地址不可信');
-    const response = await fetch(target, { redirect: 'manual', signal: AbortSignal.timeout(120000), headers: { 'User-Agent': 'GardenKingdom-Updater', Accept: 'application/vnd.github+json' } });
+    const response = await fetch(target, { redirect: 'manual', signal: AbortSignal.timeout(timeout), headers: { 'User-Agent': 'GardenKingdom-Updater', Accept: 'application/vnd.github+json' } });
     if ([301,302,303,307,308].includes(response.status)) { target = new URL(response.headers.get('location'), target).href; await response.body?.cancel(); continue; }
     if (!response.ok) throw new Error(`更新服务暂不可用 (${response.status})`);
     return response;
