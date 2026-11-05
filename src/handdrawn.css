@@ -108,3 +108,12 @@ body, #root, #root .platform-game, #root .score-screen {
   #root .adventure-score { font-size: 13px; }
   #root .adventure-message { font-size: 15px; }
 }
+/* Desktop actions reuse the same paper buttons as the game. */
+.desktop-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.app-shell > .desktop-actions { justify-content: flex-end; margin: 0 0 12px; }
+.garden-backup { padding: 16px 0; color: #777761; font-size: 16px; }
+.garden-backup summary { cursor: pointer; min-height: 44px; padding: 12px 0; }
+.garden-backup p { line-height: 1.7; }
+.garden-backup .desktop-actions { justify-content: flex-start; }
+
+.desktop-update-status { flex-basis:100%; text-align:center; overflow-wrap:anywhere; font-size:15px; }

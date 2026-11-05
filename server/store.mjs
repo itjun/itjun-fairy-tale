@@ -102,6 +102,12 @@ export function openStore(path) {
       const points = summary.sessions <= 1000 ? db.prepare(`SELECT id, startedAt, levelId, score, status FROM runs WHERE ${where} ORDER BY startedAt, id`).all(...params) : [];
       return { summary, levels, records, points, days: [...days.values()].map(day => ({ ...day, average: Math.round(day.total / day.sessions * 10) / 10 })), isDailyOnly: summary.sessions > 1000, timezone, offset };
     },
+    importRuns(rows) {
+      // A malformed/conflicting backup must not leave a partially imported history.
+      db.exec('BEGIN');
+      try { for (const row of rows) this.save(row); db.exec('COMMIT'); }
+      catch (error) { db.exec('ROLLBACK'); throw error; }
+    },
     close() { db.close(); },
   };
 }

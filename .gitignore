@@ -1,5 +1,6 @@
 node_modules/
 dist/
+release/
 legacy/
 *.zip
 .DS_Store
@@ -10,3 +11,8 @@ docs/qa/
 *.db
 *.db-*
 *.log
+
+__pycache__/
+*.pyc
+.env
+.env.*

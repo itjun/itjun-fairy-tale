@@ -1,0 +1,41 @@
+appId: com.itjun.fairytale
+productName: 花园王国
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/client/**/*
+  - desktop/*.mjs
+  - desktop/preload.cjs
+  - "!desktop/smoke.mjs"
+  - server/store.mjs
+  - shared/**/*
+  - build/icon.png
+  - package.json
+  - LICENSE
+  - THIRD_PARTY_NOTICES.md
+  - '!node_modules/**/*'
+asar: true
+npmRebuild: false
+artifactName: 'GardenKingdom-${version}-${os}-${arch}.${ext}'
+mac:
+  category: public.app-category.family-games
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  identity: '-'
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: 花园王国
+  deleteAppDataOnUninstall: false

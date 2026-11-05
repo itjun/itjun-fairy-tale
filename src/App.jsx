@@ -1,4 +1,6 @@
 import { lazy, Suspense } from 'react';
+import { DesktopActions } from './DesktopActions.jsx';
+import { GardenBackup } from './GardenBackup.jsx';
 import { flushScores } from './scores/client.js';
 const ScoreHistory = lazy(() => import('./scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
 const PlatformGame = lazy(() => import('./game/PlatformGame.jsx').then(module => ({ default: module.PlatformGame })));
@@ -179,6 +181,7 @@ export function App() {
       <a className="brand" href="#" aria-label="花园王国首页" onClick={e => { e.preventDefault(); closeModal(); setIsDecorating(false); }}><span className="brand-icon"><Icon as={Flower} size={34} /></span><span>花园王国<small>一个小画家的奇妙世界</small></span></a>
       <div className="header-actions"><button className="quiet-button" onClick={() => setIsScores(true)}><Icon as={Trophy} size={21} />我的成绩本</button><button className="quiet-button" onClick={() => setMode('gallery')}><Icon as={Images} size={21} />小小画展</button><button className="sound-button" aria-label={isSound ? '关闭声音' : '打开声音'} aria-pressed={isSound} onClick={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }}><Icon as={isSound ? SpeakerHigh : SpeakerSlash} size={23} /><span>声音{isSound ? '开' : '关'}</span></button></div>
     </header>
+    <DesktopActions />
     <main>
       <section className="intro"><div><div className="intro-note"><Icon as={Sun} size={20} />今天也是适合冒险的一天</div><h1>欢迎来到<span>花园王国</span></h1><p>和家人一起，把画里的小小心愿变成真的。</p></div><button className="collection" onClick={() => setMode('collection')}><span className="collection-icons">{quests.map((q, i) => <Icon key={q.id} as={q.icon} size={29} className={completed[i] ? 'earned' : ''} />)}</span><span>我的小成就 <b>{total} / 3</b></span></button></section>
       <section className="adventure-launch"><img src="./assets/girl-player.png" alt="粉裙小画家" /><div><h2>彩笔跳台探险</h2><p>八个小世界，随机跳台。从童话城堡出发，去海边、森林和雪地找宝物。</p></div><button className="primary-button" onClick={() => { window.speechSynthesis?.cancel(); setIsAdventure(true); }}><Icon as={Play} weight="fill" />去跳台探险<Icon as={ArrowRight} size={20} /></button></section>
@@ -196,6 +199,7 @@ export function App() {
       </section>
       {isDecorating ? <section className="sticker-tools" aria-label="花园贴纸"><span>我的贴纸</span>{[['flower', '小花'], ['heart', '爱心'], ['star', '星星'], ['butterfly', '蝴蝶']].map(([type, name]) => <button key={type} aria-label={`${name}贴纸`} aria-pressed={stamp === type} className={`sticker-choice stamp-${type} ${stamp === type ? 'selected' : ''}`} onClick={() => setStamp(type)} data-stamp-type={type}><Stamp type={type} /><span>{name}</span></button>)}<button className="quiet-button" disabled={!progress.stamps.length} onClick={() => setProgress(p => ({ ...p, stamps: p.stamps.slice(0, -1) }))}><Icon as={ArrowCounterClockwise} />撤回</button><button className="quiet-button" disabled={isExporting} onClick={saveGarden}><Icon as={DownloadSimple} />{isExporting ? "保存中……" : "保存花园"}</button></section> : <section className="quest-list" aria-label="三个小冒险">{quests.map((quest, i) => <button className={`quest-card ${quest.color} ${completed[i] ? 'complete' : ''}`} key={quest.id} onClick={() => openQuest(quest.id)}><span className="quest-icon"><Icon as={quest.icon} size={34} /></span><span className="quest-copy"><small>小冒险 0{i + 1}</small><strong>{quest.title}</strong><span>{completed[i] ? '做得真棒，可以再看看' : quest.hint}</span></span><span className="quest-arrow"><Icon as={completed[i] ? Check : ArrowRight} size={22} /></span></button>)}</section>}
       <footer><span><Icon as={Heart} size={16} />灵感来自一位 6 岁小画家的 11 幅画</span><span>{isSaved ? '小心愿会自动记住' : '这次进度暂时无法保存'}<span className="footer-divider">/</span><button onClick={() => setMode('reset')}>重新开始</button></span></footer>
+      <GardenBackup progress={progress} onImport={setProgress} />
     </main>
     {activeQuest && <Modal title={activeQuest.title} onClose={closeModal} className={`quest-modal ${activeQuest.color}`}>
       <div className="quest-modal-description"><p>{mode === 'rainbow' ? '把六种颜色送回彩虹里。' : mode === 'garden' ? '一口水，一点阳光，小花就会长大。' : '选个口味，再点一位家人，把甜蜜送给他们。'}</p><button className="icon-button" aria-label="听玩法" onClick={() => speak(mode === 'rainbow' ? '请找出' + (colors[progress.rainbow]?.name || '全部颜色，你成功啦') : mode === 'garden' ? '先点水滴给小花浇水，再点太阳送它阳光。' : '先选一个口味，再点一位家人。', true)}><Icon as={SpeakerHigh} /></button></div>

@@ -5,6 +5,7 @@ import { COLLECTIBLES, LEVEL_COLLECTIBLES } from './collectibles.js';
 import { LEVELS } from '../../shared/levels.js';
 import { queueRun, flushScores, saveOnLeave } from '../scores/client.js';
 import './game.css';
+import { DesktopActions } from '../DesktopActions.jsx';
 const ScoreHistory = lazy(() => import('../scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
 const initialStats = { flowers: 0, distance: 0, gardens: 0, score: 0, platform: 0, seconds: 0, message: '', positions: [], platforms: 0 };
 function makeSeed() { return crypto.getRandomValues(new Uint32Array(1))[0]; }
@@ -62,10 +63,17 @@ export function PlatformGame({ onExit, initialSound = true }) {
       if (record) saveOnLeave(record);
     }
     window.addEventListener('pagehide', leave);
+    function prepareClose() {
+      engine.current?.pause(true);
+      const record = snapshotRun(engine.current?.snapshot() || initialStats, 'ended');
+      if (record) queueRun(record);
+      if (run.current) { setStats(engine.current?.snapshot() || initialStats); changeStatus('ended'); }
+    }
+    window.addEventListener('garden:prepare-close', prepareClose);
     const timer = setInterval(() => {
       if (run.current && !['completed', 'ended'].includes(run.current.status)) persist(engine.current?.snapshot() || initialStats, statusRef.current === 'playing' ? 'playing' : 'paused');
     }, 3000);
-    return () => { isMounted.current = false; clearInterval(timer); window.removeEventListener('pagehide', leave); audio.current?.close(); };
+    return () => { isMounted.current = false; clearInterval(timer); window.removeEventListener('pagehide', leave); window.removeEventListener('garden:prepare-close', prepareClose); audio.current?.close(); };
   }, []);
   useEffect(() => {
     document.body.classList.add('is-platform-game');
@@ -152,6 +160,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
         {status==='error'&&<button className="primary-button" onClick={()=>restart()}>重新打开</button>}
         {['ready','paused','completed','ended'].includes(status)&&!isChangeMap&&<button className="text-button" onClick={()=>setIsScores(true)}><Trophy size={19}/>我的成绩本</button>}
         <button className="text-button" onClick={exit}><House size={18}/>回到我的花园</button>
+        <DesktopActions />
       </div>
     </section></div>}
     {isScores&&<Suspense fallback={<div className="adventure-overlay">正在翻开成绩本…</div>}><ScoreHistory onClose={()=>setIsScores(false)}/></Suspense>}
