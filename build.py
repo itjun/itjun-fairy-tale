@@ -29,17 +29,21 @@ def processes():
             # App bundles by exact executable suffix; dev Electron only in this checkout.
             own_bundle = f'/{NAME}.app/Contents/MacOS/{NAME}'
             own_dev = str(ROOT / 'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron')
-            if (own_bundle in command or command.startswith(own_dev)) and pid.isdigit():
+            bundle_roots = ('/Applications/', str(Path.home() / 'Applications') + '/', str(ROOT / 'release') + '/')
+            is_bundle = command.startswith(bundle_roots) and own_bundle in command and command.split(own_bundle, 1)[1][:1] in ('', ' ')
+            is_dev = command.startswith(own_dev) and command[len(own_dev):][:1] in ('', ' ')
+            if (is_bundle or is_dev) and pid.isdigit():
                 result.append(int(pid))
         return result
-    script = "Get-CimInstance Win32_Process | Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress"
+    script = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); Get-CimInstance Win32_Process | Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress"
     data = json.loads(subprocess.check_output(['powershell.exe', '-NoProfile', '-Command', script], text=True, encoding='utf-8-sig') or '[]')
     if isinstance(data, dict): data = [data]
     destination = Path(os.environ['LOCALAPPDATA']) / 'Programs' / 'GardenKingdom'
+    installed_paths = [destination / f'{NAME}.exe', destination.parent / NAME / f'{NAME}.exe', destination.parent / 'itjun-fairy-tale' / f'{NAME}.exe']
     results = []
     for item in data:
         path = item.get('ExecutablePath') or ''
-        is_installed = path.casefold() == str(destination / f'{NAME}.exe').casefold()
+        is_installed = path.casefold() in [str(item).casefold() for item in installed_paths]
         is_build = path.casefold().startswith(str(ROOT / 'release').casefold() + os.sep) and Path(path).name == f'{NAME}.exe'
         is_dev = path.casefold() == str(ROOT / 'node_modules/electron/dist/electron.exe').casefold() and str(ROOT).casefold() in (item.get('CommandLine') or '').casefold()
         if is_installed or is_build or is_dev: results.append(item['ProcessId'])

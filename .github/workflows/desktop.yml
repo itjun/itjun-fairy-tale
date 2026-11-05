@@ -22,6 +22,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      - run: python -m unittest discover -s tests -p test_build.py
       - if: runner.os == 'macOS'
         run: npm run desktop:test
       - if: runner.os == 'macOS'
