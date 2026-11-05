@@ -8,12 +8,25 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { newerVersion, selectUpdate, releaseAssetUrl } from '../desktop/update-policy.mjs';
 import { verifyFile, UpdateManager, macSwapScript } from '../desktop/updates.mjs';
+import { validateMacArchive } from '../desktop/zip-directory.mjs';
 const exec = promisify(execFile);
 const content = Buffer.from('verified-update');
 const file = { platform: process.platform, arch: process.arch, name: 'GardenKingdom-0.2.0-test' + (process.platform === 'darwin' ? '.zip' : '.exe'), size: content.length, sha512: createHash('sha512').update(content).digest('hex') };
 const url = `https://github.com/itjun/itjun-fairy-tale/releases/download/v0.2.0/${file.name}`;
 const release = { tag_name: 'v0.2.0', assets: [{ name: 'garden-update.json', browser_download_url: 'https://github.com/itjun/itjun-fairy-tale/releases/download/v0.2.0/garden-update.json' }, { name: file.name, size: file.size, browser_download_url: url }] };
 const manifest = { schema: 1, version: '0.2.0', files: [file] };
+test('中文 UTF-8 ZIP 不依赖系统 unzip 编码，拒绝越界及截断的目录', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'garden-zip-'));
+  // ZIP fixtures produced by Python's zipfile, independently of the reader.
+  const valid = Buffer.from('UEsDBBQAAAgAABSbZV0Mfn/YBAAAAAQAAAAkAAAA6Iqx5Zut546L5Zu9LmFwcC9Db250ZW50cy9JbmZvLnBsaXN0dGVzdFBLAQIUAxQAAAgAABSbZV0Mfn/YBAAAAAQAAAAkAAAAAAAAAAAAAACAAQAAAADoirHlm63njovlm70uYXBwL0NvbnRlbnRzL0luZm8ucGxpc3RQSwUGAAAAAAEAAQBSAAAARgAAAAAA', 'base64');
+  const unsafe = Buffer.from('UEsDBBQAAAAAABSbZV0Mfn/YBAAAAAQAAAAKAAAALi4vb3V0c2lkZXRlc3RQSwECFAMUAAAAAAAUm2VdDH5/2AQAAAAEAAAACgAAAAAAAAAAAAAAgAEAAAAALi4vb3V0c2lkZVBLBQYAAAAAAQABADgAAAAsAAAAAAA=', 'base64');
+  try {
+    const path = join(dir, 'fixture.zip'); await writeFile(path, valid);
+    assert.deepEqual(await validateMacArchive(path), ['花园王国.app/Contents/Info.plist']);
+    await writeFile(path, unsafe); await assert.rejects(validateMacArchive(path), /路径无效/);
+    await writeFile(path, valid.subarray(0, valid.length - 10)); await assert.rejects(validateMacArchive(path), /目录缺失/);
+  } finally { await rm(dir, { recursive:true, force:true }); }
+});
 test('只接受正式升级、正确架构、固定仓库和匹配校验清单', () => {
   assert.equal(newerVersion('1.10.0','1.9.9'), true);
   assert.equal(newerVersion('0.1.0','0.2.0'), false);

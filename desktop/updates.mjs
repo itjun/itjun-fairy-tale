@@ -5,6 +5,7 @@ import { join, dirname, resolve } from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { RELEASES, releaseAssetUrl, selectUpdate } from './update-policy.mjs';
+import { validateMacArchive } from './zip-directory.mjs';
 const exec = promisify(execFile);
 
 // Node fetch is intentionally separate from the renderer's blocked network session.
@@ -56,8 +57,7 @@ export async function prepareInstaller({ app, file, cache }) {
   await access(dirname(target), constants.W_OK);
   const unpack = join(cache, 'unpacked');
   await rm(unpack, { recursive: true, force: true }); await mkdir(unpack, { recursive: true });
-  const { stdout } = await exec('/usr/bin/unzip', ['-Z1', file.path], { maxBuffer: 8 * 1024 * 1024 });
-  if (stdout.split('\n').filter(Boolean).some(name => name.startsWith('/') || name.split('/').includes('..') || (!name.startsWith('花园王国.app/') && !name.startsWith('__MACOSX/')))) throw new Error('更新压缩包路径无效');
+  await validateMacArchive(file.path);
   await exec('/usr/bin/ditto', ['-x', '-k', file.path, unpack]);
   const bundle = join(unpack, '花园王国.app');
   await exec('/usr/bin/codesign', ['--verify', '--deep', '--strict', bundle]);
