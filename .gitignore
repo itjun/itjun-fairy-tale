@@ -1,0 +1,12 @@
+node_modules/
+dist/
+legacy/
+*.zip
+.DS_Store
+data/
+docs/qa/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log

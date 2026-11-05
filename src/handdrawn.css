@@ -1,0 +1,110 @@
+/* 手写字体和真实彩笔 PNG 统一覆盖首页、跳台与成绩本。 */
+@font-face {
+  font-family: GardenHand;
+  src: url('/fonts/LXGWWenKai-Regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+:root {
+  --hand-font: GardenHand, 'Kaiti SC', KaiTi, serif;
+  --paper-panel: url('/assets/ui-paper-panel.png');
+  --paper-button: url('/assets/ui-button-cream.png');
+  --green-button: url('/assets/ui-button-green.png');
+  --pink-button: url('/assets/ui-button-pink.png');
+}
+body, #root, #root .platform-game, #root .score-screen {
+  font-family: var(--hand-font);
+}
+#root :is(h1,h2,h3,button,input,select,kbd,strong) {
+  font-family: var(--hand-font);
+}
+/* 九切片保留手绘边角，内容区随窗口伸缩，不把弹窗栅格化。 */
+#root :is(.adventure-menu,.modal,.invitation,.score-filters,.score-chart-card,.score-records,.score-summary>div,.level-score-list>div,.quest-card,.adventure-launch) {
+  border: 2px solid transparent;
+  border-image: var(--paper-panel) 96 fill / 18px / 0 stretch;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+#root :is(.primary-button,.quiet-button,.text-button,.icon-button,.sound-button,.world-help,.map-hotspot,.decorate-toggle,.family-choices button,.color-choices button,.flavor,.flower-pot button,.achievement-list button,.sticker-tools button,.gallery-controls button,.adventure-header button,.adventure-bottom button,.touch-controls button,.player-mode button,.score-presets button,.score-pagination button) {
+  border: 2px solid transparent;
+  border-image: var(--paper-button) 128 fill / 12px / 0 stretch;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #565441;
+  min-height: 44px;
+}
+#root :is(button,a).primary-button {
+  border-image-source: var(--green-button);
+  color: #263d24;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  min-height: 52px;
+}
+#root :is(.quiet-button,.text-button) { font-size: 16px; }
+#root .color-choices button { color: var(--choice); }
+#root :is(.player-mode button[aria-pressed=true],.score-presets button[aria-pressed=true],.flavor[aria-pressed=true],.sticker-tools button[aria-pressed=true]) {
+  border-image-source: var(--green-button);
+  color: #263d24;
+}
+#root .touch-controls .touch-jump {
+  border-image-source: var(--pink-button);
+  color: #713752;
+}
+#root :is(.adventure-title,.adventure-score,.adventure-message,.adventure-bottom>span,.level-progress,.place-label,.collection) {
+  border: 2px solid transparent;
+  border-image: var(--paper-panel) 96 fill / 13px / 0 stretch;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#root .level-choices button {
+  border: 2px solid transparent;
+  border-image: var(--paper-panel) 96 fill / 13px / 0 stretch;
+  border-radius: 0;
+  background: transparent;
+}
+#root .level-choices button[aria-pressed=true] {
+  border-image-source: var(--green-button);
+  border-image-slice: 128 fill;
+}
+#root .level-choices button[aria-pressed=true] :is(strong,small,span) { color: #314629; }
+#root :is(.adventure-menu,.modal) { box-shadow: 0 12px 30px #5a442418; }
+#root .adventure-menu:not(.level-menu) { padding: 28px 32px; }
+#root .adventure-menu:not(.level-menu) h2 { font-size: 32px; color: #4e6042; }
+#root .adventure-menu:not(.level-menu) p { font-size: 18px; color: #78664f; }
+#root .adventure-menu-actions { gap: 10px; }
+#root .adventure-menu-actions>.text-button { min-width: 180px; padding: 9px 18px; }
+#root .adventure-menu .menu-row { gap: 12px; }
+#root .adventure-menu .menu-row button { padding: 10px 18px; }
+#root :is(button,a,input,select):focus-visible {
+  outline: 3px dashed #477b9f;
+  outline-offset: 4px;
+}
+#root button:hover:not(:disabled) { filter: brightness(1.025); }
+#root button:active:not(:disabled) { filter: brightness(.98); }
+#root button:disabled { filter: grayscale(.6); opacity: .5; }
+#root .score-screen :is(input,select) {
+  font-family: var(--hand-font);
+  border: 2px solid transparent;
+  border-image: var(--paper-button) 128 fill / 10px / 0 stretch;
+  background: transparent;
+}
+#root .score-screen :is(td,th) { font-family: var(--hand-font); font-size: 15px; }
+#root .score-summary strong { font-family: var(--hand-font); }
+#root .adventure-score { font-size: 16px; }
+#root .adventure-message { font-size: 17px; }
+@media(max-width:850px) {
+  #root .level-menu .adventure-menu-actions { gap: 8px; }
+  #root .level-menu .adventure-menu-actions>.text-button { min-height: 42px; }
+}
+@media(max-width:650px) {
+  #root .adventure-menu:not(.level-menu) { padding: 24px 20px; }
+  #root .adventure-menu:not(.level-menu) h2 { font-size: 27px; }
+  #root .adventure-menu:not(.level-menu) p { font-size: 16px; }
+  #root .adventure-score { font-size: 13px; }
+  #root .adventure-message { font-size: 15px; }
+}
