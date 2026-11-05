@@ -2,23 +2,48 @@
 
 根据一位 6 岁小画家的 11 幅作品制作的亲子游戏。Three.js 渲染立体跳台和彩笔纸片角色；城堡、家人、花朵、彩虹与冰淇淋来自原画风格的生成素材。保留原花园互动与全部原画画展。按钮与弹窗使用真实彩笔纸张纹理，中文使用随包提供的霞鹜文楷手写字体，离线可用，字体许可见 `public/fonts/OFL.txt`。
 
-## Windows 家庭电脑
+[下载安装最新版](https://github.com/itjun/itjun-fairy-tale/releases/latest) · [问题反馈](https://github.com/itjun/itjun-fairy-tale/issues) · [MIT 许可证](LICENSE)
 
-1. 安装 Node.js **22.13 或更高版本，建议 24+**。使用新版 Edge / Chrome，开启图形加速，需支持 WebGL 2。
-2. 解压整个项目，双击 `启动花园王国.cmd`。第一次自动安装组件，需要联网；之后素材和成绩都在本机。
-3. 构建完成、服务启动后会打开浏览器。保持命令窗口打开，结束时按 Ctrl+C。若浏览器没有自动打开，访问 http://127.0.0.1:4173/ 。
+## macOS / Windows 桌面版
 
-也可以手动启动：
+Electron 桌面版启动即全屏，安装后无需 Node 或浏览器，游戏可离线运行；联网时可检查更新。macOS 提供 Apple Silicon / Intel 的 DMG 和 ZIP；Windows 提供 x64 / ARM64 的安装程序。打包产物在 `release/`，不包含家庭 SQLite 数据和测试存档。
+
+- 首页与探险暂停菜单有“全屏 / 窗口”“保存并退出”。F11 切换全屏，macOS 也支持 Control + Command + F；Esc 暂停游戏。
+- 关闭窗口、Command + Q 或 Alt + F4 都先保存本局再退出；保存失败会提示留在游戏重试。重复打开只唤起原窗口。
+- 成绩存在系统用户数据目录下的 `花园王国/saves/garden.sqlite`：macOS 通常位于 `~/Library/Application Support/`，Windows 通常位于 `%APPDATA%/`。更新应用不覆盖成绩。
+- 原生菜单“成绩本”提供备份、导入旧版 SQLite 和打开存档目录。Windows 全屏时按 Alt 可显示菜单，也可先切换窗口。
+- 原花园的小成就、贴纸仍保存在应用的本地存储。旧浏览器进度不会自动继承：在网页首页底部“家长工具”导出 JSON，再到桌面版导入；已有成就会合并保留。SQLite 备份仅包含跳台成绩。
+- macOS 安装包当前采用本地 ad-hoc 签名，未做 Apple Developer ID 签名和公证；Windows 包未做发布者签名。首次下载时系统可能要求确认开发者来源。Mac 安装后请将应用移到可写的“应用程序”目录，不要在 DMG 中运行；自动更新不会绕过系统首次安装确认。
+
+## 开发与打包
+
+开发环境固定 Node **26.13.0 LTS**（见 `.nvmrc`）。Electron **45.2.3 stable** 自带 Node **24.22.2 LTS**，无需终端用户安装 Node。Electron 没有 LTS 分支，按官方最近三个稳定主版本的支持政策更新；React **19.3.1**、Vite **8.3.5** 等采用当前稳定版并锁入 lockfile。
 
 ```sh
 npm ci
+npm start              # 构建并打开全屏 Electron
 npm run build
-npm run play
+npm test               # 物理、计分、SQLite、桌面协议、迁移和 Sites
+npm run desktop:test   # 独立临时存档：全屏、真实跳跃、关闭保存、重启检查
+npm run pack:mac       # macOS Apple Silicon + Intel
+npm run pack:win       # Windows 安装包
 ```
 
-无需复制其他电脑的 `node_modules`。服务默认只监听本机 `127.0.0.1:4173`，没有公开部署、账号、广告、付费或远程数据收集。
+推荐在对应系统打包。跨平台打包成功不等于目标系统真机验收。GitHub Actions 的发布流程与校验见下文。
 
-**积分需要 Node 服务。** 不能直接双击 HTML，也不能只把 `dist/client/` 放到静态服务器。保留的 Sites worker 仅供原有静态运行环境使用，不提供本轮 SQLite 接口。
+应用图标源图为 `build/icon-source.png`，由内置 Image Gen 按彩笔城堡风格生成；`npm run icons` 可重建 ICNS / ICO / PNG 及网页图标，完整提示词见 `docs/asset-prompts-desktop.md`。
+
+## 保留的网页版本
+
+```sh
+npm run dev            # 网页开发服务
+npm run build
+npm run play -- --open # 本机浏览器版本
+```
+
+网页版默认只监听 `127.0.0.1:4173`，SQLite 仍位于项目 `data/garden.sqlite`；开发模式首次打开 Electron 时会快照复制此数据库到桌面存档目录，原文件不修改。打包版从“成绩本 → 导入成绩本”导入旧库。
+
+桌面版使用固定 `garden://app` 地址，直接在应用内处理 `/api/`，无需监听 HTTP 端口。渲染进程使用隔离上下文和沙箱，外部网络默认禁用。保留的 Sites worker 不提供 SQLite 接口；原 Sites 文件结构保持完整。
 
 ## 关卡与操作
 
@@ -106,3 +131,34 @@ npm run build
 原有 `.openai/hosting.json`、`worker/` 和构建脚本保留。`npm run build` 输出 `dist/client` 及 Sites 兼容文件；家庭电脑实际使用 `server/index.mjs` 提供页面和 SQLite API。所有运行资源随包交付，无远程 CDN。
 
 已在本机浏览器验证真实通关、积分写入、关卡切换、统计筛选、断开服务后补存。Windows 真机、长时间运行和手机实体多点触控尚未实测。详细证据见 `design-qa.md`。
+
+## 一键本机构建与启动
+
+安装 `.nvmrc` 指定的 Node LTS 和 Python 3 后，在仓库根目录执行：
+
+```sh
+python build.py
+# macOS 如果命令名是 python3：
+python3 build.py
+# 只构建安装，不启动：
+python3 build.py --no-launch
+```
+
+脚本先让本游戏旧进程保存退出，等待 15 秒后仅强制结束仍存活的项目进程，再执行 `npm ci`、构建、测试、按本机架构打包并安装。macOS 安装到可写的 `/Applications`，否则使用 `~/Applications`；Windows 使用当前用户的 `%LOCALAPPDATA%/Programs/GardenKingdom`。成功后启动全屏游戏。旧程序替换时保留回退副本，用户数据目录不会被覆盖。Node 版本不匹配时会提前停止，不修改全局 Node。
+
+## 发布新版与自动更新
+
+维护者修改 `package.json` / lockfile 的版本号和 `docs/release-notes.md` 后，提交并推送对应标签：
+
+```sh
+npm version patch
+git push origin main --follow-tags
+```
+
+`.github/workflows/desktop.yml` 为 macOS / Windows 的 ARM64、x64 分别构建。全部成功后生成 `garden-update.json`（架构、文件大小、SHA-512）和 `SHA256SUMS.txt`，先上传到草稿 Release，资产齐全后公开为最新版。普通分支 push 不发布；手动运行只上传构建产物。版本标签必须与 package 版本一致，失败的任务不会发布不完整的新版。
+
+应用启动 12 秒后及每 4 小时检查 GitHub 最新正式版本，也可以点“检查更新”。新版自动下载；进入首页或暂停/结算界面后等待 5 秒，自动保存当前成绩、安装、重启全屏。正在跳跃时不会自动重启；暂停局会结束并保存，更新后重新选关。断网、校验失败或保存失败均保留现有应用和存档，可以稍后重试。
+
+更新器只接受本仓库的稳定版本，拒绝降级、错误架构与哈希不匹配的包。Windows 使用当前用户 NSIS 静默安装；Mac 校验应用标识、版本、架构及 ad-hoc 签名后，在原应用目录暂存、退出后原子替换并保留 `.previous` 回退副本。当前不使用需要 Developer ID 的 Squirrel.Mac；SHA-512 校验依赖 GitHub 发布账户和 HTTPS 的可信性，不能替代发布者签名。Mac 原位置不可写或位于磁盘映像时会提示迁移目录。更新失败信息在界面显示；存档独立于安装位置。
+
+代码及本仓库自有素材按 MIT 开源。原画署名为“花园王国小画家”；霞鹜文楷使用 SIL OFL，详见 [素材与第三方说明](THIRD_PARTY_NOTICES.md)。不包含用户的真实成绩、存档或测试截图。

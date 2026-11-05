@@ -126,3 +126,27 @@ final result: passed
 ## 未测项与后续微调
 
 Windows 真机、手机实体多点触控、数小时持续游玩未实测。当前真实历史集中于同一天，跨日期边界由自动化数据验证；不伪造孩子历史成绩填充曲线。P3 可在积累真实记录后继续调整刻度密度。
+# Electron 桌面基座验收 · 2026-11-05
+
+final result: passed
+
+范围：macOS 本机运行与桌面视觉、源码自动测试、macOS/Windows 安装包结构及图标。Windows、Intel Mac、Windows ARM64 尚未做目标机器上的实际运行验收；CI 矩阵已配置，未触发远程运行。
+
+- 技术栈：开发 Node 26.13.0 LTS，Electron 45.2.3 stable（内置 Node 24.22.2 LTS），React 19.3.1，Vite 8.3.5，electron-builder 26.18.0。无预发布依赖。
+- 23 项自动测试通过，涵盖原有物理/积分/SQLite、固定桌面来源、文件路径边界、事务式成绩导入、花园进度合并和 Sites 兼容文件。
+- Electron 独立临时存档实测：全屏启动、真实键盘跳跃收集、积分写入、退出等待保存、重启后总分与 localStorage 保留；最终测试局 40 分，独立于家庭数据。
+- 打包的 macOS ARM64 应用通过 CUA 实际打开：全屏、八关选择、卡通关卡、暂停、保存退出。退出后测试库记录状态为 ended。截图：`docs/qa/electron-packaged-pause.png`（本地 QA 文件，不打包）。
+- 视觉：沿用现有纸张弹窗、彩笔按钮、手写字体与关卡插图；新增全屏/退出按钮使用同一按钮样式，暂停菜单完整显示，未遮挡继续探险。图标保留参考画的蓝色尖顶、粉色墙、青绿墙、彩虹与花朵；透明外围和粗轮廓在缩小后仍能辨认。
+- 图标：内置 Image Gen 生成，源图及完整提示词见 `docs/asset-prompts-desktop.md`；ICNS 包含 16–1024 像素，ICO 包含 16–256 像素共 6 档。Windows x64 / ARM64 可执行程序及 x64 安装器的图标资源均检查通过。
+- 打包：macOS ARM64 / x64 DMG+ZIP，Windows x64 / ARM64 安装器及双架构安装器构建成功；4 个应用包的 asar 均与最终前端产物一致，不含 SQLite、测试数据、测试脚本或 QA 截图。
+- macOS 两架构的 ad-hoc 签名均通过 codesign --verify --deep --strict；尚无 Developer ID 公证或 Windows 发布者签名。
+- 网页保留版本在 IAB 打开，八关与计分说明正常。原画字体和所有素材保持本地引用；未公开部署。
+
+## 开源桌面发布与自动更新
+
+- Mac ARM64：`python3 build.py` 完成旧进程退出、冻结依赖安装、构建、测试、签名校验、替换安装与全屏启动。
+- 27 项自动测试通过，包括固定仓库、稳定版本与架构限制、损坏包拒绝、安全状态安装、断网重试、Mac 替换及失败回退。
+- 桌面实测全屏启动、真实键盘跳跃、收集 50 分、保存退出、重启后 SQLite 与本地进度保留。测试档案与家庭存档隔离。
+- 初版没有公开旧版本可验证完整跨版本升级；Windows 静默更新、Intel 与 Windows ARM 真机尚未验收。Mac 使用 ad-hoc 签名，Windows 未签名。
+- 发布审查：Git 历史不包含 data、SQLite 或 QA 截图，凭据模式扫描无命中；原画副本 EXIF 不含 GPS 字段。
+- final result: passed（已执行的本机验证）；跨系统真机和后续正式版本升级仍需验收。

@@ -1,0 +1,66 @@
+name: Build and release desktop
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        arch: [arm64, x64]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - if: runner.os == 'macOS'
+        run: npm run desktop:test
+      - if: runner.os == 'macOS'
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - if: runner.os == 'Windows'
+        run: npx electron-builder --win --${{ matrix.arch }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: garden-${{ runner.os }}-${{ matrix.arch }}
+          path: |
+            release/GardenKingdom-*.dmg
+            release/GardenKingdom-*.zip
+            release/GardenKingdom-*.exe
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: garden-*
+          path: release
+          merge-multiple: true
+      - name: Validate tag and generate update manifest
+        run: |
+          node --input-type=module -e 'import p from "./package.json" with {type:"json"}; if (process.env.GITHUB_REF_NAME !== `v${p.version}`) process.exit(1)'
+          node scripts/release-manifest.mjs
+      - name: Publish complete release atomically
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "花园王国 $GITHUB_REF_NAME" --notes-file docs/release-notes.md release/GardenKingdom-* release/garden-update.json release/SHA256SUMS.txt
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
