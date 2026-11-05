@@ -25,7 +25,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
   function changeStatus(value) { statusRef.current = value; setStatus(value); }
   function snapshotRun(snapshot, state) {
     if (!run.current || ['completed', 'ended'].includes(run.current.status)) return null;
-    run.current = { ...run.current, flowers: snapshot.flowers, platform: snapshot.platform, seconds: snapshot.seconds, status: state, revision: run.current.revision + 1 };
+    run.current = { ...run.current, flowers: snapshot.flowers, collectedIds: snapshot.collectedIds || [], platform: snapshot.platform, seconds: snapshot.seconds, status: state, revision: run.current.revision + 1 };
     return run.current;
   }
   async function persist(snapshot, state) {
@@ -104,7 +104,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
   function start() {
     if (statusRef.current === 'playing') return;
     if (!run.current || ['completed', 'ended'].includes(run.current.status)) {
-      run.current = { id: crypto.randomUUID(), levelId: level.id, startedAt: new Date().toISOString(), players: count, seed, revision: 0, status: 'playing' };
+      run.current = { id: crypto.randomUUID(), levelId: level.id, startedAt: new Date().toISOString(), players: count, seed, scoringVersion: 2, revision: 0, status: 'playing' };
     }
     try { const Audio = window.AudioContext || window.webkitAudioContext; if (Audio && sound.current) { audio.current ||= new Audio(); audio.current.resume(); } } catch { /* 可静音游玩。 */ }
     engine.current?.pause(false); changeStatus('playing'); persist(engine.current.snapshot(), 'playing');
@@ -128,7 +128,8 @@ export function PlatformGame({ onExit, initialSound = true }) {
       <div className="adventure-title"><small>第 {levelIndex + 1} 关 / 花园王国</small><h1>{level.name}</h1></div>
       <div className="adventure-actions"><button aria-label={isSound ? '关闭探险声音' : '打开探险声音'} onClick={() => { sound.current = !isSound; setIsSound(!isSound); if (sound.current) { try { const Audio = window.AudioContext || window.webkitAudioContext; if (Audio) { audio.current ||= new Audio(); audio.current.resume(); } } catch {} } }}>{isSound ? <SpeakerHigh size={24} /> : <SpeakerSlash size={24} />}</button><button aria-label="暂停探险" disabled={status !== 'playing'} onClick={pause}><Pause size={24} weight="fill" /></button></div>
     </header>
-    <aside className="adventure-score" aria-label="探险收集"><span><Trophy size={24} />积分 <b>{stats.score}</b></span><span><Star size={22} />宝物 <b>{stats.flowers}/{level.requiredFlowers}</b></span><span className="infinite-life"><Heart size={23} />无限生命</span></aside>
+    <div className="score-popups" aria-hidden="true">{stats.pickups?.map(pickup=><span key={pickup.id} className="score-popup" style={{left:`${Math.max(12,Math.min(88,pickup.x))}%`,top:`${Math.max(30,Math.min(75,pickup.y))}%`,animationPlayState:status==='playing'?'running':'paused'}}><img src={`./assets/${COLLECTIBLES[pickup.kind].image}.png`} alt=""/>+{pickup.points} 分</span>)}</div>
+    <aside className="adventure-score" aria-label="探险收集"><span><Trophy size={24} />积分 <b key={stats.score} className="score-total">{stats.score}</b>{stats.pickups?.length>0&&<em className="score-gain" key={stats.pickups.at(-1).id}>+{stats.pickups.at(-1).points}</em>}</span><span><Star size={22} />宝物 <b>{stats.flowers}/{level.requiredFlowers}</b></span><span className="infinite-life"><Heart size={23} />无限生命</span></aside>
     <div className="level-progress"><span>跳台 {stats.platform} / {level.platforms}</span><progress value={stats.platform} max={level.platforms} aria-label="关卡进度" /></div>
     <div className="adventure-message" role="status">{stats.message}</div>
     <div className="adventure-bottom" inert={status !== 'playing'}><span>{count === 1 ? '小女孩：A D / ← → 移动，空格 / ↑ 跳跃' : '小女孩：A D + 空格　爸爸：← → + ↑'}<small className={sync.isSaved?'':'save-pending'}>{sync.message}</small></span><button onClick={() => engine.current?.returnToSafety()} disabled={status !== 'playing'}><ArrowsClockwise size={19} />回安全台</button></div>
@@ -136,12 +137,12 @@ export function PlatformGame({ onExit, initialSound = true }) {
     {status !== 'playing' && <div className="adventure-overlay" inert={isScores}><section ref={menu} onKeyDown={trapMenuFocus} className={`adventure-menu ${status==='ready'?'level-menu':''}`} role="dialog" aria-modal="true" aria-labelledby="adventure-heading">
       <span className="adventure-kicker">带着画里的自己，去看更大的世界</span>
       <h2 id="adventure-heading">{status === 'loading' ? '彩笔世界准备中…' : status === 'error' ? '画面需要一点帮助' : isChangeMap ? '换一张新地图？' : status === 'completed' ? `${level.name}，挑战成功！` : status === 'ended' ? '今天的小脚印，收好啦' : status === 'paused' ? '坐下来，歇一小会儿' : '选一个小世界，出发吧'}</h2>
-      {status === 'error' ? <p>{error}</p> : status === 'loading' ? <p>把新的风景和小伙伴放进画里。</p> : isChangeMap ? <p>这次积分会先保存，再为你重新排列跳台。</p> : isResult ? <><div className="result-score"><Trophy size={38} weight="duotone" /><strong>{stats.score}</strong><span>分</span></div><p>宝物 {stats.flowers} × 10 分{status==='completed'?` ＋ 通关奖励 ${level.bonus} 分`:''}</p><div className="collectible-preview" aria-label="本次收集">{Object.entries(stats.collection || {}).map(([id,total])=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt={COLLECTIBLES[id].name}/>{total}</span>)}</div><p className={sync.isSaved?'result-saved':'save-pending'} role="status">{sync.isSaved&&<Check size={18}/>} {sync.message}</p>{!sync.isSaved&&<button className="quiet-button" onClick={()=>persist(stats,status)}>重试保存</button>}</> : status==='paused' ? <p>已经收集 {stats.flowers} 件宝物，得到 {stats.score} 分。<br/>休息时不计时，掉落也不扣分。</p> : <>
+      {status === 'error' ? <p>{error}</p> : status === 'loading' ? <p>把新的风景和小伙伴放进画里。</p> : isChangeMap ? <p>这次积分会先保存，再为你重新排列跳台。</p> : isResult ? <><div className="result-score"><Trophy size={38} weight="duotone" /><strong>{stats.score}</strong><span>分</span></div><p>宝物积分 {stats.score - (status==='completed'?level.bonus:0)} 分{status==='completed'?` ＋ 通关奖励 ${level.bonus} 分`:''}</p><div className="collectible-preview" aria-label="本次收集">{Object.entries(stats.collection || {}).map(([id,total])=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt={COLLECTIBLES[id].name}/>{COLLECTIBLES[id].name} {total} × {COLLECTIBLES[id].points} = {total * COLLECTIBLES[id].points} 分</span>)}</div><p className={sync.isSaved?'result-saved':'save-pending'} role="status">{sync.isSaved&&<Check size={18}/>} {sync.message}</p>{!sync.isSaved&&<button className="quiet-button" onClick={()=>persist(stats,status)}>重试保存</button>}</> : status==='paused' ? <p>已经收集 {stats.flowers} 件宝物，得到 {stats.score} 分。<br/>休息时不计时，掉落也不扣分。</p> : <>
         <div className="level-choices" aria-label="选择挑战关卡">{LEVELS.map((item,index)=><button key={item.id} aria-pressed={index===levelIndex} onClick={()=>setLevelIndex(index)}><img src={`./assets/${item.image}.png`} alt={item.subtitle}/><span>第 {index+1} 关</span><strong>{item.name}</strong><small>{item.platforms} 个跳台 / 收集 {item.requiredFlowers} 件宝物</small><small>通关加 {item.bonus} 分</small></button>)}</div>
         <p className="level-source">{level.sources.length ? `这一关组合了原画 ${level.sources.join('、')} 的元素。` : level.story} 收集宝物，再到最后的终点台。</p>
-        <div className="collectible-preview" aria-label="这一关的宝物">{LEVEL_COLLECTIBLES[level.id].map(id=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt=""/>{COLLECTIBLES[id].name}</span>)}</div>
+        <div className="collectible-preview" aria-label="这一关的宝物">{LEVEL_COLLECTIBLES[level.id].map(id=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt=""/>{COLLECTIBLES[id].name} <b>{COLLECTIBLES[id].points} 分</b></span>)}</div>
         <div className="player-mode"><button aria-pressed={count===1} onClick={()=>setCount(1)}><img src="./assets/girl-player.png" alt=""/><span>自己探险</span></button><button aria-pressed={count===2} onClick={()=>setCount(2)}><Users size={28}/><span>和爸爸一起</span></button></div>
-        <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span>{count===2&&<span>爸爸用 <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd></span>}</div><small className="game-reassurance">每件宝物 10 分。无限生命，没有倒计时。</small>
+        <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span>{count===2&&<span>爸爸用 <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd></span>}</div><small className="game-reassurance">不同宝物有不同积分。无限生命，没有倒计时。</small>
       </>}
       <div className="adventure-menu-actions">
         {['ready','paused'].includes(status)&&!isChangeMap&&<button className="primary-button" onClick={start}><Play size={21} weight="fill"/>{status==='paused'?'继续探险':'出发吧'}<ArrowRight size={21}/></button>}

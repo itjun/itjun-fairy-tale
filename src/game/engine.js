@@ -12,6 +12,8 @@ export class GardenEngine {
     this.level = level;
     this.collectibleKinds = collectibleSequence(level.id, seed, level.platforms);
     this.collection = {};
+    this.collectedIds = [];
+    this.pickups = [];
     this.isCompleted = false;
     this.furthestPlatform = 0;
     this.isDisposed = false;
@@ -189,7 +191,10 @@ export class GardenEngine {
         if (!view.isCollected && Math.abs(player.x - platform.x) < 0.8 && Math.abs(player.y + 0.9 - (platform.y + 1.05)) < 1.3) {
           view.isCollected = true; view.collectible.visible = false; this.collected++;
           this.collection[view.kind] = (this.collection[view.kind] || 0) + 1;
-          this.callbacks.onSound('flower'); this.publish(`找到${COLLECTIBLES[view.kind].phrase}，增加 10 分！`);
+          this.collectedIds.push(platform.id);
+          const item = COLLECTIBLES[view.kind];
+          this.pickups.push({ id: platform.id, kind: view.kind, points: item.points, x: platform.x, y: platform.y + 2.5, at: this.elapsed });
+          this.callbacks.onSound('flower'); this.publish(`找到${COLLECTIBLES[view.kind].phrase}，+${COLLECTIBLES[view.kind].points} 分！`);
         }
       }
     });
@@ -206,8 +211,13 @@ export class GardenEngine {
     }
   }
   snapshot() {
-    return { flowers: this.collected, collection: { ...this.collection }, distance: this.distance, gardens: Math.floor(this.checkpoint / 6), platform: this.furthestPlatform,
-      seconds: Math.floor(this.elapsed), score: calculateScore(this.collected, this.isCompleted, this.level), isCompleted: this.isCompleted,
+    this.pickups = this.pickups.filter(pickup => this.elapsed - pickup.at < 2.2);
+    const pickups = this.pickups.map(pickup => {
+      const position = new THREE.Vector3(pickup.x, pickup.y, 0.5).project(this.camera);
+      return { id: pickup.id, kind: pickup.kind, points: pickup.points, x: (position.x + 1) * 50, y: (1 - position.y) * 50 };
+    });
+    return { flowers: this.collected, collectedIds: [...this.collectedIds], pickups, collection: { ...this.collection }, distance: this.distance, gardens: Math.floor(this.checkpoint / 6), platform: this.furthestPlatform,
+      seconds: Math.floor(this.elapsed), score: calculateScore(this.collection, this.isCompleted, this.level), isCompleted: this.isCompleted,
       message: this.message, positions: this.players.map(p => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), recoveries: p.recoveries })), platforms: this.platforms.length };
   }
   publish(message) {
