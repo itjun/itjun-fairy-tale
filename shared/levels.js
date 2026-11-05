@@ -1,3 +1,4 @@
+import { collectionPoints } from './collectibles.js';
 // requiredFlowers / flowers 保留旧版字段名，统一表示宝物数量，兼容既有 SQLite 成绩。
 export const LEVELS = Object.freeze([
   { id: 'rainbow', name: '彩虹花园', subtitle: '跟着彩虹找宝物', image: 'level-rainbow', sources: [1, 2, 6, 9], platforms: 8, requiredFlowers: 4, bonus: 50, gapMin: 0.8, gapRange: 0.6, rise: 1, color: '#b65d83', side: '#dfb6cd' },
@@ -10,5 +11,5 @@ export const LEVELS = Object.freeze([
   { id: 'cartoon', name: '卡通梦工场', subtitle: '跟机器人和恐龙去冒险', image: 'level-cartoon', sources: [], backdropWidth: 30, backdropY: -1.5, backdropOffset: 4, story: '机器人、恐龙和小火箭，邀请你参加气球派对。', platforms: 12, requiredFlowers: 8, bonus: 100, gapMin: 1.1, gapRange: 0.8, rise: 1.4, color: '#b4556c', side: '#dcb8e9', surface: 'paper-texture', topColor: '#efb5de', finish: 'collectible-balloon' },
 ]);
 export function findLevel(id) { return LEVELS.find(level => level.id === id); }
-export function calculateScore(flowers, isCompleted, level) { return flowers * 10 + (isCompleted ? level.bonus : 0); }
+export function calculateScore(flowers, isCompleted, level) { return (typeof flowers === 'number' ? flowers * 10 : collectionPoints(flowers)) + (isCompleted ? level.bonus : 0); }
 export function hasCompleted(level, flowers, platform) { return flowers >= level.requiredFlowers && platform >= level.platforms; }

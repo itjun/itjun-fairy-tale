@@ -110,3 +110,66 @@ test('本机 HTTP 实际写入、读取、错误响应和跨来源保护', async
     assert.match(await (await fetch(url+'/')).text(), /花园王国/);
   } finally { await new Promise(resolve=>server.close(resolve)); }
 });
+
+test('不同宝物按位置和种子计分，跳过、回头、双人重复及乱序保存不会多算', () => {
+  const store = openStore(':memory:');
+  try {
+    // seed 123 的彩虹关依次是小花、星星、彩虹、爱心，允许跳过前面的宝物。
+    const run = fixture({ scoringVersion: 2, collectedIds: [3], flowers: 1, platform: 3, score: 9999 });
+    assert.equal(store.save(run).score, 50);
+    assert.equal(store.save({ ...run, revision: 2, collectedIds: [3, 1], flowers: 2 }).score, 60);
+    assert.equal(store.save({ ...run, revision: 1 }).score, 60);
+    // 较新但不完整的快照合并已有拾取，不撤销先前积分。
+    assert.equal(store.save({ ...run, revision: 3, collectedIds: [2], flowers: 1 }).score, 100);
+    const result = store.save({ ...run, revision: 4, collectedIds: [1, 2, 3, 4], flowers: 4, platform: 8, status: 'completed' });
+    assert.equal(result.score, 175);
+    assert.deepEqual(result.collectedIds, [1, 2, 3, 4]);
+    assert.equal(store.save({ ...run, revision: 5 }).score, 175);
+    assert.equal(store.report(range).summary.total, 175);
+    assert.throws(() => store.save(fixture({ scoringVersion: 2, collectedIds: [1, 1] })), /重复/);
+    assert.throws(() => store.save(fixture({ scoringVersion: 2, collectedIds: [0, 9] })), /位置/);
+    assert.throws(() => store.save(fixture({ scoringVersion: 2, collectedIds: [1] })), /不一致/);
+    assert.throws(() => store.save({ ...run, scoringVersion: 1, revision: 6 }), /规则不能改变/);
+  } finally { store.close(); }
+});
+
+test('旧 SQLite 平滑升级，旧局继续按 10 分，新局和曲线使用不同宝物分值', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const dir = mkdtempSync(join(tmpdir(), 'garden-score-migrate-'));
+  const path = join(dir, 'old.sqlite');
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE runs (id TEXT PRIMARY KEY, levelId TEXT NOT NULL, startedAt TEXT NOT NULL, updatedAt TEXT NOT NULL, players INTEGER NOT NULL, seed INTEGER NOT NULL, flowers INTEGER NOT NULL, platform INTEGER NOT NULL, seconds INTEGER NOT NULL, revision INTEGER NOT NULL, status TEXT NOT NULL, score INTEGER NOT NULL); PRAGMA user_version=1;`);
+  const legacy = fixture();
+  old.prepare('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(legacy.id, legacy.levelId, legacy.startedAt, legacy.startedAt, 1, 123, 2, 2, 30, 1, 'playing', 20);
+  old.close();
+  let store = openStore(path);
+  try {
+    assert.equal(store.report(range).summary.total, 20);
+    assert.equal(store.save({ ...legacy, revision: 2, flowers: 3, status: 'ended' }).score, 30);
+    const run = fixture({ scoringVersion: 2, collectedIds: [2, 3], flowers: 2, status: 'ended' });
+    assert.equal(store.save(run).score, 90);
+    store.close(); store = openStore(path);
+    const report = store.report(range);
+    assert.equal(report.summary.total, 120);
+    assert.equal(report.summary.average, 60);
+    assert.equal(report.summary.best, 90);
+    assert.equal(report.days[0].average, 60);
+    assert.deepEqual(report.points.map(point => point.score).sort((a,b)=>a-b), [30, 90]);
+    assert.equal(report.records.find(row=>row.id===legacy.id).scoringVersion, 1);
+    assert.equal(report.records.find(row=>row.id===run.id).scoringVersion, 2);
+  } finally { store.close(); rmSync(dir, { recursive: true }); }
+});
+
+test('新版 HTTP 记录忽略客户端分数，以宝物明细算分并持久化', async () => {
+  const { server } = createGardenServer({ databasePath: ':memory:', clientPath: 'dist/client' });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const run = fixture({ scoringVersion: 2, collectedIds: [1, 3], flowers: 2, status: 'ended', score: 9999 });
+    const response = await fetch(url+'/api/runs',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(run)});
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).run.score, 60);
+    const report = await (await fetch(url+'/api/scores?'+new URLSearchParams(range))).json();
+    assert.equal(report.points[0].score, 60);
+  } finally { await new Promise(resolve=>server.close(resolve)); }
+});

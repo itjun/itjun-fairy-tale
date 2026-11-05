@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { findLevel, calculateScore, hasCompleted } from '../shared/levels.js';
+import { collectionForPlatforms } from '../shared/collectibles.js';
 
 export class InputError extends Error { constructor(message) { super(message); this.status = 400; } }
 function integer(value, min, max, label) { if (!Number.isInteger(value) || value < min || value > max) throw new InputError(`${label}不正确`); return value; }
@@ -13,10 +14,20 @@ export function validateRun(input) {
   const started = Date.parse(input.startedAt);
   if (!Number.isFinite(started) || started < Date.UTC(2020, 0, 1) || started > Date.now() + 300000) throw new InputError('游玩时间不正确');
   const flowers = integer(input.flowers, 0, level.platforms, '小花数量');
+  const scoringVersion = input.scoringVersion === undefined ? 1 : integer(input.scoringVersion, 1, 2, '计分规则');
+  const seed = integer(input.seed, 0, 4294967295, '地图编号');
+  let collectedIds = [];
+  if (scoringVersion === 2) {
+    if (!Array.isArray(input.collectedIds) || input.collectedIds.length !== flowers) throw new InputError('宝物明细与数量不一致');
+    collectedIds = input.collectedIds.map(id => integer(id, 1, level.platforms, '宝物位置'));
+    if (new Set(collectedIds).size !== collectedIds.length) throw new InputError('同一件宝物不能重复计分');
+    collectedIds.sort((a, b) => a - b);
+  }
   const platform = integer(input.platform, 0, level.platforms, '跳台进度');
   if (!['playing', 'paused', 'ended', 'completed'].includes(input.status)) throw new InputError('记录状态不正确');
   if (input.status === 'completed' && !hasCompleted(level, flowers, platform)) throw new InputError('还没完成关卡目标');
-  return { id: input.id, levelId: level.id, startedAt: new Date(started).toISOString(), players: integer(input.players, 1, 2, '玩家数量'), seed: integer(input.seed, 0, 4294967295, '地图编号'), flowers, platform, seconds: integer(input.seconds, 0, 604800, '游玩时长'), revision: integer(input.revision, 1, 10000000, '记录版本'), status: input.status, score: calculateScore(flowers, input.status === 'completed', level) };
+  const collection = scoringVersion === 2 ? collectionForPlatforms(level.id, seed, collectedIds, level.platforms) : flowers;
+  return { id: input.id, levelId: level.id, startedAt: new Date(started).toISOString(), players: integer(input.players, 1, 2, '玩家数量'), seed, scoringVersion, collectedIds, flowers, platform, seconds: integer(input.seconds, 0, 604800, '游玩时长'), revision: integer(input.revision, 1, 10000000, '记录版本'), status: input.status, score: calculateScore(collection, input.status === 'completed', level) };
 }
 export function openStore(path) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -29,26 +40,42 @@ export function openStore(path) {
       status TEXT NOT NULL, score INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS runs_started ON runs(startedAt);
-    CREATE INDEX IF NOT EXISTS runs_level_started ON runs(levelId, startedAt);
-    PRAGMA user_version=1;`);
+    CREATE INDEX IF NOT EXISTS runs_level_started ON runs(levelId, startedAt);`);
+  // 旧记录保持原分数和旧规则，旧页面/离线队列也可以继续保存。
+  const columns = db.prepare('PRAGMA table_info(runs)').all().map(column => column.name);
+  if (!columns.includes('scoringVersion')) {
+    db.exec(`BEGIN;
+      ALTER TABLE runs ADD COLUMN scoringVersion INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE runs ADD COLUMN collectedIds TEXT NOT NULL DEFAULT '[]';
+      PRAGMA user_version=2;
+      COMMIT;`);
+  }
   const get = db.prepare('SELECT * FROM runs WHERE id = ?');
-  const write = db.prepare(`INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  const readRun = id => { const row = get.get(id); return row && { ...row, collectedIds: JSON.parse(row.collectedIds) }; };
+  const write = db.prepare(`INSERT INTO runs (id, levelId, startedAt, updatedAt, players, seed, flowers, platform, seconds, revision, status, score, scoringVersion, collectedIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET updatedAt=excluded.updatedAt, flowers=excluded.flowers,
     platform=excluded.platform, seconds=excluded.seconds, revision=excluded.revision,
-    status=excluded.status, score=excluded.score`);
+    status=excluded.status, score=excluded.score, collectedIds=excluded.collectedIds`);
   return {
     save(input) {
-      const run = validateRun(input), previous = get.get(run.id);
+      const run = validateRun(input), previous = readRun(run.id);
       if (previous) {
         if (previous.levelId !== run.levelId || previous.startedAt !== run.startedAt || previous.players !== run.players || previous.seed !== run.seed) throw new InputError('这次游玩的关卡或开始时间不能改变');
+        if (previous.scoringVersion !== run.scoringVersion) throw new InputError('这次游玩的计分规则不能改变');
         if (run.revision <= previous.revision || ['completed', 'ended'].includes(previous.status)) return previous;
         run.flowers = Math.max(run.flowers, previous.flowers);
         run.platform = Math.max(run.platform, previous.platform);
         run.seconds = Math.max(run.seconds, previous.seconds);
-        run.score = calculateScore(run.flowers, run.status === 'completed', findLevel(run.levelId));
+        if (run.scoringVersion === 2) {
+          run.collectedIds = [...new Set([...previous.collectedIds, ...run.collectedIds])].sort((a, b) => a - b);
+          run.flowers = run.collectedIds.length;
+        }
+        const level = findLevel(run.levelId);
+        const collection = run.scoringVersion === 2 ? collectionForPlatforms(run.levelId, run.seed, run.collectedIds, level.platforms) : run.flowers;
+        run.score = calculateScore(collection, run.status === 'completed', level);
       }
-      write.run(run.id, run.levelId, run.startedAt, new Date().toISOString(), run.players, run.seed, run.flowers, run.platform, run.seconds, run.revision, run.status, run.score);
-      return get.get(run.id);
+      write.run(run.id, run.levelId, run.startedAt, new Date().toISOString(), run.players, run.seed, run.flowers, run.platform, run.seconds, run.revision, run.status, run.score, run.scoringVersion, JSON.stringify(run.collectedIds));
+      return readRun(run.id);
     },
     report({ from, until, levelId, timezone = 'Asia/Shanghai', offset = 0 }) {
       if (!Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(until)) || Date.parse(from) >= Date.parse(until)) throw new InputError('请选择有效的开始和结束日期');

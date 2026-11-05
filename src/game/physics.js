@@ -1,8 +1,5 @@
+export { randomGenerator } from '../../shared/random.js';
 export const RULES = Object.freeze({ speed: 6, gravity: 23, jump: 10.8, radius: 0.28, coyote: 0.14, buffer: 0.16 });
-export function randomGenerator(seed) {
-  let value = seed >>> 0;
-  return () => { value += 0x6D2B79F5; let n = value; n = Math.imul(n ^ n >>> 15, n | 1); n ^= n + Math.imul(n ^ n >>> 7, n | 61); return ((n ^ n >>> 14) >>> 0) / 4294967296; };
-}
 export function firstPlatform() { return { id: 0, x: 0, y: 0, width: 12, isCheckpoint: true }; }
 export function nextPlatform(previous, random, level) {
   const id = previous.id + 1;
