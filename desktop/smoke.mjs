@@ -22,14 +22,19 @@ export async function runSmoke({ win, requestClose }) {
     assert.equal(await evaluate('localStorage.getItem("desktop-test-marker")'), 'retained');
     const report = await evaluate(reportCode);
     assert.ok(report.summary.total > 0);
-    assert.ok(report.records.every(run => run.status === 'ended'));
+    assert.ok(report.records.every(run => run.status === 'paused'));
     await writeFile(join(profile, 'result.json'), JSON.stringify({ isFullscreen: win.isFullScreen(), reopened: true, total: report.summary.total, sessions: report.summary.sessions, electron: process.versions.electron, node: process.versions.node }));
+    await evaluate('document.querySelector(".adventure-launch button").click()');
+    await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
+    assert.ok(Number(await evaluate('document.querySelector(".score-total").textContent')) > 0);
     requestClose(); return;
   }
   await evaluate('localStorage.setItem("desktop-test-marker","retained")');
   await evaluate('document.querySelector(".adventure-launch button").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "ready"');
   await until('!!document.querySelector(".level-choices button")');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button"), button => button.textContent.trim())'), ['出发吧', '回到我的花园']);
+  assert.equal(await evaluate('!!document.querySelector(".adventure-menu .desktop-update-status")'), false);
   await wait(500);
   await writeFile(join(profile, 'levels.png'), (await wc.capturePage()).toPNG());
   win.setFullScreen(false); await wait(1200); win.focus(); wc.focus(); await wait(300);

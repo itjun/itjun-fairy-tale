@@ -2,7 +2,8 @@ import { flushScores } from './scores/client.js';
 
 // The game synchronously snapshots its last frame before the queue is drained.
 window.gardenDesktop?.onPrepareClose(async token => {
-  window.dispatchEvent(new Event('garden:prepare-close'));
+  const event = new Event('garden:prepare-close', { cancelable: true });
+  window.dispatchEvent(event);
   const result = await flushScores();
-  window.gardenDesktop.finishClose(token, result.isSaved);
+  window.gardenDesktop.finishClose(token, result.isSaved && !event.defaultPrevented);
 });

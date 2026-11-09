@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { DesktopActions } from './DesktopActions.jsx';
 import { GardenBackup } from './GardenBackup.jsx';
-import { flushScores } from './scores/client.js';
+import { readAdventure, clearAdventure } from './game/save.js';
+import { queueRun, flushScores } from './scores/client.js';
 const ScoreHistory = lazy(() => import('./scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
 const PlatformGame = lazy(() => import('./game/PlatformGame.jsx').then(module => ({ default: module.PlatformGame })));
 import { useEffect, useRef, useState } from 'react';
@@ -51,6 +52,7 @@ export function App() {
   const [progress, setProgress] = useState(loadProgress);
   const [mode, setMode] = useState(null);
   const [isAdventure, setIsAdventure] = useState(false);
+  const [savedAdventure,setSavedAdventure] = useState(readAdventure);
   const [isScores, setIsScores] = useState(false);
   useEffect(() => { flushScores(); }, []);
   const [isSound, setIsSound] = useState(true);
@@ -175,7 +177,7 @@ export function App() {
   const activeQuest = quests.find(q => q.id === mode);
   const isQuestComplete = activeQuest && completed[quests.indexOf(activeQuest)];
   if (isScores) return <Suspense fallback={<div className="loading-adventure">正在翻开成绩本…</div>}><ScoreHistory onClose={() => setIsScores(false)} /></Suspense>;
-  if (isAdventure) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame initialSound={isSound} onExit={() => setIsAdventure(false)} /></Suspense>;
+  if (isAdventure) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame initialSound={isSound} onExit={() => { setIsAdventure(false); setSavedAdventure(readAdventure()); }} /></Suspense>;
   return <div className="app-shell">
     <header className="header">
       <a className="brand" href="#" aria-label="花园王国首页" onClick={e => { e.preventDefault(); closeModal(); setIsDecorating(false); }}><span className="brand-icon"><Icon as={Flower} size={34} /></span><span>花园王国<small>一个小画家的奇妙世界</small></span></a>
@@ -184,7 +186,7 @@ export function App() {
     <DesktopActions />
     <main>
       <section className="intro"><div><div className="intro-note"><Icon as={Sun} size={20} />今天也是适合冒险的一天</div><h1>欢迎来到<span>花园王国</span></h1><p>和家人一起，把画里的小小心愿变成真的。</p></div><button className="collection" onClick={() => setMode('collection')}><span className="collection-icons">{quests.map((q, i) => <Icon key={q.id} as={q.icon} size={29} className={completed[i] ? 'earned' : ''} />)}</span><span>我的小成就 <b>{total} / 3</b></span></button></section>
-      <section className="adventure-launch"><img src="./assets/girl-player.png" alt="粉裙小画家" /><div><h2>彩笔跳台探险</h2><p>八个小世界，随机跳台。从童话城堡出发，去海边、森林和雪地找宝物。</p></div><button className="primary-button" onClick={() => { window.speechSynthesis?.cancel(); setIsAdventure(true); }}><Icon as={Play} weight="fill" />去跳台探险<Icon as={ArrowRight} size={20} /></button></section>
+      <section className="adventure-launch"><img src="./assets/girl-player.png" alt="粉裙小画家" /><div><h2>彩笔跳台探险</h2><p>八个小世界，随机跳台。从童话城堡出发，去海边、森林和雪地找宝物。</p></div><button className="primary-button" onClick={() => { window.speechSynthesis?.cancel(); setIsAdventure(true); }}><Icon as={Play} weight="fill" />{savedAdventure ? '继续跳台探险' : '去跳台探险'}<Icon as={ArrowRight} size={20} /></button>{savedAdventure && <button className="text-button" onClick={()=>{ queueRun({...savedAdventure.run,status:'ended',revision:savedAdventure.run.revision+1});clearAdventure();setSavedAdventure(null);window.speechSynthesis?.cancel();setIsAdventure(true);}}>新冒险</button>}</section>
       <section className={`world-frame ${isDecorating ? 'is-decorating' : ''}`} aria-label="花园王国游玩场景">
         <div className="world" onClick={placeStamp}>
           <img className="world-art" src={asset('assets/garden.png')} alt="彩笔画的花园：蓝色尖顶、粉色和青绿的城堡，彩虹、大花朵和绿草地" draggable="false" />
