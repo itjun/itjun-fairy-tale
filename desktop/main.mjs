@@ -54,7 +54,7 @@ async function importScores() {
   const source = new DatabaseSync(filePaths[0], { readOnly: true });
   let rows;
   try {
-    rows = source.prepare('SELECT * FROM runs').all().map(row => ({ ...row, collectedIds: JSON.parse(row.collectedIds || '[]'), scoringVersion: row.scoringVersion || 1 }));
+    rows = source.prepare('SELECT * FROM runs').all().map(row => ({ ...row, collectedIds: JSON.parse(row.collectedIds || '[]'), defeatedIds: JSON.parse(row.defeatedIds || '[]'), scoringVersion: row.scoringVersion || 1 }));
     rows.forEach(validateRun);
   } finally { source.close(); }
   store.importRuns(rows);

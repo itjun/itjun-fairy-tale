@@ -22,7 +22,7 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   player.knockTime = Math.max(0, player.knockTime - dt);
   player.dropTime = Math.max(0, player.dropTime - dt);
   player.springTime = Math.max(0, player.springTime - dt);
-  if (player.isGrounded && player.ground?.isMoving) player.y += player.ground.deltaY || 0;
+  if (player.isGrounded && player.ground?.isMoving) { player.y += player.ground.deltaY || 0; player.x += player.ground.deltaX || 0; }
   if (input.drop && player.isGrounded && player.ground?.isOneWay) {
     player.ignoredPlatform = player.ground.id; player.dropTime = 0.3;
     player.isGrounded = false; player.coyote = 0; player.buffer = 0; player.y -= 0.08;
@@ -30,7 +30,9 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   if (input.jump) player.buffer = RULES.buffer;
   else player.buffer = Math.max(0, player.buffer - dt);
   player.coyote = player.isGrounded ? RULES.coyote : Math.max(0, player.coyote - dt);
-  player.vx = player.knockTime > 0 ? player.knockVx : input.direction * RULES.speed;
+  const targetVx = input.direction * RULES.speed;
+  player.vx = player.knockTime > 0 ? player.knockVx : player.isGrounded && player.ground?.isIce ? player.vx + Math.max(-12*dt, Math.min(12*dt,targetVx-player.vx)) : targetVx;
+  if (player.isGrounded && player.ground?.conveyor) player.x += player.ground.conveyor * dt;
   if (input.direction) player.facing = input.direction;
   let isJumped = false;
   if (player.buffer > 0 && player.coyote > 0) {
@@ -45,7 +47,7 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   let landing;
   if (player.vy <= 0) {
     for (const platform of platforms) {
-      if (player.dropTime > 0 && platform.id === player.ignoredPlatform) continue;
+      if (platform.isEnabled === false || player.dropTime > 0 && platform.id === player.ignoredPlatform) continue;
       if (previousY >= platform.y - 0.01 && player.y <= platform.y && Math.abs(player.x - platform.x) < platform.width / 2 + RULES.radius && (!landing || platform.y > landing.y)) landing = platform;
     }
   }

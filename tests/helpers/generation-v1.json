@@ -1,0 +1,42 @@
+[
+  {
+    "levelId": "rainbow",
+    "seed": 42,
+    "sha256": "28f25f228711ef418b281f2f8562acc26b5144d06f285fe68d08cc3ee664e73e"
+  },
+  {
+    "levelId": "family",
+    "seed": 42,
+    "sha256": "cb5877b92ea421fc077f0fac5072d997d8a6f88651798bb098fe53f0a9a9cd95"
+  },
+  {
+    "levelId": "sweet",
+    "seed": 42,
+    "sha256": "38f89eeb2d6891a461b5745b082de4832ea7409dace0599b79cce00fc88a12e4"
+  },
+  {
+    "levelId": "beach",
+    "seed": 42,
+    "sha256": "6283512096b6c0acf0205dc046324a81ca7c42fc75280d4912299a448281ae4e"
+  },
+  {
+    "levelId": "meadow",
+    "seed": 42,
+    "sha256": "71f8bd7a1b484f875dd4fc2b1f0d31b1f52b594a6be993c4094de064870421dd"
+  },
+  {
+    "levelId": "snow",
+    "seed": 42,
+    "sha256": "910a4471dcb911d1f3622e34aa96c0363289b327aeaee0bdde3beadca273b0ba"
+  },
+  {
+    "levelId": "forest",
+    "seed": 42,
+    "sha256": "2261fe338412c4cba58b2f540906c8dc985a975e274631f6eb8062b24230370c"
+  },
+  {
+    "levelId": "cartoon",
+    "seed": 42,
+    "sha256": "7260181e22a9cb280bd964ce205842fab1905be1ed033f3b76d2a87fd12d787f"
+  }
+]
