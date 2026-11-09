@@ -70,6 +70,37 @@ def stop_running():
         else: run(['taskkill', '/PID', str(pid), '/T', '/F'])
 
 
+def trash_mac_bundle(bundle):
+    if not bundle.exists(): return
+    register = Path('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister')
+    if register.exists():
+        for app_bundle in [bundle, *bundle.glob('Contents/Frameworks/*.app')]:
+            subprocess.run([str(register), '-u', str(app_bundle)], check=False, capture_output=True)
+    trash = Path.home() / '.Trash'
+    trash.mkdir(exist_ok=True)
+    destination = trash / f'{bundle.name}-{time.time_ns()}'
+    shutil.move(str(bundle), str(destination))
+    if register.exists():
+        for app_bundle in [destination, *destination.glob('Contents/Frameworks/*.app')]:
+            subprocess.run([str(register), '-u', str(app_bundle)], check=False, capture_output=True)
+    print('构建副本移到废纸篓：', destination, flush=True)
+
+
+def finish_mac_install(source, target, previous, arch):
+    version = json.loads((ROOT / 'package.json').read_text())['version']
+    archive = ROOT / 'release' / f'GardenKingdom-{version}-mac-{arch}.zip'
+    run(['/usr/bin/ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', source, archive])
+    # 压缩包用于分发；本机只登记正式安装，不留下构建/备份应用入口。
+    trash_mac_bundle(source)
+    trash_mac_bundle(previous)
+    register = Path('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister')
+    if register.exists():
+        run([register, '-f', target])
+        for helper in target.glob('Contents/Frameworks/*.app'):
+            subprocess.run([str(register), '-u', str(helper)], check=False, capture_output=True)
+    print('安装包：', archive, flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--no-launch', action='store_true', help='构建安装，但不启动游戏')
@@ -93,16 +124,17 @@ def main():
         parent.mkdir(parents=True, exist_ok=True)
         target = parent / f'{NAME}.app'
         stage, previous = parent / f'{NAME}.app.building', parent / f'{NAME}.app.previous'
-        if stage.exists(): shutil.rmtree(stage)
+        if stage.exists(): trash_mac_bundle(stage)
         run(['/usr/bin/ditto', source, stage])
         run(['/usr/bin/codesign', '--verify', '--deep', '--strict', stage])
         stop_running()
-        if previous.exists(): shutil.rmtree(previous)
+        if previous.exists(): trash_mac_bundle(previous)
         if target.exists(): target.rename(previous)
         try: stage.rename(target)
         except Exception:
             if previous.exists(): previous.rename(target)
             raise
+        finish_mac_install(source, target, previous, arch)
         if not args.no_launch: run(['/usr/bin/open', target])
     else:
         # A stable per-user directory also permits unattended future NSIS updates.
