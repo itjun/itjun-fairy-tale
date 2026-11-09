@@ -11,3 +11,15 @@ body.is-platform-game{overflow:hidden}.platform-game{position:fixed;inset:0;back
 .level-menu{width:min(980px,100%)}.level-menu .level-choices{grid-template-columns:repeat(4,minmax(0,1fr));max-height:min(36vh,310px);overflow-y:auto;overscroll-behavior:contain;padding:4px}.level-menu .level-choices img{height:75px;object-position:50% 35%}.level-menu .level-choices strong{font-size:20px}.level-menu .level-choices button{gap:4px}.level-menu .level-source{min-height:21px}@media(max-width:850px){.level-menu{padding:16px 15px}.level-menu h2{font-size:23px}.level-menu .level-choices{grid-template-columns:repeat(2,minmax(0,1fr));max-height:35vh}.level-menu .level-choices img{height:70px}.level-menu .level-choices strong{font-size:19px}.level-menu .adventure-kicker{letter-spacing:1px;font-size:11px}}@media(max-height:540px){.level-menu .level-choices{max-height:32vh}}
 /* 拾取反馈保持真实文字，画纸纹理与全站手绘按钮一致。 */
 .score-popups{position:absolute;inset:0;pointer-events:none;overflow:hidden}.score-popup{position:absolute;display:flex;align-items:center;gap:6px;transform:translate(-50%,-100%);padding:10px 16px;border:2px solid transparent;border-image:var(--paper-button) 128 fill / 12px / 0 stretch;color:#395329;font-size:28px;font-weight:bold;white-space:nowrap;animation:pickup-rise 2.2s ease-out both}.score-popup img{width:32px;height:36px;object-fit:contain}.adventure-score .score-gain{font-style:normal;color:#945238;font-weight:bold;font-size:22px}.score-total{animation:score-bounce .35s ease-out}.collectible-preview b{color:#486738;font-weight:400;white-space:nowrap}@keyframes pickup-rise{0%{opacity:0;translate:0 10px}12%,75%{opacity:1}100%{opacity:0;translate:0 -40px}}@keyframes score-bounce{50%{scale:1.18}}@media(max-width:650px){.score-popup{font-size:23px;padding:8px 12px}.adventure-score .score-gain{font-size:16px}.adventure-score{gap:9px}.adventure-score span{gap:5px}}@media(prefers-reduced-motion:reduce){.score-popup,.score-total{animation:none}}
+
+/* 桌面把空间留给关卡；触屏仍保留完整方向、下跳和跳跃按钮。 */
+@media(min-width:1100px) and (pointer:fine){.touch-controls{display:none}}
+.adventure-message{pointer-events:none;white-space:normal;width:max-content;max-width:min(660px,80%)}
+.level-progress{top:175px}
+@media(max-width:650px){.level-progress{top:145px}.touch-controls>div{gap:8px}.touch-controls button{width:54px;height:58px}.touch-controls .touch-jump{width:72px}.adventure-bottom>span{max-width:65%}}
+@media(min-width:1100px){
+  .adventure-title{padding:12px 32px}.adventure-title h1{font-size:34px}.adventure-title small{font-size:13px;letter-spacing:3px}
+  .adventure-header button{min-height:54px;font-size:20px;padding:12px 20px}.adventure-actions button{width:54px;padding:12px}
+  #root .adventure-score{top:130px;font-size:20px;padding:14px 20px}.adventure-score b{font-size:24px}.level-progress{top:199px;font-size:14px}
+  .adventure-bottom>span{font-size:18px}.adventure-bottom button{font-size:18px}
+}
