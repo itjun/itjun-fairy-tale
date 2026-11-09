@@ -1,3 +1,4 @@
+import { damageEnemy } from './combat.js';
 import { RULES } from './physics.js';
 
 export function stepEnemies(enemies, dt) {
@@ -11,15 +12,15 @@ export function stepEnemies(enemies, dt) {
   }
 }
 
-export function touchEnemy(player, enemy, previousY) {
+export function touchEnemy(player, enemy, previousY, elapsed = enemy.elapsed) {
   if (enemy.isDefeated || player.protection > 0) return null;
   if (Math.abs(player.x - enemy.x) > enemy.width / 2 + RULES.radius) return null;
   const top = enemy.y + enemy.height;
   if (player.vy <= 0 && previousY >= top - 0.15 && player.y <= top + 0.08) {
-    enemy.isDefeated = true; enemy.defeatedAt = enemy.elapsed;
+    const isDefeated = damageEnemy(enemy, elapsed);
     player.y = top; player.vy = RULES.jump * 0.88;
     player.isGrounded = false; player.ground = null; player.coyote = 0;
-    return 'stomp';
+    return isDefeated ? 'stomp' : 'hit';
   }
   if (player.y >= top || player.y + 1.65 < enemy.y) return null;
   player.protection = 2; player.knockTime = 0.25;
