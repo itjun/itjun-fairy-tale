@@ -22,6 +22,9 @@ export async function runSmoke({ win, requestClose }) {
   for (const [index, id] of ['rainbow', 'garden', 'treat'].entries()) {
     await evaluate(`document.querySelectorAll('.quest-card')[${index}].click()`);
     await until(`document.querySelector('.mini-${id} .mini-stage') !== null`);
+    try { await until('document.querySelector(".mini-game audio")?.readyState >= 2'); }
+    catch { throw new Error('离线引导未就绪：' + await evaluate('JSON.stringify({src:document.querySelector("audio")?.src, ready:document.querySelector("audio")?.readyState, error:document.querySelector("audio")?.error?.message})')); }
+    assert.equal(await evaluate('document.querySelector(".mini-game audio").error'), null);
     if (!isReopen) {
       if (id === 'rainbow') await evaluate(`document.querySelector('[aria-label="找到' + document.querySelector('.find-clue strong').textContent + '"]').click()`);
       if (id === 'garden') {

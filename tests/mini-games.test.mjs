@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createMiniSession, actOnMiniSession, readMiniSession, isMiniComplete, weatherFor, miniHint } from '../src/mini-games/session.js';
 import { readGardenBackup, mergeGardenProgress } from '../src/garden-backup.js';
 import { earnedQuests } from '../src/garden-progress.js';
+import { readFile, stat } from 'node:fs/promises';
+import { narrationText, narrationFile, PHASE_NARRATION } from '../src/mini-games/narration.js';
 
 const empty = { rainbow: 0, flowers: [0,0,0,0], served: [false,false,false,false], stamps: [] };
 function perform(session, action) {
@@ -177,4 +179,25 @@ test('导入拒绝无法继续的自动完成盘面及能复活已送出订单�
   while (!treat.board.builds[0].isServed) treat = perform(treat, solveAction(treat)).session;
   assert.equal(readMiniSession({...treat, history:[unserved]}, 'treat'), null);
   assert.equal(readMiniSession({...treat, id:'unknown'}, 'unknown'), null);
+});
+
+test('离线自然语音覆盖三个阶段、结算和每一步两级提示，文件完整且不依赖系统朗读', async () => {
+  const directory = new URL('../public/audio/guidance/', import.meta.url);
+  const manifest = JSON.parse(await readFile(new URL('manifest.json', directory), 'utf8'));
+  const clips = new Map(manifest.lines.map(line => [line.text, line.file]));
+  for (const line of manifest.lines) {
+    assert.equal(line.file, narrationFile(line.text));
+    assert.ok((await stat(new URL(line.file, directory))).size > 1000);
+  }
+  for (const id of ['rainbow','garden','treat']) {
+    for (const text of PHASE_NARRATION[id]) assert.ok(clips.has(text));
+    for (let seed = 0; seed < 80; seed++) {
+      let session = createMiniSession(id, seed);
+      while (!isMiniComplete(session)) {
+        for (const hintLevel of [0,1,2]) assert.ok(clips.has(narrationText({...session,hintLevel})), narrationText({...session,hintLevel}));
+        session = perform(session, solveAction(session)).session;
+      }
+      assert.ok(clips.has(narrationText(session)));
+    }
+  }
 });

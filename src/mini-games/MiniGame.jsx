@@ -7,6 +7,7 @@ import { TreatGame } from './TreatGame.jsx';
 import { InteractionProvider } from './Interaction.jsx';
 import { Art, Gem, Bloom, Ingredient, Tool } from './Art.jsx';
 import { TOOLS } from './flowers.js';
+import { narrationFile, narrationText } from './narration.js';
 import './mini-games.css';
 
 export function MiniGame({ session, onChange, onExit, onReplay, isSound, onSound, onChime, isSaved }) {
@@ -14,15 +15,27 @@ export function MiniGame({ session, onChange, onExit, onReplay, isSound, onSound
   current.current = session;
   const [feedback, setFeedback] = useState({ message: '', isSuccess: false });
   const title = useRef(null);
+  const narration = useRef(null);
+  const [narrationRequest, setNarrationRequest] = useState(0);
   const game = MINI_GAMES[session.id], task = session.tasks[session.taskIndex];
   const isComplete = isMiniComplete(session);
   const phase = task?.phase ?? 2;
   useEffect(() => { window.scrollTo(0, 0); title.current?.focus({ preventScroll: true }); }, [session.id, session.seed, session.taskIndex]);
+  useEffect(() => { narration.current?.pause(); }, [session.taskIndex]);
+  useEffect(() => {
+    const audio = narration.current;
+    if (!isSound || !audio) return;
+    audio.src = `./audio/guidance/${narrationFile(narrationText(session))}`;
+    audio.volume = 0.85;
+    audio.play().catch(() => { /* 系统阻止播放时保留文字提示，不回退到机械朗读。 */ });
+    return () => { audio.pause(); audio.removeAttribute('src'); audio.load(); };
+  }, [isSound, session.seed, phase, isComplete, narrationRequest]);
   useEffect(() => {
     window.gardenDesktop?.updateSafe(isComplete);
     return () => window.gardenDesktop?.updateSafe(true);
   }, [isComplete]);
   function send(action) {
+    if (action.type === 'hint') setNarrationRequest(value => value + 1);
     const result = actOnMiniSession(current.current, { ...action, taskId: task?.id, revision: session.revision });
     if (result.session !== current.current) {
       current.current = result.session;
@@ -38,6 +51,7 @@ export function MiniGame({ session, onChange, onExit, onReplay, isSound, onSound
   }
   const Game = { rainbow: RainbowGame, garden: GardenGame, treat: TreatGame }[session.id];
   return <main className={`mini-game mini-${session.id}`}>
+    <audio ref={narration} preload="none" aria-hidden="true" />
     <header className="mini-header"><button className={`quiet-button ${isComplete ? 'is-placeholder' : ''}`} aria-hidden={isComplete || undefined} tabIndex={isComplete ? -1 : undefined} onClick={onExit}><ArrowLeft size={24} />回花园</button><h1 ref={title} tabIndex={-1}>{game.title}</h1><button className="icon-button" aria-label={isSound ? '关闭声音' : '打开声音'} onClick={onSound}>{isSound ? <SpeakerHigh size={28} /> : <SpeakerSlash size={28} />}</button></header>
     <nav className="mini-phases" aria-label="冒险进度">{game.phases.map((name, i) => <span className={`${i === phase ? 'is-current' : ''} ${i < phase || isComplete ? 'is-finished' : ''}`} key={name} aria-current={i === phase ? 'step' : undefined}>{(i < phase || isComplete) && <Check size={22} />}<b>{name}</b>{i < 2 && <ArrowRight size={22} className="phase-arrow" />}</span>)}</nav>
     {isComplete ? <section className="mini-finale"><Art name={session.id === 'rainbow' ? 'collectible-rainbow' : session.id === 'garden' ? 'flower' : 'icecream'} /><h2>{game.title}，完成啦！</h2><p>你是「{game.reward}」！这一份快乐，留在花园里。</p><div className="mini-finale-actions"><button className="primary-button" onClick={() => { setFeedback({ message: '', isSuccess: false }); onReplay(); }}><ArrowCounterClockwise size={23} />再来一次</button><button className="quiet-button" onClick={onExit}><ArrowLeft size={22} />回花园</button></div></section> : <>

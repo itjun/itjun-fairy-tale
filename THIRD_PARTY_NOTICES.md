@@ -6,3 +6,9 @@
 - Electron / Chromium 的第三方许可随安装包附带；前端依赖包括 React、Three.js、Chart.js、Phosphor Icons。具体依赖版本由 `package-lock.json` 锁定，构建保留库的许可证注释。
 
 公开仓库及安装包不含家庭 SQLite 存档、个人成绩、QA 截图和认证凭据。游戏无需账户，不收集游戏记录；检查更新会向 GitHub 请求版本及安装包，GitHub 会接收正常网络请求信息。
+
+## 小游戏离线引导语音
+
+`public/audio/guidance/` 为游戏自有引导文案的预生成音频，使用 Microsoft `zh-CN-XiaoxiaoNeural` 普通话女声。文案与声音参数记录在同目录 `manifest.json`。游戏运行时只播放本地文件，不向语音服务发送玩家数据。
+
+开发生成工具为 [edge-tts](https://github.com/rany2/edge-tts) 7.3.1（不随桌面包分发）；音色说明见 [Microsoft 语音支持文档](https://learn.microsoft.com/azure/ai-services/speech-service/language-support)。本段仅说明生成来源，不将合成语音冒充真人录音。

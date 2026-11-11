@@ -12,7 +12,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 app.setName('花园王国');
 // Explicit test profile keeps verification out of the family's real saves.
 if (process.env.GARDEN_DESKTOP_PROFILE) app.setPath('userData', resolve(process.env.GARDEN_DESKTOP_PROFILE));
-protocol.registerSchemesAsPrivileged([{ scheme: 'garden', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: 'garden', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 let win, store, databasePath, closeRequest, updater, installing = false, mayExit = false;
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
