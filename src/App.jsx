@@ -1,6 +1,10 @@
 import { lazy, Suspense } from 'react';
 import { DesktopActions } from './DesktopActions.jsx';
 import { GardenBackup } from './GardenBackup.jsx';
+import { earnedQuests } from './garden-progress.js';
+import { readMiniGames } from './garden-backup.js';
+import { createMiniSession, isMiniComplete } from './mini-games/session.js';
+const MiniGame = lazy(() => import('./mini-games/MiniGame.jsx').then(module => ({ default: module.MiniGame })));
 import { readAdventure, clearAdventure } from './game/save.js';
 import { queueRun, flushScores } from './scores/client.js';
 const ScoreHistory = lazy(() => import('./scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
@@ -9,15 +13,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Flower, Rainbow, IceCream, Heart, Star, Sparkle, ArrowRight, ArrowLeft, SpeakerHigh, SpeakerSlash, X, Check, House, Images, PaintBrush, ArrowCounterClockwise, DownloadSimple, Play, Drop, Sun, Flag, Butterfly, Trophy } from '@phosphor-icons/react';
 
 const asset = (path) => window.__GAME_ASSETS__?.[path] || `./${path}`;
-const colors = [
-  { name: '红色', hex: '#e95666' }, { name: '橙色', hex: '#f4a34c' },
-  { name: '黄色', hex: '#e8c949' }, { name: '绿色', hex: '#88b768' },
-  { name: '蓝色', hex: '#62abc9' }, { name: '紫色', hex: '#9c81bb' },
-];
 const quests = [
-  { id: 'rainbow', title: '找回彩虹', hint: '和颜色捉迷藏', icon: Rainbow, color: 'pink', reward: '彩虹魔法师' },
-  { id: 'garden', title: '照顾花朵', hint: '让小花开开心心', icon: Flower, color: 'green', reward: '花园小园丁' },
-  { id: 'treat', title: '甜蜜分享', hint: '给家人做冰淇淋', icon: IceCream, color: 'blue', reward: '甜心分享家' },
+  { id: 'rainbow', title: '找回彩虹', hint: '找线索，解开彩虹机关', icon: Rainbow, color: 'pink', reward: '彩虹魔法师' },
+  { id: 'garden', title: '照顾花朵', hint: '播种照料，搭配花束', icon: Flower, color: 'green', reward: '花园小园丁' },
+  { id: 'treat', title: '甜蜜分享', hint: '看订单，制作多层冰淇淋', icon: IceCream, color: 'blue', reward: '甜心分享家' },
 ];
 const artworkNames = ['爱心花园', '绿色小城堡', '我们在一起', '阳光下的小家', '粉色城堡', '彩虹花园王国', '幸福的一家人', '蓝色大城堡', '我的花园王国', '超级冰淇淋', '高高的城堡'];
 const turns = [-90, -90, -90, -90, 90, 90, -90, -90, 0, 0, 0];
@@ -31,6 +30,8 @@ function loadProgress() {
       rainbow: Number.isInteger(data.rainbow) ? Math.max(0, Math.min(6, data.rainbow)) : 0,
       flowers: Array.isArray(data.flowers) && data.flowers.length === 4 ? data.flowers.map(v => [0, 1, 2].includes(v) ? v : 0) : [0, 0, 0, 0],
       served: Array.isArray(data.served) && data.served.length === 4 ? data.served.map(v => v === true) : [false, false, false, false],
+      achievements: Object.fromEntries(quests.map(({ id }) => [id, data.achievements?.[id] === true])),
+      miniGames: readMiniGames(data.miniGames),
       stamps: Array.isArray(data.stamps) ? data.stamps.filter(v => ['flower', 'heart', 'star', 'butterfly'].includes(v.type) && Number.isFinite(v.x) && Number.isFinite(v.y) && v.x >= 0 && v.x <= 100 && v.y >= 0 && v.y <= 100).slice(-40) : [],
     };
   } catch { return emptyProgress; }
@@ -59,16 +60,15 @@ export function App() {
   const [isDecorating, setIsDecorating] = useState(false);
   const [stamp, setStamp] = useState('flower');
   const [galleryIndex, setGalleryIndex] = useState(8);
-  const [flavor, setFlavor] = useState(null);
   const [notice, setNotice] = useState('今天，邀请家人来花园开派对吧！');
-  const [feedback, setFeedback] = useState('');
   const [isSaved, setIsSaved] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [photo, setPhoto] = useState(null);
   const isExportingRef = useRef(false);
   const soundContext = useRef(null);
   const noticeTimer = useRef(null);
-  const completed = [progress.rainbow === 6, progress.flowers.every(v => v === 2), progress.served.every(Boolean)];
+  const achievements = earnedQuests(progress);
+  const completed = quests.map(({ id }) => achievements[id]);
   const total = completed.filter(Boolean).length;
   const next = quests.find((_, i) => !completed[i]);
   useEffect(() => {
@@ -97,44 +97,27 @@ export function App() {
       });
     } catch { /* 声音不可用时，文字提示仍可完成游戏。 */ }
   }
-  function speak(text, isRequested = false) {
-    if ((!isSound && !isRequested) || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'zh-CN'; utterance.rate = 0.85;
-    window.speechSynthesis.speak(utterance);
-  }
   function tell(text) {
     setNotice(text); clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice('慢慢来，每一个小发现都很棒。'), 6500);
   }
   function openQuest(id) {
-    setFeedback(''); setFlavor(null); setMode(id);
-    const text = { rainbow: '彩虹想找回六种颜色。跟着提示，点一点彩色爱心吧。', garden: '小花口渴啦。先给每朵花浇水，再送它一点阳光。', treat: '选一个冰淇淋口味，再点一位家人，分享甜甜的快乐。' }[id];
-    speak(text);
+    setProgress(p => {
+      const saved = p.miniGames?.[id];
+      return { ...p, achievements: earnedQuests(p), miniGames: { ...p.miniGames, [id]: saved && !isMiniComplete(saved) ? saved : createMiniSession(id) } };
+    });
+    setMode(id);
+    window.speechSynthesis?.cancel();
+  }
+  function saveMiniSession(session) {
+    const updated = { ...progress, miniGames: { ...progress.miniGames, [session.id]: session } };
+    updated.achievements = earnedQuests(updated);
+    // 每次有效操作立即落盘，关闭窗口也不丢最后一步。
+    try { localStorage.setItem(storageKey, JSON.stringify(updated)); setIsSaved(true); }
+    catch { setIsSaved(false); }
+    setProgress(updated);
   }
   function closeModal() { setMode(null); window.speechSynthesis?.cancel(); }
-  function pickColor(index) {
-    if (progress.rainbow >= 6) return;
-    if (index !== progress.rainbow) { setFeedback(`这是${colors[index].name}。再找找${colors[progress.rainbow].name}吧！`); speak(`再找找${colors[progress.rainbow].name}吧`); return; }
-    setProgress(p => ({ ...p, rainbow: p.rainbow + 1 }));
-    setFeedback(`${colors[index].name}找到啦！`); chime(index === 5);
-    if (index === 5) speak('彩虹回来啦！你是彩虹魔法师！');
-  }
-  function careForFlower(index) {
-    if (progress.flowers[index] === 2) return;
-    const step = progress.flowers[index];
-    setProgress(p => ({ ...p, flowers: p.flowers.map((v, i) => i === index ? v + 1 : v) }));
-    setFeedback(step === 0 ? '咕噜咕噜，谢谢你！再送我一点阳光吧。' : '小花开了！你把花园照顾得真好。');
-    chime(step === 1);
-  }
-  function serve(index) {
-    if (progress.served[index]) return;
-    if (flavor === null) { setFeedback('先点一个你喜欢的口味吧。'); return; }
-    setProgress(p => ({ ...p, served: p.served.map((v, i) => i === index ? true : v) }));
-    setFeedback(`${['爸爸', '妈妈', '姐姐', '妹妹'][index]}说：谢谢你，${['草莓', '蓝莓', '芒果'][flavor]}味真好吃！`);
-    setFlavor(null); chime(true);
-  }
   function placeStamp(event) {
     if (!isDecorating || event.target.closest('button')) return;
     if (progress.stamps.length >= 40) { tell('花园已经满满当当啦！可以撤回一张再贴。'); return; }
@@ -175,7 +158,7 @@ export function App() {
     finally { isExportingRef.current = false; setIsExporting(false); }
   }
   const activeQuest = quests.find(q => q.id === mode);
-  const isQuestComplete = activeQuest && completed[quests.indexOf(activeQuest)];
+  if (activeQuest) return <Suspense fallback={<div className="loading-adventure">正在打开小冒险…</div>}><MiniGame session={progress.miniGames[activeQuest.id]} onChange={saveMiniSession} onExit={closeModal} onReplay={() => openQuest(activeQuest.id)} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} onChime={chime} isSaved={isSaved} /></Suspense>;
   if (isScores) return <Suspense fallback={<div className="loading-adventure">正在翻开成绩本…</div>}><ScoreHistory onClose={() => setIsScores(false)} /></Suspense>;
   if (isAdventure) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame initialSound={isSound} onExit={() => { setIsAdventure(false); setSavedAdventure(readAdventure()); }} /></Suspense>;
   return <div className="app-shell">
@@ -199,18 +182,10 @@ export function App() {
         </div>
         <div className="world-bottom"><div className="guide"><Icon as={Heart} size={23} /><span aria-live="polite">{notice}</span></div><button className={`decorate-toggle ${isDecorating ? 'active' : ''}`} onClick={() => setIsDecorating(!isDecorating)}><Icon as={isDecorating ? Check : PaintBrush} size={22} />{isDecorating ? '装饰好啦' : '装饰花园'}</button></div>
       </section>
-      {isDecorating ? <section className="sticker-tools" aria-label="花园贴纸"><span>我的贴纸</span>{[['flower', '小花'], ['heart', '爱心'], ['star', '星星'], ['butterfly', '蝴蝶']].map(([type, name]) => <button key={type} aria-label={`${name}贴纸`} aria-pressed={stamp === type} className={`sticker-choice stamp-${type} ${stamp === type ? 'selected' : ''}`} onClick={() => setStamp(type)} data-stamp-type={type}><Stamp type={type} /><span>{name}</span></button>)}<button className="quiet-button" disabled={!progress.stamps.length} onClick={() => setProgress(p => ({ ...p, stamps: p.stamps.slice(0, -1) }))}><Icon as={ArrowCounterClockwise} />撤回</button><button className="quiet-button" disabled={isExporting} onClick={saveGarden}><Icon as={DownloadSimple} />{isExporting ? "保存中……" : "保存花园"}</button></section> : <section className="quest-list" aria-label="三个小冒险">{quests.map((quest, i) => <button className={`quest-card ${quest.color} ${completed[i] ? 'complete' : ''}`} key={quest.id} onClick={() => openQuest(quest.id)}><span className="quest-icon"><Icon as={quest.icon} size={34} /></span><span className="quest-copy"><small>小冒险 0{i + 1}</small><strong>{quest.title}</strong><span>{completed[i] ? '做得真棒，可以再看看' : quest.hint}</span></span><span className="quest-arrow"><Icon as={completed[i] ? Check : ArrowRight} size={22} /></span></button>)}</section>}
+      {isDecorating ? <section className="sticker-tools" aria-label="花园贴纸"><span>我的贴纸</span>{[['flower', '小花'], ['heart', '爱心'], ['star', '星星'], ['butterfly', '蝴蝶']].map(([type, name]) => <button key={type} aria-label={`${name}贴纸`} aria-pressed={stamp === type} className={`sticker-choice stamp-${type} ${stamp === type ? 'selected' : ''}`} onClick={() => setStamp(type)} data-stamp-type={type}><Stamp type={type} /><span>{name}</span></button>)}<button className="quiet-button" disabled={!progress.stamps.length} onClick={() => setProgress(p => ({ ...p, stamps: p.stamps.slice(0, -1) }))}><Icon as={ArrowCounterClockwise} />撤回</button><button className="quiet-button" disabled={isExporting} onClick={saveGarden}><Icon as={DownloadSimple} />{isExporting ? "保存中……" : "保存花园"}</button></section> : <section className="quest-list" aria-label="三个小冒险">{quests.map((quest, i) => <button className={`quest-card ${quest.color} ${completed[i] ? 'complete' : ''}`} key={quest.id} onClick={() => openQuest(quest.id)}><span className="quest-icon"><Icon as={quest.icon} size={34} /></span><span className="quest-copy"><small>小冒险 0{i + 1}</small><strong>{quest.title}</strong><span>{completed[i] ? '做得真棒，再玩一次' : quest.hint}</span></span><span className="quest-arrow"><Icon as={completed[i] ? Check : ArrowRight} size={22} /></span></button>)}</section>}
       <footer><span><Icon as={Heart} size={16} />灵感来自一位 6 岁小画家的 11 幅画</span><span>{isSaved ? '小心愿会自动记住' : '这次进度暂时无法保存'}<span className="footer-divider">/</span><button onClick={() => setMode('reset')}>重新开始</button></span></footer>
       <GardenBackup progress={progress} onImport={setProgress} />
     </main>
-    {activeQuest && <Modal title={activeQuest.title} onClose={closeModal} className={`quest-modal ${activeQuest.color}`}>
-      <div className="quest-modal-description"><p>{mode === 'rainbow' ? '把六种颜色送回彩虹里。' : mode === 'garden' ? '一口水，一点阳光，小花就会长大。' : '选个口味，再点一位家人，把甜蜜送给他们。'}</p><button className="icon-button" aria-label="听玩法" onClick={() => speak(mode === 'rainbow' ? '请找出' + (colors[progress.rainbow]?.name || '全部颜色，你成功啦') : mode === 'garden' ? '先点水滴给小花浇水，再点太阳送它阳光。' : '先选一个口味，再点一位家人。', true)}><Icon as={SpeakerHigh} /></button></div>
-      {mode === 'rainbow' && <div className="rainbow-game"><div className="color-progress">{colors.map((color, i) => <span key={color.name} style={{ color: progress.rainbow > i ? color.hex : '#dedbd1' }}><Icon as={Heart} weight={progress.rainbow > i ? 'fill' : 'regular'} size={39} /></span>)}</div>{!isQuestComplete && <h3>找一找 <span style={{ color: colors[progress.rainbow].hex }}>{colors[progress.rainbow].name}</span> 的爱心</h3>}<div className="color-choices">{[4, 0, 3, 5, 1, 2].map(index => <button key={index} style={{ '--choice': colors[index].hex }} aria-label={`${colors[index].name}爱心`} disabled={index < progress.rainbow} onClick={() => pickColor(index)}><Icon as={index < progress.rainbow ? Check : Heart} weight="fill" size={58} /><span>{colors[index].name}</span></button>)}</div><p className="game-counter">已找到 {progress.rainbow} / 6 种颜色</p></div>}
-      {mode === 'garden' && <div className="flower-game">{progress.flowers.map((step, i) => <div className={`flower-pot step-${step}`} key={i}><span className="flower-name">{['小粉', '朵朵', '花花', '小芽'][i]}</span><img src={asset('assets/flower.png')} alt={`第${i + 1}朵小花`} /><button disabled={step === 2} onClick={() => careForFlower(i)} aria-label={`${step === 0 ? '浇水' : step === 1 ? '送阳光' : '已开花'}给${['小粉', '朵朵', '花花', '小芽'][i]}`}><Icon as={step === 0 ? Drop : step === 1 ? Sun : Check} weight="duotone" />{['浇浇水', '晒太阳', '开花啦'][step]}</button></div>)}</div>}
-      {mode === 'treat' && <div className="treat-game"><div className="icecream-making"><img className={flavor !== null ? 'icecream-ready' : ''} src={asset('assets/icecream.png')} alt="原画风格的彩色冰淇淋" /><div><h3>{flavor !== null ? '做好啦！送给谁呢？' : '你想做什么口味？'}</h3><div className="flavor-choices">{['草莓', '蓝莓', '芒果'].map((name, i) => <button className={`flavor flavor-${i}`} key={name} aria-pressed={flavor === i} onClick={() => { setFlavor(i); setFeedback(`${name}味冰淇淋做好啦！点一位家人送给他们。`); chime(); }} disabled={isQuestComplete}><Icon as={IceCream} size={27} />{name}{flavor === i && <Icon as={Check} size={18} />}</button>)}</div></div></div><img className="sharing-family" src={asset('assets/family.png')} alt="等着一起吃冰淇淋的一家四口" /><div className="family-choices">{['爸爸', '妈妈', '姐姐', '妹妹'].map((name, i) => <button key={name} disabled={progress.served[i]} onClick={() => serve(i)}>{progress.served[i] && <Icon as={Check} size={18} />}{progress.served[i] ? `${name}收到啦` : `送给${name}`}</button>)}</div></div>}
-      <p className="game-feedback" aria-live="polite">{feedback || '点一点，试试看。'}</p>
-      {isQuestComplete && <div className="success-panel"><Icon as={activeQuest.icon} size={42} /><div><strong>你是「{activeQuest.reward}」啦！</strong><span>这份小成就，送给温柔又勇敢的你。</span></div><button className="primary-button" onClick={() => { closeModal(); tell(`获得小成就：${activeQuest.reward}！`); if (total === 3) setMode('party'); }}> {total === 3 ? '去开派对' : '回到花园'}<Icon as={ArrowRight} size={18} /></button></div>}
-    </Modal>}
     {mode === 'photo' && <Modal title="我的花园照片" onClose={closeModal} className="gallery-modal"><p className="modal-subtitle">把今天的快乐留在照片里。</p><img className="garden-photo" src={photo} alt="包含家人和贴纸的花园照片" /><div className="photo-actions"><a className="primary-button" href={photo} download="我的花园王国.png"><Icon as={DownloadSimple} />下载图片</a><span>也可以长按或右键图片保存</span></div></Modal>}
     {mode === 'gallery' && <Modal title="小小画家的画展" onClose={closeModal} className="gallery-modal"><p className="modal-subtitle">每个奇妙的故事，都从一张画开始。</p><div className="artwork-view"><img src={asset(`artworks/${galleryIndex + 1}.jpg`)} className={turns[galleryIndex] ? 'rotated-art' : ''} style={{ transform: `translate(-50%, -50%) rotate(${turns[galleryIndex]}deg)` }} alt={artworkNames[galleryIndex]} /></div><div className="gallery-controls"><button className="icon-button" aria-label="上一幅画" onClick={() => setGalleryIndex((galleryIndex + 10) % 11)}><Icon as={ArrowLeft} /></button><div><strong>{artworkNames[galleryIndex]}</strong><span>{galleryIndex + 1} / 11</span></div><button className="icon-button" aria-label="下一幅画" onClick={() => setGalleryIndex((galleryIndex + 1) % 11)}><Icon as={ArrowRight} /></button></div></Modal>}
     {mode === 'collection' && <Modal title="我的小成就" onClose={closeModal}><p className="modal-subtitle">每一次用心，都值得被记住。</p><div className="achievement-list">{quests.map((q, i) => <button key={q.id} onClick={() => openQuest(q.id)} className={completed[i] ? 'earned' : ''}><Icon as={q.icon} size={48} /><strong>{q.reward}</strong><span>{completed[i] ? '已经收集到啦' : '去玩一玩'}</span></button>)}</div><p className="game-counter">已经收集 {total} / 3 份小成就</p></Modal>}
