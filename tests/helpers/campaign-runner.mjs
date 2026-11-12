@@ -2,8 +2,8 @@ import {createCampaignWorld} from '../../shared/campaign.js';
 import {createPlayer,stepPlayer} from '../../src/game/physics.js';
 import {moveCampaignPlatforms} from '../../src/game/combat.js';
 import {touchSpring} from '../../src/game/enemies.js';
-export function play(id,seed=42){
- const w=createCampaignWorld(seed,id),p=createPlayer(w.start);let elapsed=0,idx=0,lastAdvance=0;const visited=new Set(),collected=new Set();
+export function play(id,seed=42,version=1){
+ const w=createCampaignWorld(seed,id,version),p=createPlayer(w.start);let elapsed=0,idx=0,lastAdvance=0;const visited=new Set(),collected=new Set();
  for(let frame=0;frame<120*1800;frame++){
   elapsed+=1/120;moveCampaignPlatforms(w.lifts,elapsed);
   const next=w.platforms[w.mainPath[idx+1]];if(!next)return {id,seconds:Math.round(elapsed),recoveries:p.recoveries,visited:visited.size,collected:collected.size,required:w.requiredFlowers,total:w.zones.length};

@@ -16,7 +16,7 @@ export function validateRun(input) {
   if (!Number.isFinite(started) || started < Date.UTC(2020, 0, 1) || started > Date.now() + 300000) throw new InputError('游玩时间不正确');
   const scoringVersion = input.scoringVersion === undefined ? 1 : integer(input.scoringVersion, 1, 3, '计分规则');
   const seed = integer(input.seed, 0, 4294967295, '地图编号');
-  const generationVersion = scoringVersion === 3 ? integer(input.generationVersion, GENERATION_VERSION, GENERATION_VERSION, '地图版本') : 0;
+  const generationVersion = scoringVersion === 3 ? integer(input.generationVersion, GENERATION_VERSION, 2, '地图版本') : 0;
   const world = scoringVersion === 3 ? createCampaignWorld(seed, level, generationVersion) : null;
   const treasureCount = world?.treasures.length ?? level.platforms;
   const flowers = integer(input.flowers, 0, treasureCount, '小花数量');
