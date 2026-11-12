@@ -85,7 +85,7 @@ test('存档同种子保留奖励、小怪生命、机关与恢复点，损坏�
  const world=createCampaignWorld(42,'sweet'), map=new Map(),storage={getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v)};
  const run={seed:42,levelId:'sweet',scoringVersion:3,generationVersion:1,players:1,status:'paused'};
  const state={version:1,seed:42,levelId:'sweet',elapsed:42,collectedIds:[1],defeatedIds:[1],visited:[1],switches:[0],players:[{safeId:0}],enemies:world.enemies};
- writeAdventure(run,state,storage);assert.deepEqual(readAdventure(storage),{run,state});
+ writeAdventure(run,state,storage);const migrated=readAdventure(storage);const {survival,checkpointId,...restored}=migrated.state;assert.deepEqual({run:migrated.run,state:restored},{run,state});assert.equal(survival.lives,9);assert.equal(checkpointId,0);
  state.skillState={kind:'bubble',until:62,collectedIds:[1]};
  writeAdventure(run,state,storage);assert.deepEqual(readAdventure(storage).state.skillState,state.skillState);
  assert.equal(currentSkill(readAdventure(storage).state.skillState,42),'bubble');

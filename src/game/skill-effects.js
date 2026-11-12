@@ -28,7 +28,7 @@ export class SkillEffects {
     for (let i = 0; i < (this.isReducedMotion ? 4 : 10); i++) this.add(group, 'stars', 0.6, 0.6);
     this.bursts.push({ group, at, isReward });
   }
-  update(waves, state, players, elapsed, cameraX, halfWidth) {
+  update(waves, state, players, elapsed, cameraX, halfWidth, playerKinds) {
     const kind = currentSkill(state, elapsed);
     for (const { reward, group } of this.rewards) {
       group.visible = !state.collectedIds.includes(reward.id) && Math.abs(reward.x - cameraX) < halfWidth + 3;
@@ -41,6 +41,7 @@ export class SkillEffects {
     }
     for (const [wave, group] of this.shots) if (!waves.includes(wave)) { this.scene.remove(group); this.shots.delete(wave); }
     for (const wave of waves) {
+      if (wave.kind === 'pulse') continue;
       let group = this.shots.get(wave);
       if (!group) {
         group = this.group(); this.shots.set(wave, group);
@@ -65,10 +66,11 @@ export class SkillEffects {
         this.add(group, 'stars', 0.6, 0.6).position.set(1.2, 1, 0);
         this.halos[i] = group;
       }
-      const halo = this.halos[i]; halo.visible = kind !== 'blade';
+      const playerKind = playerKinds?.[i] || kind;
+      const halo = this.halos[i]; halo.visible = playerKind !== 'blade';
       halo.position.set(player.x, player.y + 1.1, 0.4);
       halo.rotation.z = this.isReducedMotion ? 0 : Math.sin(elapsed * 2) * 0.12;
-      halo.children[1].visible = kind === 'stars';
+      halo.children[1].visible = playerKind === 'stars';
     });
     this.bursts = this.bursts.filter(burst => {
       const age = elapsed - burst.at;

@@ -13,7 +13,7 @@ export function createPlayer(platform, offset = 0) {
   return { x: platform.x + offset, y: platform.y, vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, facing: 1, recoveries: 0, protection: 0, knockTime: 0, dropTime: 0, springTime: 0 };
 }
 export function rescue(player, platform = player.safe) {
-  Object.assign(player, { x: platform.x, y: platform.y, vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, protection: 2, knockTime: 0, dropTime: 0, springTime: 0 });
+  Object.assign(player, { x: platform.x, y: platform.y, vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, protection: 2, knockTime: 0, dropTime: 0, springTime: 0, isAirJumpUsed: false });
   player.recoveries += 1;
 }
 // 固定 120 Hz 步长。落地只检查下降穿过台面，孩子可从下方跳上台。
@@ -30,13 +30,16 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   if (input.jump) player.buffer = RULES.buffer;
   else player.buffer = Math.max(0, player.buffer - dt);
   player.coyote = player.isGrounded ? RULES.coyote : Math.max(0, player.coyote - dt);
-  const targetVx = input.direction * RULES.speed;
+  const targetVx = input.direction * RULES.speed * (input.speedMultiplier ?? 1);
   player.vx = player.knockTime > 0 ? player.knockVx : player.isGrounded && player.ground?.isIce ? player.vx + Math.max(-12*dt, Math.min(12*dt,targetVx-player.vx)) : targetVx;
   if (player.isGrounded && player.ground?.conveyor) player.x += player.ground.conveyor * dt;
   if (input.direction) player.facing = input.direction;
   let isJumped = false;
   if (player.buffer > 0 && player.coyote > 0) {
     player.vy = RULES.jump; player.buffer = 0; player.coyote = 0; player.isGrounded = false; isJumped = true;
+  }
+  if (!isJumped && input.jump && input.isDoubleJump && !player.isGrounded && !player.isAirJumpUsed && player.dropTime <= 0) {
+    player.vy = RULES.jump; player.buffer = 0; player.coyote = 0; player.isAirJumpUsed = true; isJumped = true;
   }
   const previousY = player.y;
   player.x += player.vx * dt;
@@ -53,12 +56,12 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   }
   player.ground = landing;
   if (landing) {
-    player.y = landing.y; player.vy = 0; player.isGrounded = true;
+    player.y = landing.y; player.vy = 0; player.isGrounded = true; player.isAirJumpUsed = false;
     // 移动台不作为复活点；静止平台中央才能记录为安全位置。
     if (!landing.isMoving && Math.abs(player.x - landing.x) < landing.width / 2 - 0.35) player.safe = landing;
   }
   const isRescued = player.y < (bounds.minY ?? -7);
-  if (isRescued) rescue(player);
+  if (isRescued && !bounds.isFiniteLife) rescue(player);
   return { isJumped, isRescued };
 }
 export function regroup(players, maxDistance = 13) {

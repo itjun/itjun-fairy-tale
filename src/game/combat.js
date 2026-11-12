@@ -48,7 +48,7 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   const distance = Math.min(wave.remaining, wave.speed * dt);
   const dx = wave.direction * distance, dy = wave.slope * distance;
   const contacts = enemies.filter(e => !e.isDefeated && !wave.hitIds.has(e.id)).map(enemy => ({
-    enemy, time: contactTime(wave.x, wave.y, dx, dy, enemy, wave.kind === 'bubble' ? 0.65 : 0.25),
+    enemy, time: contactTime(wave.x, wave.y, dx, dy, enemy, wave.kind === 'bubble' ? 0.65 : (wave.radius ?? 0.25)),
   })).filter(hit => hit.time !== null).sort((a, b) => a.time - b.time);
   const fraction = wave.kind === 'bubble' && contacts.length ? contacts[0].time : 1;
   wave.x += dx * fraction; wave.y += dy * fraction; wave.remaining -= distance; wave.age += dt;
@@ -56,8 +56,8 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   let targets = contacts.map(hit => hit.enemy);
   if (wave.kind === 'bubble' && (contacts.length || !wave.isActive)) {
     wave.isActive = false;
-    wave.burst = { x: wave.x, y: wave.y, radius: 3.8 };
-    targets = enemies.filter(e => !e.isDefeated && Math.hypot(e.x - wave.x, e.y + e.height / 2 - wave.y) <= 3.8);
+    wave.burst = { x: wave.x, y: wave.y, radius: wave.burstRadius ?? 3.8 };
+    targets = enemies.filter(e => !e.isDefeated && Math.hypot(e.x - wave.x, e.y + e.height / 2 - wave.y) <= (wave.burstRadius ?? 3.8));
   }
   return targets.filter(enemy => !wave.hitIds.has(enemy.id)).map(enemy => {
     wave.hitIds.add(enemy.id);
