@@ -1,3 +1,4 @@
+import { expandEncounters } from './encounters.js';
 import { expandAdventureWorld } from './adventure-world.js';
 import { randomGenerator } from './random.js';
 import { COLLECTIBLES, LEVEL_COLLECTIBLES, collectionPoints } from './collectibles.js';
@@ -181,6 +182,7 @@ export function validateCampaign(world) {
   return world.milestones.length === CAMPAIGNS[world.levelId].regions.length;
 }
 export function createCampaignWorld(seed, level, version = GENERATION_VERSION) {
+  if (version === 3) return expandEncounters(createCampaignWorld(seed, level, 2));
   if (version === 2) return expandAdventureWorld(createCampaignWorld(seed, level, 1));
   if (version !== GENERATION_VERSION) throw new Error('这局地图版本暂不支持');
   const id = typeof level === 'string' ? level : level.id;

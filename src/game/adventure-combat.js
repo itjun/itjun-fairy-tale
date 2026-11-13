@@ -14,7 +14,7 @@ export function fireAdventureWeapon(player, elapsed, bounds, weapon, powers = {}
   return shots.map(shot => ({ ...shot, powers: { ...powers }, burstRadius: 3.8 + (powers.area || 0) * 0.7, radius: 0.25 + (powers.area || 0) * 0.12 + (weapon === 'blade' ? (powers.wide || 0) * 0.25 : 0), hitIds: new Set(shot.hitIds) }));
 }
 export function areaAttack(x, y, radius, enemies, elapsed, powers = {}) {
-  return enemies.filter(e => !e.isDefeated && !e.isDormant && Math.hypot(e.x - x, e.y + e.height / 2 - y) < radius).map(enemy => {
+  return enemies.filter(e => !e.isDefeated && !e.isDormant && !e.isHidden && Math.hypot(e.x - x, e.y + e.height / 2 - y) < radius).map(enemy => {
     if (powers.frost) enemy.slowUntil = elapsed + 1.5 + powers.frost;
     return { enemy, isDefeated: damageEnemy(enemy, elapsed) };
   });
@@ -22,7 +22,7 @@ export function areaAttack(x, y, radius, enemies, elapsed, powers = {}) {
 export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
   if (!wave.isActive) return { hits: [], spawned: [] };
   const powers = wave.powers || {}, spawned = [];
-  const active = enemies.filter(e => !e.isDormant);
+  const active = enemies.filter(e => !e.isDormant && !e.isHidden);
   if (wave.kind === 'pulse') {
     wave.age += dt;
     if (wave.age < wave.delay) return { hits: [], spawned };
@@ -53,6 +53,10 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
     if (powers.returnSplit) for (const slope of [-0.2, 0.2]) spawned.push({ ...wave, kind: 'stars', slope, powers: {}, hitIds: new Set() });
   }
   for (const hit of [...hits]) {
+    if (wave.bindingCharge && !wave.bindingCharge.isUsed) {
+      wave.bindingCharge.isUsed = true;
+      hit.enemy.boundUntil = elapsed + (hit.enemy.isElite ? 0.7 : 1.6);
+    }
     if (powers.frost) hit.enemy.slowUntil = elapsed + 1.5 + powers.frost;
     if (powers.chain && !wave.isChained) {
       const targets = active.filter(e => !e.isDefeated && !wave.hitIds.has(e.id) && Math.hypot(e.x - hit.enemy.x, e.y - hit.enemy.y) < 4 + powers.chain).slice(0, powers.chain);

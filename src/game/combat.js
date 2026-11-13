@@ -1,6 +1,7 @@
 // 固定步长内用线段扫过目标，光波再快也不会穿过小怪。
-export function damageEnemy(enemy, elapsed = enemy.elapsed) {
-  if (enemy.isDefeated) return false;
+export function damageEnemy(enemy, elapsed = enemy.elapsed, source) {
+  if (enemy.isDefeated || enemy.isHidden) return false;
+  if (enemy.isGuarding && source && Math.sign(source.x-enemy.x) === enemy.direction) { enemy.guardHits = (enemy.guardHits || 0) + 1; if (enemy.guardHits % 2) { enemy.hitUntil = elapsed + 0.16; return false; } }
   enemy.hp = Math.max(0, (enemy.hp ?? 1) - 1);
   enemy.hitUntil = elapsed + 0.16;
   if (enemy.hp) return false;
@@ -45,9 +46,10 @@ function contactTime(x, y, dx, dy, enemy, radius) {
 
 export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   if (!wave.isActive) return [];
+  const source = { x: wave.x };
   const distance = Math.min(wave.remaining, wave.speed * dt);
   const dx = wave.direction * distance, dy = wave.slope * distance;
-  const contacts = enemies.filter(e => !e.isDefeated && !wave.hitIds.has(e.id)).map(enemy => ({
+  const contacts = enemies.filter(e => !e.isDefeated && !e.isHidden && !wave.hitIds.has(e.id)).map(enemy => ({
     enemy, time: contactTime(wave.x, wave.y, dx, dy, enemy, wave.kind === 'bubble' ? 0.65 : (wave.radius ?? 0.25)),
   })).filter(hit => hit.time !== null).sort((a, b) => a.time - b.time);
   const fraction = wave.kind === 'bubble' && contacts.length ? contacts[0].time : 1;
@@ -61,7 +63,7 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   }
   return targets.filter(enemy => !wave.hitIds.has(enemy.id)).map(enemy => {
     wave.hitIds.add(enemy.id);
-    return { enemy, isDefeated: damageEnemy(enemy, elapsed) };
+    return { enemy, isDefeated: damageEnemy(enemy, elapsed, source) };
   });
 }
 export function moveCampaignPlatforms(lifts, elapsed) {

@@ -10,11 +10,21 @@ export function nextPlatform(previous, random, level) {
   return { id, width, x: previous.x + previous.width / 2 + gap + width / 2, y, isCheckpoint };
 }
 export function createPlayer(platform, offset = 0) {
-  return { x: platform.x + offset, y: platform.y, vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, facing: 1, recoveries: 0, protection: 0, knockTime: 0, dropTime: 0, springTime: 0 };
+  return { x: platform.x + offset, y: platform.y, vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, safeX: platform.x + offset, facing: 1, recoveries: 0, protection: 0, knockTime: 0, dropTime: 0, springTime: 0 };
 }
-export function rescue(player, platform = player.safe) {
-  Object.assign(player, { x: platform.x, y: platform.y, vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, protection: 2, knockTime: 0, dropTime: 0, springTime: 0, isAirJumpUsed: false });
+export function rescue(player, platform = player.safe, x = platform.x) {
+  Object.assign(player, { x, y: platform.y, vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, protection: 2, knockTime: 0, dropTime: 0, springTime: 0, isAirJumpUsed: false });
+  if (!platform.isMoving) { player.safe = platform; player.safeX = x; }
   player.recoveries += 1;
+}
+export function revivalPoint(player, platforms, isFall) {
+  // 掉坑回到最后站稳的位置；受伤死亡优先原地或脚下的平台，不退回旧旗子。
+  let platform = !isFall && player.isGrounded && player.ground?.isEnabled !== false ? player.ground : null;
+  if (!platform && !isFall) platform = platforms.filter(p => p.isEnabled !== false && p.y <= player.y + 0.01 && player.y - p.y < 8 && Math.abs(player.x - p.x) <= p.width / 2 - 0.35).sort((a,b) => b.y-a.y)[0];
+  const x = platform ? player.x : player.safeX ?? player.safe.x;
+  platform ||= player.safe;
+  const margin = Math.max(0, platform.width / 2 - 0.35);
+  return { platformId: platform.id, offsetX: Math.max(-margin, Math.min(margin, x-platform.x)) };
 }
 // 固定 120 Hz 步长。落地只检查下降穿过台面，孩子可从下方跳上台。
 export function stepPlayer(player, input, platforms, dt, bounds = {}) {
@@ -57,8 +67,8 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   player.ground = landing;
   if (landing) {
     player.y = landing.y; player.vy = 0; player.isGrounded = true; player.isAirJumpUsed = false;
-    // 移动台不作为复活点；静止平台中央才能记录为安全位置。
-    if (!landing.isMoving && Math.abs(player.x - landing.x) < landing.width / 2 - 0.35) player.safe = landing;
+    // 记录最近站稳的平台及横向位置，掉坑后不退回平台中央或检查点。
+    if (!landing.isMoving && Math.abs(player.x - landing.x) < landing.width / 2 - 0.35) { player.safe = landing; player.safeX = player.x; }
   }
   const isRescued = player.y < (bounds.minY ?? -7);
   if (isRescued && !bounds.isFiniteLife) rescue(player);

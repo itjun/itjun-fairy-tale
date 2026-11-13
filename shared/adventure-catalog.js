@@ -1,5 +1,5 @@
 // 新冒险的内容目录与旧地图版本分开，服务端和游戏共用怪物奖励定义。
-export const ADVENTURE_GENERATION_VERSION = 2;
+export const ADVENTURE_GENERATION_VERSION = 3;
 export const MONSTERS = Object.freeze({
   jelly: { name: '果冻怪', points: 10, family: 'power', behavior: 'hop', image: 'enemy-jelly' },
   leaf: { name: '叶子怪', points: 15, family: 'flight', behavior: 'leap', image: 'enemy-leaf' },
@@ -12,6 +12,18 @@ export const MONSTERS = Object.freeze({
   squirrel: { name: '松果松鼠', points: 25, family: 'nature', behavior: 'lob', image: 'enemy-squirrel' },
   firefly: { name: '萤火虫', points: 25, family: 'flight', behavior: 'dart', image: 'enemy-firefly' },
   toy: { name: '发条玩具', points: 25, family: 'power', behavior: 'charge', image: 'enemy-toy' },
+  flowerpot: { name: '花盆怪', points: 20, family: 'nature', behavior: 'vine', image: 'monster-flowerpot' },
+  umbrella: { name: '小伞怪', points: 20, family: 'flight', behavior: 'glide', image: 'monster-umbrella' },
+  bell: { name: '铃铛哨兵', points: 25, family: 'power', behavior: 'alarm', image: 'monster-bell' },
+  ink: { name: '墨滴怪', points: 20, family: 'bubble', behavior: 'inkhop', image: 'monster-ink' },
+  leafshield: { name: '叶盾怪', points: 25, family: 'nature', behavior: 'guard', image: 'monster-leafshield' },
+  wool: { name: '毛线虫', points: 20, family: 'nature', behavior: 'crawl', image: 'monster-wool' },
+  moth: { name: '灯笼蛾', points: 25, family: 'flight', behavior: 'orbit', image: 'monster-moth' },
+  pillow: { name: '枕头守卫', points: 30, family: 'power', behavior: 'stomp', image: 'monster-pillow' },
+  sandcastle: { name: '沙堡怪', points: 25, family: 'power', behavior: 'build', image: 'monster-sandcastle' },
+  icicle: { name: '冰锥团', points: 25, family: 'frost', behavior: 'drop', image: 'monster-icicle' },
+  burrow: { name: '地洞团', points: 20, family: 'nature', behavior: 'burrow', image: 'monster-burrow' },
+  paint: { name: '彩笔桶', points: 30, family: 'bubble', behavior: 'summon', image: 'monster-paint' },
   candy: { name: '糖果团', points: 20, family: 'bubble', behavior: 'split', image: 'enemy-candy' },
 });
 export const THEME_MONSTERS = Object.freeze({
@@ -19,6 +31,17 @@ export const THEME_MONSTERS = Object.freeze({
   sweet: ['jelly', 'candy', 'mushroom', 'toy'], beach: ['crab', 'fish', 'puff', 'jelly'],
   meadow: ['leaf', 'squirrel', 'firefly', 'mushroom'], snow: ['snowball', 'snowflower', 'puff', 'toy'],
   forest: ['mushroom', 'squirrel', 'firefly', 'leaf'], cartoon: ['toy', 'candy', 'fish', 'firefly'],
+});
+// 版本 2 沿用上方候选池，版本 3 才使用扩展池，避免旧存档重抽。
+export const EXPANDED_THEME_MONSTERS = Object.freeze({
+  rainbow: ['jelly', 'leaf', 'mushroom', 'puff', 'flowerpot', 'umbrella', 'ink', 'wool'],
+  family: ['leaf', 'toy', 'puff', 'squirrel', 'bell', 'leafshield', 'pillow', 'paint'],
+  sweet: ['jelly', 'candy', 'mushroom', 'toy', 'pillow', 'ink', 'paint', 'umbrella'],
+  beach: ['crab', 'fish', 'puff', 'jelly', 'sandcastle', 'umbrella', 'burrow', 'wool'],
+  meadow: ['leaf', 'squirrel', 'firefly', 'mushroom', 'flowerpot', 'leafshield', 'wool', 'burrow'],
+  snow: ['snowball', 'snowflower', 'puff', 'toy', 'icicle', 'pillow', 'umbrella', 'bell'],
+  forest: ['mushroom', 'squirrel', 'firefly', 'leaf', 'moth', 'leafshield', 'flowerpot', 'burrow'],
+  cartoon: ['toy', 'candy', 'fish', 'firefly', 'paint', 'bell', 'ink', 'moth'],
 });
 export const WEAPONS = Object.freeze({
   blade: { name: '贯穿光刃', shortName: '光刃', image: 'light-wave', hint: '穿过平台和沿途小怪', family: 'power' },
@@ -29,10 +52,28 @@ export const WEAPONS = Object.freeze({
   firefly: { name: '萤火法杖', shortName: '萤火', image: 'weapon-firefly', hint: '小萤光追着前方小怪飞', family: 'nature' },
 });
 export const UPGRADES = Object.freeze({
+  petal: { name: '花瓣护心', hint: '打败 6 只小怪，恢复 1 格体力', image: 'upgrade-petal', family: 'nature', category: 'survival' },
+  armor: { name: '叶片护甲', hint: '每片区域挡一次伤害，不能挡掉坑', image: 'monster-leafshield', family: 'nature', category: 'survival' },
+  cotton: { name: '软软棉衣', hint: '受伤时不容易被撞飞', image: 'monster-wool', family: 'frost', category: 'survival' },
+  safeLanding: { name: '安稳落脚', hint: '落下高台时，短暂保护自己', image: 'lift-leaf', family: 'flight', category: 'survival' },
+  courage: { name: '小小勇气', hint: '只剩 1 格体力时保护一次，每关一次', image: 'collectible-heart', family: 'power', category: 'survival' },
+  wreath: { name: '守护花环', hint: '清空一片区域，获得一次护罩', image: 'flower', family: 'nature', category: 'survival' },
+  recycle: { name: '彩笔回收', hint: '放弃本次奖励，可换 3 片彩笔碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
+  duplicate: { name: '重复变宝', hint: '重复本领可回收为 5 片碎片', image: 'upgrade-recycle', family: 'bubble', category: 'resource' },
+  pocket: { name: '补给口袋', hint: '精英额外给碎片和一份恢复点心', image: 'icecream', family: 'nature', category: 'resource' },
+  thrift: { name: '节约巧手', hint: '休息点回体力，只花 3 片碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
+  snack: { name: '备用点心', hint: '满血时存一份点心，受伤后自动吃', image: 'icecream', family: 'bubble', category: 'resource' },
+  explorer: { name: '探路奖励', hint: '首次走完分岔路线，多得 3 片碎片', image: 'collectible-star', family: 'flight', category: 'resource' },
+  bind: { name: '泡泡束缚', hint: '每隔 5 秒，命中可困住小怪', image: 'magic-bubble', family: 'bubble', category: 'utility' },
+  lure: { name: '花香诱饵', hint: '每隔 8 秒，攻击留下引开小怪的花', image: 'flower', family: 'nature', category: 'utility' },
+  breeze: { name: '清风推开', hint: '受伤时推开附近小怪', image: 'collectible-rainbow', family: 'flight', category: 'utility' },
+  cleanse: { name: '彩虹净化', hint: '每隔 8 秒，清掉身边最多 3 颗弹丸', image: 'collectible-rainbow', family: 'frost', category: 'utility' },
+  guide: { name: '宝物指路', hint: '显示附近未找到的宝物方向', image: 'collectible-star', family: 'nature', category: 'utility' },
+  feather: { name: '轻羽缓落', hint: '在空中按住跳跃，慢慢落下来', image: 'collectible-balloon', family: 'flight', category: 'utility' },
   double: { name: '双重发射', hint: '一次发出两组攻击', image: 'collectible-star', family: 'power' },
   split: { name: '星光分裂', hint: '命中时再散出小星星', image: 'collectible-star', family: 'bubble' },
   frost: { maxRank: 3, name: '冰霜', hint: '打中后，小怪慢下来', image: 'upgrade-frost', family: 'frost' },
-  chain: { maxRank: 3, name: '连锁光点', hint: '光点跳向附近的小怪', image: 'collectible-rainbow', family: 'nature' },
+  chain: { maxRank: 3, name: '连锁光点', hint: '光点跳向附近的小怪', image: 'upgrade-chain', family: 'nature' },
   area: { maxRank: 3, name: '范围加宽', hint: '攻击变大，更容易打中', image: 'magic-bubble', family: 'bubble' },
   rapid: { maxRank: 3, name: '轻快连发', hint: '按住攻击，发射更快', image: 'light-wave', family: 'power' },
   wide: { maxRank: 3, name: '宽宽光刃', hint: '光刃更高，打到更多小怪', image: 'light-wave', family: 'power', weapon: 'blade' },
@@ -49,3 +90,6 @@ export const UPGRADES = Object.freeze({
   haste: { maxRank: 3, name: '轻快脚步', hint: '打败小怪后，跑快一小会儿', image: 'collectible-star', family: 'power' },
 });
 export const FAMILY_LABELS = { power: '光刃强化', bubble: '泡泡强化', flight: '星雨强化', frost: '冰霜强化', nature: '花种强化' };
+
+export const CATEGORY_LABELS = { attack: '攻击', survival: '生存', resource: '资源', utility: '探索' };
+export function upgradeCategory(id) { return UPGRADES[id]?.category || ({ shield: 'survival', magnet: 'resource', air: 'utility', haste: 'utility' }[id]) || 'attack'; }

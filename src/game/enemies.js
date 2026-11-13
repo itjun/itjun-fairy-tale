@@ -13,7 +13,7 @@ export function stepEnemies(enemies, dt) {
 }
 
 export function touchEnemy(player, enemy, previousY, elapsed = enemy.elapsed) {
-  if (enemy.isDefeated || player.protection > 0) return null;
+  if (enemy.isDefeated || enemy.isHidden || player.protection > 0) return null;
   if (Math.abs(player.x - enemy.x) > enemy.width / 2 + RULES.radius) return null;
   const top = enemy.y + enemy.height;
   if (player.vy <= 0 && previousY >= top - 0.15 && player.y <= top + 0.08) {
