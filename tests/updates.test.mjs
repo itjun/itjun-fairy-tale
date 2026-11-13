@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { newerVersion, selectUpdate, releaseAssetUrl } from '../desktop/update-policy.mjs';
-import { verifyFile, UpdateManager, macSwapScript } from '../desktop/updates.mjs';
+import { newerVersion, selectUpdate, releaseAssetUrl, releaseTag, RELEASES, LATEST_RELEASE } from '../desktop/update-policy.mjs';
+import { verifyFile, UpdateManager, macSwapScript, findUpdate, fetchRelease } from '../desktop/updates.mjs';
 import { validateMacArchive } from '../desktop/zip-directory.mjs';
 const exec = promisify(execFile);
 const content = Buffer.from('verified-update');
@@ -15,6 +15,37 @@ const file = { platform: process.platform, arch: process.arch, name: 'GardenKing
 const url = `https://github.com/itjun/itjun-fairy-tale/releases/download/v0.2.0/${file.name}`;
 const release = { tag_name: 'v0.2.0', assets: [{ name: 'garden-update.json', browser_download_url: 'https://github.com/itjun/itjun-fairy-tale/releases/download/v0.2.0/garden-update.json' }, { name: file.name, size: file.size, browser_download_url: url }] };
 const manifest = { schema: 1, version: '0.2.0', files: [file] };
+test('GitHub API 限流时通过正式发布标签检查，清单和下载仍锁定同一版本', async () => {
+  const calls = [];
+  const fetcher = async (address, options) => {
+    calls.push(address);
+    if (address === RELEASES) throw Object.assign(new Error('403'), { isRateLimited: true });
+    if (address === LATEST_RELEASE) {
+      assert.equal(options.method, 'HEAD');
+      return { url: 'https://github.com/itjun/itjun-fairy-tale/releases/tag/v0.2.0' };
+    }
+    assert.equal(address, release.assets[0].browser_download_url);
+    return Response.json(manifest);
+  };
+  const update = await findUpdate(fetcher, '0.1.0', process.platform, process.arch);
+  assert.equal(update.url, url); assert.equal(update.sha512, file.sha512); assert.equal(update.size, file.size);
+  assert.equal(await findUpdate(fetcher, '0.2.0', process.platform, process.arch), null);
+  assert.equal(await findUpdate(fetcher, '0.3.1', process.platform, process.arch), null);
+  assert.equal(calls.length, 9);
+  await assert.rejects(findUpdate(async address => address === release.assets[0].browser_download_url ? Response.json({...manifest,version:'0.3.0'}) : fetcher(address, {method:'HEAD'}), '0.1.0', process.platform, process.arch), /不匹配/);
+  await assert.rejects(findUpdate(async () => { throw new Error('offline'); }, '0.1.0', process.platform, process.arch), /offline/);
+  assert.throws(() => releaseTag('https://github.com/other/repo/releases/tag/v0.2.0'), /不可信/);
+  assert.throws(() => releaseTag('https://github.com/itjun/itjun-fairy-tale/releases/tag/v0.2.0-beta'), /稳定版本/);
+});
+test('仅 API 明确限流才走备用入口，并拒绝非官方重定向', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('', {status:403,headers:{'x-ratelimit-remaining':'0'}}));
+  await assert.rejects(fetchRelease(RELEASES), error => error.isRateLimited === true);
+  await assert.rejects(fetchRelease(LATEST_RELEASE), error => error.isRateLimited === false);
+  globalThis.fetch = async () => new Response('', {status:403});
+  await assert.rejects(fetchRelease(RELEASES), error => error.isRateLimited === false);
+  globalThis.fetch = async () => new Response('', {status:302,headers:{location:'https://example.com/update'}});
+  await assert.rejects(fetchRelease(RELEASES), /不可信/);
+});
 test('中文 UTF-8 ZIP 不依赖系统 unzip 编码，拒绝越界及截断的目录', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'garden-zip-'));
   // ZIP fixtures produced by Python's zipfile, independently of the reader.

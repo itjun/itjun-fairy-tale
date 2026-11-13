@@ -4,23 +4,45 @@ import { createReadStream, constants } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { RELEASES, releaseAssetUrl, selectUpdate } from './update-policy.mjs';
+import { RELEASES, LATEST_RELEASE, REPOSITORY, releaseTag, releaseAssetUrl, selectUpdate, selectManifestUpdate } from './update-policy.mjs';
 import { validateMacArchive } from './zip-directory.mjs';
 const exec = promisify(execFile);
 
 // Node fetch is intentionally separate from the renderer's blocked network session.
-export async function fetchRelease(url) {
+export async function fetchRelease(url, { method = 'GET' } = {}) {
   let target = url;
   const timeout = /\.(zip|exe)$/.test(new URL(url).pathname) ? 15 * 60 * 1000 : 30000;
   for (let i = 0; i < 6; i++) {
     const u = new URL(target);
     if (u.protocol !== 'https:' || !['api.github.com', 'github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'].includes(u.hostname) || u.username || u.password) throw new Error('更新下载地址不可信');
-    const response = await fetch(target, { redirect: 'manual', signal: AbortSignal.timeout(timeout), headers: { 'User-Agent': 'GardenKingdom-Updater', Accept: 'application/vnd.github+json' } });
+    const response = await fetch(target, { method, redirect: 'manual', signal: AbortSignal.timeout(timeout), headers: { 'User-Agent': 'GardenKingdom-Updater', Accept: u.hostname === 'api.github.com' ? 'application/vnd.github+json' : '*/*' } });
     if ([301,302,303,307,308].includes(response.status)) { target = new URL(response.headers.get('location'), target).href; await response.body?.cancel(); continue; }
-    if (!response.ok) throw new Error(`更新服务暂不可用 (${response.status})`);
+    if (!response.ok) {
+      const error = new Error(`更新服务暂不可用 (${response.status})`);
+      error.isRateLimited = u.hostname === 'api.github.com' && (response.status === 429 || response.status === 403 && (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after')));
+      await response.body?.cancel();
+      throw error;
+    }
     return response;
   }
   throw new Error('更新重定向过多');
+}
+export async function findUpdate(fetcher, current, platform, arch) {
+  let release;
+  try { release = await (await fetcher(RELEASES)).json(); }
+  catch (error) {
+    if (!error.isRateLimited) throw error;
+    // GitHub 的正式发布入口不占 REST 匿名额度；固定到解析出的标签，避免两次请求跨版本。
+    const response = await fetcher(LATEST_RELEASE, { method: 'HEAD' });
+    await response.body?.cancel();
+    const tag = releaseTag(response.url);
+    const manifest = await (await fetcher(releaseAssetUrl(`https://github.com/${REPOSITORY}/releases/download/${tag}/garden-update.json`))).json();
+    return selectManifestUpdate(manifest, tag, current, platform, arch);
+  }
+  const asset = release.assets?.find(item => item.name === 'garden-update.json');
+  if (!asset) throw new Error('正式版本尚未提供更新清单');
+  const manifest = await (await fetcher(releaseAssetUrl(asset.browser_download_url))).json();
+  return selectUpdate(manifest, release, current, platform, arch);
 }
 export async function verifyFile(path, expected) {
   const hash = createHash('sha512'); let size = 0;
@@ -102,11 +124,7 @@ export class UpdateManager {
     this.busy = true;
     try {
       this.emit('checking', '正在检查新版本…');
-      const release = await (await this.fetcher(RELEASES)).json();
-      const asset = release.assets?.find(item => item.name === 'garden-update.json');
-      if (!asset) throw new Error('正式版本尚未提供更新清单');
-      const manifest = await (await this.fetcher(releaseAssetUrl(asset.browser_download_url))).json();
-      const update = selectUpdate(manifest, release, this.app.getVersion(), process.platform, process.arch);
+      const update = await findUpdate(this.fetcher, this.app.getVersion(), process.platform, process.arch);
       if (!update) { this.emit('current', '已经是最新版本'); return this.state; }
       const cache = join(this.app.getPath('userData'), 'updates'); await mkdir(cache, { recursive: true, mode: 0o700 });
       const path = join(cache, update.name), part = path + '.partial';
