@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import sharp from 'sharp';
+import { fileURLToPath } from 'node:url';
 import { createCampaignWorld } from '../shared/campaign.js';
 import { GardenEngine } from '../src/game/engine.js';
 
 async function material(name) {
-  const {width,height}=await sharp(new URL(`../public/assets/${name}.png`,import.meta.url).pathname).metadata();
+  const {width,height}=await sharp(fileURLToPath(new URL(`../public/assets/${name}.png`,import.meta.url))).metadata();
   const map=new THREE.Texture({width,height});
   return new THREE.MeshBasicMaterial({map,transparent:true,alphaTest:.08});
 }
