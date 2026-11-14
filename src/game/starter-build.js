@@ -2,9 +2,9 @@ import { newAdventure } from './adventure.js';
 import { WEAPONS, UPGRADES } from '../../shared/adventure-catalog.js';
 
 const RECOMMENDED = {
-  dad: { weapons:['moonblade'], upgrades:['armor','petal'] },
-  mom: { weapons:['moonblade'], upgrades:['frost','petal'] },
-  sister: { weapons:['moonblade'], upgrades:['rapid','magnet'] },
+  dad: { weapons:['blade'], upgrades:['armor','safeLanding'] },
+  mom: { weapons:['bubble'], upgrades:['frost','petal'] },
+  sister: { weapons:['stars'], upgrades:['rapid','magnet'] },
   little: { weapons:['moonblade'], upgrades:['feather','safeLanding'] },
 };
 export const EXPLORATION_UPGRADES = new Set(['double','split','fan','seek','returnSplit','bloom','companion','linger']);
@@ -19,5 +19,6 @@ export function starterAdventure(seed,build) {
   adventure.weapons=[...build.weapons];
   adventure.upgrades=Object.fromEntries(build.upgrades.map(id=>[id,1]));
   adventure.loadouts=[{weapon:build.weapons[0],weapons:[...build.weapons],upgrades:[...build.upgrades]}];
+  adventure.starter = structuredClone(build);
   return adventure;
 }

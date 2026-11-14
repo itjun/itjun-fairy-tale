@@ -18,7 +18,7 @@ export function adventureFixture(mode = 'reward') {
   const collectedIds = isCompleted ? world.treasures.slice(0,world.requiredFlowers).map(t=>t.id) : [];
   const state = { version:2,seed,levelId,elapsed:30,isCompleted,collectedIds,defeatedIds:[],visited:isCompleted ? world.zones.map(z=>z.id+1) : [],switches:[],enemies:world.enemies,players:Array.from({length:count},()=>({safeId,recoveries:0,facing:1})),adventure,journey };
   if (mode !== 'duo') { state.survival = newSurvival('mom'); state.survival.lives = 2; state.survival.attacks = 3; state.checkpointId = safeId; }
-  if (['fallen','over'].includes(mode)) { state.survival.phase = mode; if(mode === 'over')state.survival.lives=0; }
+  if (['fallen','over'].includes(mode)) { state.survival.phase = mode; state.survival.hp=0; if(mode === 'over')state.survival.lives=0; }
   if (mode === 'fallen') {
     const platform=world.platforms.find(p=>!p.isMoving && !p.isCheckpoint && p.isEnabled!==false && p.x>60);
     state.checkpointId=world.start.id;state.players[0].safeId=platform.id;state.players[0].safeX=platform.x+0.6;
@@ -52,7 +52,7 @@ export function rogueliteFixture(mode = 'rogue-play', levelId = 'rainbow-1', zon
   if(mode==='rogue-finish')safeId=world.finish.id;
   if(mode==='rogue-score')safeId=world.treasures[0].platformId;
   survival.lives=6;
-  if(mode==='rogue-fallen')survival.phase='fallen';
+  if(mode==='rogue-fallen'){survival.phase='fallen';survival.hp=0;}
   const visited=world.zones.filter(z=>z.id<zoneIndex || mode==='rogue-finish').map(z=>z.id+1);
   const state={version:4,seed,levelId,elapsed:0,isCompleted:false,survival,checkpointId:safeId,collectedIds:[],defeatedIds:[],visited,switches:[],enemies:world.enemies,players:[{safeId,...(mode==='rogue-score'?{safeX:world.treasures[0].x-2}:{}),protection:2,recoveries:0,facing:1}],adventure,journey,supplies:[],mechanisms:[]};
   if(mode==='rogue-fallen')state.revival={platformId:safeId,offsetX:0};
@@ -64,7 +64,7 @@ export function bossFixture(mode='boss-play',levelId='forest-3') {
   const seed=42,world=createCampaignWorld(seed,levelId,5),adventure=newAdventure(seed),journey=newJourney(),survival=newSurvival('sister');
   if(!['boss-moon','boss-homing','boss-stack-reward'].includes(mode)&&!mode.startsWith('boss-loot')) {
     adventure.weapons=['blade','bubble','boomerang'];adventure.loadouts[0].weapons=[...adventure.weapons];adventure.loadouts[0].weapon=adventure.weapons[0];adventure.growth={collected:3,power:2,hearts:3};adventure.effects={rainbowBoost:40};
-    survival.maxLives=12;survival.lives=10;
+    survival.maxHp=160;survival.hp=140;
   }
   const arena=world.bossArenas[['boss-small','boss-moon'].includes(mode)?0:world.bossArenas.length-1];
   const defeatedIds=[];
@@ -77,7 +77,7 @@ export function bossFixture(mode='boss-play',levelId='forest-3') {
   if(mode==='boss-stack-reward')journey.pending={id:'qa:weapon-stack',family:'flight',title:'小关通关啦',player:0,tier:'small',pickCount:1,choices:[{type:'weapon',id:'moonblade'},{type:'weapon',id:'stars'},{type:'upgrade',id:'frost'}]};
   let combatLoot;
   if(mode.startsWith('boss-loot')) {
-    combatLoot=newCombatLoot();survival.lives=5;
+    combatLoot=newCombatLoot();survival.hp=50;
     for(const enemy of world.enemies.filter(e=>!e.isBoss&&!e.parentId&&!e.isSummoned)) {
       enemy.hp=0;enemy.isDefeated=true;enemy.defeatedAt=0;defeatedIds.push(enemy.id);
       const drop=rollCombatLoot(combatLoot,world,enemy,{safe:world.start});

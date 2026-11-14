@@ -8,10 +8,10 @@ export function grow(adventure, survival, kind, amount = 1) {
   if (!survival || survival.phase !== 'alive') return false;
   const g = adventure.growth ||= newGrowth();
   if (kind === 'heart') {
-    const gained = Math.min(amount, 99 - (survival.maxLives || 9));
+    const gained = Math.min(amount, 100 - g.hearts, Math.floor((2100-survival.maxHp)/20));
     if (gained <= 0) return false;
-    survival.maxLives = (survival.maxLives || 9) + gained;
-    survival.lives += gained; survival.revision++; g.hearts += gained;
+    survival.maxHp += gained * 20;
+    survival.hp += gained * 20; survival.revision++; g.hearts += gained;
   } else if (kind === 'power') g.power = Math.min(100, g.power + amount);
   else return false;
   adventure.revision++; return true;

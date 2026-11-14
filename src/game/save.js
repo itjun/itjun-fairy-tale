@@ -1,7 +1,8 @@
+import { isValidProjectiles } from './projectile-state.js';
 import { newSurvival, isValidSurvival, migrateSurvival } from './characters.js';
 import { createCampaignWorld, GENERATION_VERSION } from '../../shared/campaign.js';
 import { createSkillRewards, isValidSkillState } from './skills.js';
-import { isValidAdventure, isValidJourney, migrateAdventure } from './adventure.js';
+import { isValidAdventure, isValidJourney, migrateAdventure, migratePendingReward } from './adventure.js';
 import { WEAPONS } from '../../shared/adventure-catalog.js';
 import { isValidBossState } from './bosses.js';
 import { isValidCombatLoot } from './combat-loot.js';
@@ -13,6 +14,7 @@ export function writeAdventure(run,state,storage=localStorage) {
   if (original && JSON.parse(original).state?.survival?.version === 1 && !storage.getItem(`${KEY}-before-life-only`)) storage.setItem(`${KEY}-before-life-only`, original);
   if (original && JSON.parse(original).state?.survival?.version < 3 && !storage.getItem(`${KEY}-before-boss-growth`)) storage.setItem(`${KEY}-before-boss-growth`, original);
   if (original && JSON.parse(original).state?.enemies?.some(e=>e.attackStage&&e.maxHp===undefined) && !storage.getItem(`${KEY}-before-easier-combat`)) storage.setItem(`${KEY}-before-easier-combat`, original);
+  if (original && JSON.parse(original).state?.survival?.version < 4 && !storage.getItem(`${KEY}-before-hp-lives`)) storage.setItem(`${KEY}-before-hp-lives`, original);
   storage.setItem(KEY,JSON.stringify({run,state}));
 }
 export function clearAdventure(storage=localStorage) { storage.removeItem(KEY); }
@@ -21,7 +23,7 @@ export function readAdventure(storage=localStorage) {
     const saved=JSON.parse(storage.getItem(KEY));
     if(!saved) return null;
     const {run,state}=saved;
-    if(run.scoringVersion!==3 || ![1,2,3,4,5].includes(run.generationVersion) || !['playing','paused','completed','ended'].includes(run.status) || ![1,2].includes(run.players) || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.version!==run.generationVersion || state.seed!==run.seed || state.levelId!==run.levelId) return null;
+    if(run.scoringVersion!==3 || ![1,2,3,4,5,6].includes(run.generationVersion) || !['playing','paused','completed','ended'].includes(run.status) || ![1,2].includes(run.players) || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.version!==run.generationVersion || state.seed!==run.seed || state.levelId!==run.levelId) return null;
     const count = state.survival ? 1 : run.players;
     if (state.survival && (!isValidSurvival(state.survival) || state.isCompleted && state.survival.phase !== 'alive' || run.status === 'ended' && state.survival.phase !== 'over')) return null;
     if (!state.survival && run.status === 'ended') return null;
@@ -53,7 +55,7 @@ export function readAdventure(storage=localStorage) {
     if (state.version >= 2 && state.enemies.some((e,i) => e.hp < 0 || e.hp > world.enemies[i].hp || e.elapsed < 0 || ![-1,1].includes(e.direction) || typeof e.isDefeated !== 'boolean' || e.isDefeated !== state.defeatedIds.includes(e.id))) return null;
     if (state.version >= 3) {
       const isOptionalNumber = (value, max) => value === undefined || Number.isFinite(value) && value >= 0 && value <= max;
-      if (state.enemies.some(e => !isOptionalNumber(e.boundUntil, state.elapsed+2) || !isOptionalNumber(e.guardHits, 100000) || ['isHidden','isGuarding','isSummoned','isDormant'].some(k => e[k] !== undefined && typeof e[k] !== 'boolean'))) return null;
+      if (state.enemies.some(e => !isOptionalNumber(e.windUntil,state.elapsed+.6) || !isOptionalNumber(e.boundUntil, state.elapsed+2) || !isOptionalNumber(e.guardHits, 100000) || !isOptionalNumber(e.frozenUntil,state.elapsed+1.1) || !isOptionalNumber(e.freezeImmuneUntil,state.elapsed+4.1) || ['isHidden','isGuarding','isSummoned','isDormant','hasShell'].some(k => e[k] !== undefined && typeof e[k] !== 'boolean'))) return null;
       if (state.players.some(p => !isOptionalNumber(p.protection, 10) || !isOptionalNumber(p.shotRemaining, 2) || !isOptionalNumber(p.inkRemaining, 1))) return null;
       if (state.lure && (![state.lure.x,state.lure.y,state.lure.until].every(Number.isFinite) || state.lure.until > state.elapsed+3)) return null;
     }
@@ -66,8 +68,10 @@ export function readAdventure(storage=localStorage) {
       if(state.enemies.some((e,i)=>world.enemies[i].isBoss&&!isValidBossState(e,world.enemies[i],state.elapsed)))return null;
       if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
     }
+    if(!isValidProjectiles(state.projectiles,world))return null;
     if (!isValidCombatLoot(state.combatLoot,world,state.defeatedIds)) return null;
     if (state.combatLoot?.pendingId!=null && (state.survival?.phase!=='alive'||state.isCompleted||state.journey?.pending)) return null;
+    if(state.players.some(p=>p.weaponCycles&&Object.entries(p.weaponCycles).some(([id,n])=>!WEAPONS[id]||!Number.isInteger(n)||n<0||n>=60)))return null;
     if (state.players.some(p => p.weaponShots && Object.entries(p.weaponShots).some(([id,value])=>!WEAPONS[id] || !Number.isFinite(value) || value<0 || value>2))) return null;
     if (!state.survival) {
       // 保留原双人记录的计分人数；玩法只迁移第一位，背包仍完整保留。
@@ -77,7 +81,7 @@ export function readAdventure(storage=localStorage) {
     }
     state.survival = migrateSurvival(state.survival);
     if (state.adventure?.version === 1) state.journey.queued = [];
-    if (state.adventure) migrateAdventure(state.adventure);
+    if (state.adventure) {migrateAdventure(state.adventure);migratePendingReward(state.adventure,state.journey);}
     return saved;
   } catch { return null; }
 }

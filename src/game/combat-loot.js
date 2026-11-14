@@ -3,9 +3,9 @@ import { heal, resourcesFor } from './expedition.js';
 import { grow } from './growth.js';
 
 export const LIFE_CHOICES = {
-  heal:{name:'爱心补血',hint:'立即恢复 2 点生命',image:'life-potion'},
-  heart:{name:'生命长大',hint:'生命上限 +1，同时恢复 1 点',image:'collectible-heart'},
-  reserve:{name:'备用补给',hint:'存一份，下次受伤后恢复 2 点生命',image:'icecream'},
+  heal:{name:'回血药包',hint:'恢复当前血量 25',image:'supply-medkit'},
+  heart:{name:'血量长大',hint:'血量上限 +20，同时回血 +20',image:'collectible-heart'},
+  reserve:{name:'备用补给',hint:'存一份，非致命受伤后回血 +25',image:'icecream'},
 };
 export function newCombatLoot() { return {drops:[],misses:0,pendingId:null}; }
 export function rollCombatLoot(loot,world,enemy,player) {
@@ -24,16 +24,16 @@ export function nearbyLoot(loot,world,player) {
 }
 export function canChooseLife(id,adventure,survival) {
   if(survival.phase!=='alive')return false;
-  if(id==='heal')return survival.lives<survival.maxLives;
-  if(id==='heart')return survival.maxLives<99;
+  if(id==='heal')return survival.hp<survival.maxHp;
+  if(id==='heart')return survival.maxHp<2100;
   return id==='reserve'&&!(adventure.resources?.reserveHearts);
 }
 export function chooseLifeLoot(loot,adventure,survival,enemyId,id) {
   const drop=loot.drops.find(d=>d.enemyId===enemyId);
   if(loot.pendingId!==enemyId||!drop||drop.choice!==null||!canChooseLife(id,adventure,survival))return false;
-  if(id==='heal')heal(survival,2);
+  if(id==='heal')heal(survival,25);
   else if(id==='heart')grow(adventure,survival,'heart');
-  else resourcesFor(adventure).reserveHearts=2;
+  else resourcesFor(adventure).reserveHearts=25;
   drop.choice=id;loot.pendingId=null;adventure.revision++;return true;
 }
 export function isValidCombatLoot(loot,world,defeatedIds) {

@@ -1,3 +1,5 @@
+import { saveProjectiles, restoreProjectiles } from './projectile-state.js';
+import { stepMagic, consumeMagicShield, shieldCounter, equipSpell } from './magic.js';
 import { CHARACTERS, newSurvival, migrateSurvival, takeDamage, reviveSurvival, recordAttack, bloomAtHit } from './characters.js';
 import { resourcesFor, damageWithBuild, recordDefeat, completeEncounter, completeRoute, buyRecovery, campPrice, tickResources, useRecovery } from './expedition.js';
 import * as THREE from 'three';
@@ -42,7 +44,9 @@ export class GardenEngine {
     this.isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.isPaused = true; this.keys = new Set(); this.touch = new Set(); this.jumps = [false, false];
     this.collected = 0; this.distance = 0; this.checkpoint = 0; this.elapsed = 0;
-    this.players = [createPlayer(this.world.start)]; this.checkpointId = this.world.start.id;
+    this.players = [createPlayer(this.world.start)];
+    if(adventure)for(const effect of this.adventure.magic.active){effect.x=this.players[0].x;effect.y=this.players[0].y+1;effect.hitIds=[];}
+    this.checkpointId = this.world.start.id;
     this.platformViews = new Map(); this.treasureViews = new Map(); this.enemyViews = new Map(); this.enemyMarkers = new Map();
     this.textures = []; this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#faf4e6');
@@ -62,7 +66,11 @@ export class GardenEngine {
     this.abort = new AbortController();
     const options = { signal: this.abort.signal };
     window.addEventListener('keydown', event => this.keyDown(event), options);
-    window.addEventListener('keyup', event => this.keys.delete(event.code), options);
+    this.heldKeys = new Set();
+    window.addEventListener('keyup', event => {this.keys.delete(event.code);this.heldKeys.delete(event.code);}, options);
+    const releasePointer = () => { for (const key of this.heldKeys) if (key.startsWith('touch:')) this.heldKeys.delete(key); };
+    window.addEventListener('pointerup', releasePointer, options);
+    window.addEventListener('pointercancel', releasePointer, options);
     window.addEventListener('blur', () => this.requestPause(), options);
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.requestPause(); }, options);
     this.renderer.domElement.addEventListener('webglcontextlost', event => { event.preventDefault(); this.requestPause(); onError('画面暂时休息了，请返回花园后重新进入探险。'); }, options);
@@ -80,7 +88,7 @@ export class GardenEngine {
       this.isNewLandscape = landscape === 'landscape-new-drawing';
       const names = [...new Set([landscape, ...Object.values(CHARACTERS).flatMap(c => [c.image, c.attack]), 'flower', 'collectible-rainbow', 'girl-player', 'dad-player', 'girl-attack', 'dad-attack', 'light-wave', 'enemy-burst', 'treehouse-tall', 'platform-raft', 'platform-ice', 'platform-gear', 'platform-conveyor', 'island-lighthouse', 'castle-cutaway', 'street-house', 'windmill-tall', 'platform-awning', surfaceImage, finishImage, 'paper-texture',
         'enemy-jelly', 'enemy-leaf', 'enemy-puff', 'lift-leaf', 'spring-flower', 'bridge-rope', 'checkpoint-flag', 'cave-paper', 'collectible-star', 'magic-bubble',
-        ...LEVEL_COLLECTIBLES[this.level.id].map(id => COLLECTIBLES[id].image), ...(this.adventure ? ['new-drawing-tower', 'new-drawing-flowers', 'trap-pendulum', 'trap-thorns', 'trap-steam', 'terrain-blocks', 'platform-cloud', 'life-potion', 'boss-gate', 'boss-chest', 'terrain-bank', 'terrain-cookie', 'terrain-rock', 'adventure-workbench', 'platform-crayon', 'adventure-root-cave', ...Object.values(MONSTERS).map(m => m.image), ...Object.values(WEAPONS).map(w => w.image), ...this.world.enemies.filter(e=>e.isBoss && e.image).map(e=>e.image), ...this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image))] : [])])];
+        ...LEVEL_COLLECTIBLES[this.level.id].map(id => COLLECTIBLES[id].image), ...(this.adventure ? ['new-drawing-tower', 'new-drawing-flowers', 'trap-pendulum', 'trap-thorns', 'trap-steam', 'terrain-blocks', 'platform-cloud', 'life-potion', 'supply-medkit', 'flame-stream', 'collectible-snowflake', 'upgrade-frost', 'upgrade-chain', 'boss-gate', 'boss-chest', 'terrain-bank', 'terrain-cookie', 'terrain-rock', 'adventure-workbench', 'platform-crayon', 'adventure-root-cave', ...Object.values(MONSTERS).map(m => m.image), ...Object.values(WEAPONS).map(w => w.image), ...this.world.enemies.filter(e=>e.isBoss && e.image).map(e=>e.image), ...this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image))] : [])])];
       const textures = await Promise.all(names.map(async name => {
         const texture = await loader.loadAsync(`./assets/${name}.png`);
         if (this.isDisposed) { texture.dispose(); return texture; }
@@ -101,7 +109,7 @@ export class GardenEngine {
       this.waveMaterial = spriteMaterial('light-wave'); this.burstMaterial = spriteMaterial('enemy-burst');
       this.starMaterial = spriteMaterial('collectible-star'); this.treeMaterial = spriteMaterial('treehouse-tall');
       this.skillEffects = new SkillEffects(this.scene, this.planeGeometry,
-        { blade: this.waveMaterial, bubble: spriteMaterial('magic-bubble'), stars: this.starMaterial, ...(this.adventure ? { moonblade: spriteMaterial('weapon-moonblade'), boomerang: spriteMaterial('weapon-boomerang'), seed: spriteMaterial('weapon-seed'), firefly: spriteMaterial('weapon-firefly'), pulse: this.starMaterial } : {}) }, this.skillRewards, this.isReducedMotion);
+        { blade: this.waveMaterial, bubble: spriteMaterial('magic-bubble'), stars: this.starMaterial, ...(this.adventure ? { flame: spriteMaterial('flame-stream'), dragon:spriteMaterial('weapon-flame'), snow:spriteMaterial('collectible-snowflake'), thunder:this.waveMaterial, fire:spriteMaterial('flame-stream'), rain:spriteMaterial('magic-bubble'), cloud:spriteMaterial('platform-cloud'), moonblade: spriteMaterial('weapon-moonblade'), boomerang: spriteMaterial('weapon-boomerang'), seed: spriteMaterial('weapon-seed'), firefly: spriteMaterial('weapon-firefly'), pulse: this.starMaterial } : {}) }, this.skillRewards, this.isReducedMotion);
       this.caveMaterial = spriteMaterial('cave-paper');
       this.houseMaterial=spriteMaterial('street-house');this.houseMaterial.opacity=0.6;
       this.windmillMaterial=spriteMaterial('windmill-tall');this.windmillMaterial.opacity=0.65;
@@ -119,7 +127,7 @@ export class GardenEngine {
       this.enemyShotMaterials=Object.fromEntries([...new Set(this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image)))].map(name=>[name,spriteMaterial(name)]));
       if (this.adventure) {
         this.workbenchMaterial = spriteMaterial('adventure-workbench');
-        this.lifeMaterial = spriteMaterial('life-potion');
+        this.lifeMaterial = spriteMaterial('life-potion');this.medkitMaterial=spriteMaterial('supply-medkit');
         this.bossGateMaterial=spriteMaterial('boss-gate');this.bossChestMaterial=spriteMaterial('boss-chest');
         this.trapMaterials = {pendulum:spriteMaterial('trap-pendulum'),thorns:spriteMaterial('trap-thorns'),steam:spriteMaterial('trap-steam'),geyser:spriteMaterial('trap-steam'),icicle:spriteMaterial('monster-icicle')};
         this.terrainMaterials = Object.fromEntries(['bank','cookie','rock','blocks'].map(kind=>[kind,spriteMaterial(`terrain-${kind}`)]));
@@ -217,7 +225,7 @@ export class GardenEngine {
       mesh.scale.set(h.kind==='pendulum'?height/2:2.4,height,1);mesh.position.y=h.kind==='pendulum'?-height*.45:height/2;
       group.add(mesh);this.scene.add(group);this.hazardViews.set(h.id,{group,mesh});
     }
-    for (const supply of this.world.supplies || []) this.supplyViews.set(supply.id,this.sprite(this.lifeMaterial,supply.x,supply.y,.9,1.25));
+    for (const supply of this.world.supplies || []) this.supplyViews.set(supply.id,this.sprite(supply.kind==='medkit'?this.medkitMaterial:this.lifeMaterial,supply.x,supply.y,.9,1.25));
     for (const treasure of this.world.treasures) {
       const kind = this.collectibleKinds[treasure.id - 1], item = COLLECTIBLES[kind];
       const mesh = this.sprite(this.collectibleMaterials[kind], treasure.x, treasure.y, item.size * 0.78, item.size * 0.78);
@@ -263,7 +271,8 @@ export class GardenEngine {
     this.camera.top = halfWidth / aspect; this.camera.bottom = -halfWidth / aspect; this.camera.updateProjectionMatrix();
   }
   keyDown(event) {
-    if (this.isPaused) return;
+    this.heldKeys.add(event.code);
+    if (this.isPaused || event.repeat && !this.keys.has(event.code)) return;
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'Enter', 'Escape', 'KeyP'].includes(event.code)) event.preventDefault();
     if (event.code === 'Escape' || event.code === 'KeyP') { if (!event.repeat) this.requestPause(); return; }
     if (!this.keys.has(event.code)) {
@@ -272,12 +281,14 @@ export class GardenEngine {
     this.keys.add(event.code);
   }
   setTouch(action, isPressed) {
+    if(!isPressed)this.heldKeys?.delete(`touch:${action}`);
     if (this.isPaused) return;
+    if(isPressed)this.heldKeys?.add(`touch:${action}`);
     if (isPressed) { if (['jump', 'drop'].includes(action) && !this.touch.has(action)) this.jumps[0] = true; this.touch.add(action); }
     else this.touch.delete(action);
   }
-  clearInput() { this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; this.waves = []; this.enemyShots = []; }
-  pause(isPaused) { if (!isPaused && (this.survival.phase !== 'alive'||this.combatLoot?.pendingId!=null)) return; this.isPaused = isPaused; this.clearInput(); this.accumulator = 0; }
+  clearInput() { this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; }
+  pause(isPaused) { if (!isPaused && (this.survival.phase !== 'alive'||this.combatLoot?.pendingId!=null)) return; this.isPaused = isPaused; if(isPaused)this.callbacks.onSound('pause'); this.clearInput(); this.accumulator = 0; }
   requestPause() { if (!this.isPaused) { this.pause(true); this.callbacks.onPause(); } }
   returnToSafety() {
     if (this.isPaused || this.survival.phase !== 'alive') return;
@@ -317,13 +328,16 @@ export class GardenEngine {
     this.combatLoot.drops.find(drop=>drop.enemyId===enemyId).isDeferred=true;
     this.combatLoot.pendingId=null;this.publish();return true;
   }
-  hurt(isFall = false, amount = 1) {
+  hurt(isFall = false, amount = 10) {
     const powers = this.adventure ? upgradePower(this.adventure) : {};
     const player = this.players[0];
-    const beforeLife = this.survival.lives;
-    const result = this.adventure ? damageWithBuild(this.adventure, this.survival, powers, this.levelKey, player.safe?.zone ?? 0, isFall, amount) : takeDamage(this.survival, isFall, amount);
+    const beforeLife = this.survival.hp;
+    const shieldHits=!isFall&&this.adventure?consumeMagicShield(this.adventure,player,this.world.enemies,this.elapsed):null;
+    for(const hit of shieldHits || [])this.recordHit(hit);
+    const result = shieldHits ? 'armor' : this.adventure ? damageWithBuild(this.adventure, this.survival, powers, this.levelKey, player.safe?.zone ?? 0, isFall, amount) : takeDamage(this.survival, isFall, amount);
     if (!result) return;
-    if(this.world.version>=5)this.damageNumbers.push({id:++this.damageSequence,x:player.x,y:player.y+2.5,at:this.elapsed,damage:Math.max(0,beforeLife-this.survival.lives),isPlayer:true,blocked:['armor','shield','courage'].includes(result)?amount:0});
+    if(this.adventure && ['shield','armor','courage'].includes(result))for(const hit of shieldCounter(this.adventure,player,this.world.enemies,this.elapsed))this.recordHit(hit);
+    if(this.world.version>=5)this.damageNumbers.push({id:++this.damageSequence,x:player.x,y:player.y+2.5,at:this.elapsed,damage:Math.max(0,beforeLife-this.survival.hp),isPlayer:true,blocked:['armor','shield','courage'].includes(result)?amount:0});
     if (powers.cotton) player.knockVx *= 0.25;
     if (result === 'courage') player.protection = Math.max(player.protection, 4);
     if (result === 'hurt' && powers.breeze) {
@@ -333,14 +347,17 @@ export class GardenEngine {
     }
     if (result === 'armor' || result === 'courage') { this.talentEffect = { x:player.x, y:player.y+1, at:this.elapsed, isShield:true }; this.publish(result === 'armor' ? '小本领挡住了伤害！' : '小小勇气保护你！'); }
     if (result === 'shield') { this.talentEffect = { x:this.players[0].x, y:this.players[0].y + 1, at:this.elapsed, isShield:true }; this.publish('彩虹护盾挡住啦！'); }
-    if (result === 'hurt') this.publish(`生命还剩 ${this.survival.lives} 条，小心前方！`);
+    if (result === 'hurt') this.publish(`血量 ${this.survival.hp}/${this.survival.maxHp}，小心前方！`);
     if (result === 'death') { this.revival = revivalPoint(player, this.platforms, isFall); this.pause(true); this.publish(this.survival.lives ? `扣掉一条命，还剩 ${this.survival.lives} 条。` : '生命用完了，这次冒险结束。'); }
+    if(isFall && result !== 'death'){const point=revivalPoint(player,this.platforms,true);rescue(player,this.platforms[point.platformId],this.platforms[point.platformId].x+point.offsetX);player.protection=1;}
+    this.callbacks.onSound(result==='death'?'life-lost':['shield','armor','courage'].includes(result)?'block':'player-hurt');
     this.callbacks.onLifeChange?.(this.snapshot());
   }
   revive() {
     if (!reviveSurvival(this.survival)) return false;
     const point = this.revival || revivalPoint(this.players[0], this.platforms, true), platform = this.platforms[point.platformId];
-    rescue(this.players[0], platform, platform.x + point.offsetX); this.revival = undefined;
+    rescue(this.players[0], platform, platform.x + point.offsetX); this.revival = undefined; this.players[0].protection=3;
+    if(this.adventure?.revivalWaves){this.adventure.revivalWaves--;this.enemyShots=this.enemyShots.filter(shot=>shot.bossId||Math.hypot(shot.x-this.players[0].x,shot.y-this.players[0].y)>18);this.skillEffects.burst(this.players[0].x,this.players[0].y+1,this.elapsed,true);}
     this.clearInput(); this.publish('就在这里接着走，继续加油！');
     this.callbacks.onLifeChange?.(this.snapshot()); return true;
   }
@@ -355,14 +372,16 @@ export class GardenEngine {
     const platforms = this.platforms.filter(nearby), enemies = this.world.enemies.filter(nearby);
     if (this.adventure) {
       tickResources(this.adventure, STEP); tickEffects(this.adventure, STEP);
-      if (useRecovery(this.adventure, this.survival, upgradePower(this.adventure))) this.publish('补充了 1 条生命！');
+      if (useRecovery(this.adventure, this.survival, upgradePower(this.adventure))) this.publish('回血 +10！');
       stepAdventureEnemies(enemies, this.players, STEP, this.elapsed, this.enemyShots, this.world.version >= 3 ? {
-        bounds: { left: this.cameraX-this.camera.right, right: this.cameraX+this.camera.right }, maxAttackers: this.world.zones.length < 5 ? 3 : 5,
+        bounds: { left: this.cameraX-this.camera.right, right: this.cameraX+this.camera.right }, maxAttackers: this.world.version>=6?(this.stage.index<6?4:6):this.world.zones.length < 5 ? 3 : 5,
         allEnemies: this.world.enemies, lure: this.lure, attackGate: this.attackGate,
       } : {});
     }
     else stepEnemies(enemies, STEP);
+    const previousBoss=currentBoss(this.world),previousStage=previousBoss?.attackStage;
     stepBosses(this.world,this.players[0],STEP,this.elapsed,this.enemyShots);
+    const nextBoss=currentBoss(this.world);if(nextBoss?.attackStage==='warning'&&previousStage!=='warning')this.callbacks.onSound('boss-warning');
     const spawned = [];
     for (const wave of this.waves) {
       // 宽屏光刃可能越过玩家周围的物理更新范围，命中不能只检查 nearby。
@@ -370,11 +389,10 @@ export class GardenEngine {
       const hits = result.hits;
       const bloom = bloomAtHit(wave, hits, this.world.enemies, this.elapsed); if (bloom) this.talentEffect = bloom;
       spawned.push(...result.spawned);
-      if (hits.length) this.callbacks.onSound('hit');
-      for (const hit of hits) this.recordHit(hit);
+      for (const hit of hits) this.recordHit({...hit,source:wave.source || wave.kind});
       if (wave.burst) this.skillEffects.burst(wave.burst.x, wave.burst.y, this.elapsed, false, !!currentBoss(this.world));
     }
-    this.waves = [...this.waves.filter(w => w.isActive), ...spawned].slice(-160);
+    this.waves = [...this.waves.filter(w => w.isActive), ...spawned];
     this.players.forEach((player, index) => {
       const isSingle = this.players.length === 1;
       const left = index === 0 ? this.keys.has('KeyA') || this.touch.has('left') || isSingle && this.keys.has('ArrowLeft') : this.keys.has('ArrowLeft');
@@ -426,6 +444,13 @@ export class GardenEngine {
       }
       while (this.visited.has(this.furthestPlatform+1)) this.furthestPlatform++;
       const isFiring = index === 0 ? this.keys.has('KeyJ') || this.touch.has('attack') : this.keys.has('Enter');
+      if(this.adventure){
+        const magic=stepMagic(this.adventure,this.survival,player,this.world.enemies,this.enemyShots,STEP,this.elapsed,isFiring,{left:this.cameraX-this.camera.right,right:this.cameraX+this.camera.right});
+        for(const hit of magic.hits)this.recordHit(hit);
+        for(const effect of this.adventure.magic.active)this.callbacks.onSound(`${effect.id}:loop`);
+        for(const event of magic.events)this.callbacks.onSound(`${event.id}:${event.type}`);
+        this.callbacks.onSound(isFiring&&activeWeapons(this.adventure).includes('flame')?'flame:loop':'flame:stop');
+      }
       if (isFiring) {
         const kind = this.adventure ? this.adventure.loadouts[index].weapon : currentSkill(this.skillState, this.elapsed);
         const bounds = { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right };
@@ -440,14 +465,14 @@ export class GardenEngine {
             if (this.survival.character === 'mom') { const floralCharge = { isUsed:false }; shots.forEach(shot => { shot.floralCharge = floralCharge; }); }
             if (this.survival.character === 'sister') shots.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, bounds, 'stars', powers));
           }
-          this.waves.push(...shots); this.callbacks.onSound(kind === 'blade' ? 'fire' : kind);
+          this.waves.push(...shots); for(const id of new Set(shots.map(shot=>shot.kind)))this.callbacks.onSound(`${id}:fire`);
           this.callbacks.onLifeChange?.(this.snapshot());
         }
       }
       if (this.world.version >= 4) {
-        for (const hazard of this.world.hazards) if (touchingHazard(player,hazard,this.elapsed)) { player.protection=2; this.hurt(); if(this.survival.phase!=='alive')return; }
+        for (const hazard of this.world.hazards) if (touchingHazard(player,hazard,this.elapsed)) { player.protection=1; this.hurt(false,15); if(this.survival.phase!=='alive')return; }
         const supply=takeLifeSupply(this.world,this.claimedSupplies,player,this.survival,this.adventure,powers);
-        if(supply){this.supplyViews.get(supply.id).visible=false;this.skillEffects.burst(supply.x,supply.y,this.elapsed,true);this.publish(this.survival.lives===(this.survival.maxLives || 9)&&this.adventure.resources.snack?'备用补给收好了！':'生命 +1！');this.callbacks.onLifeChange?.(this.snapshot());}
+        if(supply){this.supplyViews.get(supply.id).visible=false;this.skillEffects.burst(supply.x,supply.y,this.elapsed,true);this.publish(supply.kind==='medkit'?'回血 +25！':'血瓶 +1 条命！');this.callbacks.onLifeChange?.(this.snapshot());}
       }
       for (const reward of this.skillRewards) {
         if (Math.abs(player.x - reward.x) < 1.2 && Math.abs(player.y + 0.9 - reward.y) < 1.5
@@ -465,7 +490,7 @@ export class GardenEngine {
       for (const enemy of enemies.filter(e => !e.isDormant)) {
         const contact = touchEnemy(player, enemy, previousY, this.elapsed);
         if (contact === 'stomp' || contact === 'hit') { this.recordHit({enemy,isDefeated:contact==='stomp',damage:enemy.lastDamage,blocked:enemy.lastBlocked});this.callbacks.onSound('hit'); }
-        if (contact === 'bump') { player.protection += (powers.shield || 0); this.hurt(false, 1); if (this.survival.phase !== 'alive') return; }
+        if (contact === 'bump') { player.protection += (powers.shield || 0); this.hurt(false, enemy.isBoss?20:enemy.behavior==='charge'?15:10); if (this.survival.phase !== 'alive') return; }
       }
       if (this.adventure && powers.cleanse && !resourcesFor(this.adventure).cleanseCooldown) {
         const nearbyShots = this.enemyShots.filter(shot => shot.isActive && Math.hypot(shot.x-player.x, shot.y-player.y-0.8) < 4).slice(0,3);
@@ -474,8 +499,8 @@ export class GardenEngine {
       for (const shot of this.enemyShots) if (shot.isActive && Math.abs(shot.x-player.x) < 0.9 && (['ink','vine','shock'].includes(shot.kind) ? player.y <= shot.y+0.45 && player.y+1.65 >= shot.y : Math.abs(shot.y-player.y-0.8) < 1)) {
         if (shot.kind === 'ink') { player.inkUntil = this.elapsed+0.6; continue; }
         if (player.protection > 0) continue;
-        shot.isActive = false; player.protection = 2 + (powers.shield || 0); player.knockTime = 0.2; player.knockVx = Math.sign(shot.vx) * 3;
-        this.hurt(false, shot.damage || 1); if (this.survival.phase !== 'alive') return;
+        shot.isActive = false; player.protection = 1 + (powers.shield || 0); player.knockTime = 0.2; player.knockVx = Math.sign(shot.vx) * 3;
+        this.hurt(false, shot.damage || 10); if (this.survival.phase !== 'alive') return;
       }
       for (const treasure of this.world.treasures.filter(nearby)) {
         const view = this.treasureViews.get(treasure.id);
@@ -485,7 +510,7 @@ export class GardenEngine {
           const isGrown=this.world.version>=5 && collectGrowth(this.adventure,this.survival);
           const item = COLLECTIBLES[view.kind];
           this.pickups.push({ id: treasure.id, kind: view.kind, points: item.points, x: treasure.x, y: treasure.y + 1, at: this.elapsed });
-          this.callbacks.onSound('flower'); this.publish(isGrown ? `成长啦！生命上限 +1，攻击 +10%！` : `找到${item.phrase}，+${item.points} 分！`);
+          this.callbacks.onSound('flower'); this.publish(isGrown ? `成长啦！血量上限 +20，攻击 +10%！` : `找到${item.phrase}，+${item.points} 分！`);
         }
       }
     });
@@ -499,12 +524,12 @@ export class GardenEngine {
         this.isCompleted = true; this.pause(true); this.callbacks.onSound('checkpoint');
         if(this.adventure){
           const chosen=this.world.forks.map(f=>f.routes.find(r=>r.id===this.journey.routes[f.id])).filter(Boolean);
-          const tier=this.world.version>=5 ? (this.world.bossArenas.length>1?'world':'small') : undefined;
+          const tier=this.world.version>=5 ? (this.world.enemies.some(e=>e.isWorldBoss)?'world':'small') : undefined;
           queueReward(this.journey,`finish:${this.levelKey}`,chosen.at(-1)?.family || 'power',tier==='world'?'大关 BOSS 挑战成功':'小关通关啦',tier);
           if(tier==='world'){grow(this.adventure,this.survival,'heart');grow(this.adventure,this.survival,'power');}
           openReward(this.adventure,this.journey,this.survival);
           const powers = upgradePower(this.adventure);
-          resourcesFor(this.adventure).balance += (this.world.version>=5 ? (this.world.bossArenas.length>1?12:6) : 3) + (powers.pocket ? 2 : 0) + (powers.explorer ? Math.min(3, chosen.length) : 0);
+          resourcesFor(this.adventure).balance += (this.world.version>=5 ? (this.world.enemies.some(e=>e.isWorldBoss)?12:6) : 3) + (powers.pocket ? 2 : 0) + (powers.explorer ? Math.min(3, chosen.length) : 0);
         }
         this.publish('关卡完成啦！宝物和勇气，都是你的收获。'); this.callbacks.onComplete?.(this.snapshot());
       } else if (this.elapsed - (this.lastFinishHint || 0) > 3) {
@@ -513,6 +538,8 @@ export class GardenEngine {
     }
   }
   recordHit(hit) {
+    if(hit.damage)this.callbacks.onSound(`${hit.source || 'blade'}:${hit.isDefeated?'defeat':'hit'}`);
+    else if(hit.blocked)this.callbacks.onSound('block');
     if(this.world.version>=5 && (hit.damage || hit.blocked)) {
       const recent=this.damageNumbers.find(item=>item.enemyId===hit.enemy.id&&item.damage===hit.damage&&item.blocked===hit.blocked&&this.elapsed-item.at<.2);
       if(recent)recent.count++;
@@ -542,7 +569,7 @@ export class GardenEngine {
     }
     const points=enemy.points+(enemy.drop?COLLECTIBLES[enemy.drop].points:0);
     this.pickups.push({id:`enemy-${enemy.id}`,kind:enemy.drop,points,x:enemy.x,y:enemy.y+2,at:this.elapsed});
-    this.callbacks.onSound('flower'); this.publish(enemy.isBoss ? `${enemy.name}挑战成功！${enemy.isWorldBoss?'去出口领取大关奖励。':areBossesDefeated(this.world)?'继续向前，收下通关奖励！':'继续向前，挑战大关 BOSS！'}` : `打败小怪，+${points} 分！${this.recoveryNotice || ''}`); this.recoveryNotice = '';
+    this.callbacks.onSound(enemy.isBoss?'boss-defeat':'flower'); this.publish(enemy.isBoss ? `${enemy.name}挑战成功！${enemy.isMidBoss?'继续向前，药包已准备好！':enemy.isWorldBoss?'去出口领取大关奖励。':areBossesDefeated(this.world)?'继续向前，收下通关奖励！':'继续向前，挑战大关 BOSS！'}` : `打败小怪，+${points} 分！${this.recoveryNotice || ''}`); this.recoveryNotice = '';
   }
   selectReward(index, expectedId, expectedPlayer) {
     if (this.survival?.phase && this.survival.phase !== 'alive' || !this.adventure || !this.isPaused || this.journey.pending?.id !== expectedId || this.journey.pending?.player !== expectedPlayer) return false;
@@ -558,19 +585,20 @@ export class GardenEngine {
   buyCampRecovery() {
     const camp = this.snapshot().camp;
     if (!this.isPaused || !this.canRest() || !camp || !buyRecovery(this.adventure, this.survival, upgradePower(this.adventure), `${this.levelKey}:${camp.id}`)) return false;
-    this.publish('补给吃好啦，补充了 1 条生命！'); return true;
+    this.publish('补给吃好啦，回血 +25！'); return true;
   }
+  configureSpell(id) {const changed=this.isPaused&&this.adventure&&equipSpell(this.adventure,id);if(changed)this.publish();return !!changed;}
   configureWeapon(player, id) { const changed = this.isPaused && this.adventure && equipWeapon(this.adventure, player, id); if (changed) this.publish(); return !!changed; }
   configureUpgrade(player, id) { const changed = this.isPaused && this.adventure && toggleUpgrade(this.adventure, player, id); if (changed) this.publish(); return !!changed; }
   canRest() { return this.survival.phase === 'alive' && !!this.snapshot().camp && !this.journey.pending; }
   exportAdventure() { return this.adventure ? structuredClone(this.adventure) : null; }
   exportState() {
-    return {combatLoot:structuredClone(this.combatLoot || newCombatLoot()),supplies:[...(this.claimedSupplies || [])],mechanisms:mechanismSave(this.world),survival:structuredClone(this.survival),checkpointId:this.checkpointId,revival:this.revival ? {...this.revival} : undefined,isCompleted:this.isCompleted,version:this.world.version,lure:this.lure,seed:this.seed,levelId:(this.stage || this.level).id,elapsed:this.elapsed,collectedIds:this.collectedIds,defeatedIds:this.defeatedIds,
+    return {projectiles:saveProjectiles(this.waves,this.enemyShots),combatLoot:structuredClone(this.combatLoot || newCombatLoot()),supplies:[...(this.claimedSupplies || [])],mechanisms:mechanismSave(this.world),survival:structuredClone(this.survival),checkpointId:this.checkpointId,revival:this.revival ? {...this.revival} : undefined,isCompleted:this.isCompleted,version:this.world.version,lure:this.lure,seed:this.seed,levelId:(this.stage || this.level).id,elapsed:this.elapsed,collectedIds:this.collectedIds,defeatedIds:this.defeatedIds,
       skillState:{...this.skillState,collectedIds:[...this.skillState.collectedIds]},
       ...(this.adventure ? { adventure: structuredClone(this.adventure), journey: structuredClone(this.journey) } : {}),
       visited:[...this.visited],switches:this.world.switches.filter(s=>s.isOpen).map(s=>s.id),
       enemies:this.world.enemies.map(saveEnemy),
-      players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),weaponShots:Object.fromEntries(Object.entries(p.weaponShots || {}).map(([id,value])=>[id,Math.max(0,value-this.elapsed)]))}))};
+      players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),weaponCycles:{...p.weaponCycles},weaponShots:Object.fromEntries(Object.entries(p.weaponShots || {}).map(([id,value])=>[id,Math.max(0,value-this.elapsed)]))}))};
   }
   restoreState(state) {
     if (state.version!==this.world.version || state.seed!==this.seed || state.levelId!==(this.stage || this.level).id) throw new Error('存档地图不一致');
@@ -581,6 +609,8 @@ export class GardenEngine {
     this.combatLoot=structuredClone(state.combatLoot || newCombatLoot());
     this.claimedSupplies=[...(state.supplies || [])];restoreMechanisms(this.world,state.mechanisms,state.elapsed);
     for(const id of this.claimedSupplies)if(this.supplyViews?.has(id))this.supplyViews.get(id).visible=false;
+    Object.assign(this,restoreProjectiles(state.projectiles));
+    this.enemyShots=this.shots;delete this.shots;
     this.elapsed=state.elapsed; this.collectedIds=[...state.collectedIds];this.collected=this.collectedIds.length;this.defeatedIds=[...state.defeatedIds];this.visited=new Set(state.visited);
     if (state.skillState) this.skillState = {...state.skillState, collectedIds:[...state.skillState.collectedIds]};
     this.furthestPlatform=0;while(this.visited.has(this.furthestPlatform+1))this.furthestPlatform++;
@@ -588,7 +618,7 @@ export class GardenEngine {
     for(const saved of state.enemies) restoreEnemy(this.world.enemies[saved.id-1],saved);
     for(const id of state.switches){const sw=this.world.switches[id];sw.isOpen=true;this.platforms[sw.bridgeId].isEnabled=true;}
     moveCampaignPlatforms(this.world.lifts,this.elapsed);
-    this.players.forEach((p,i)=>{const saved=state.players[i];rescue(p,this.platforms[saved.safeId],saved.safeX);p.recoveries=saved.recoveries;p.facing=saved.facing;if(saved.protection!==undefined)p.protection=saved.protection;p.nextShot=this.elapsed+(saved.shotRemaining || 0);p.inkUntil=this.elapsed+(saved.inkRemaining || 0);p.weaponShots=Object.fromEntries(Object.entries(saved.weaponShots || {}).map(([id,value])=>[id,this.elapsed+value]));});
+    this.players.forEach((p,i)=>{const saved=state.players[i];rescue(p,this.platforms[saved.safeId],saved.safeX);p.recoveries=saved.recoveries;p.facing=saved.facing;if(saved.protection!==undefined)p.protection=saved.protection;p.nextShot=this.elapsed+(saved.shotRemaining || 0);p.inkUntil=this.elapsed+(saved.inkRemaining || 0);p.weaponCycles={...saved.weaponCycles};p.weaponShots=Object.fromEntries(Object.entries(saved.weaponShots || {}).map(([id,value])=>[id,this.elapsed+value]));});
     this.cameraX = this.players.reduce((sum, p) => sum + p.x, 0) / this.players.length + Math.min(5, this.camera.right * 0.25);
     this.cameraY = this.players.reduce((sum, p) => sum + p.y, 0) / this.players.length + (this.journey.pending ? -4 : 4);
     this.publish('接着上次的冒险出发吧！');
@@ -653,6 +683,8 @@ export class GardenEngine {
       for (const sw of this.world.switches) this.switchViews.get(sw.id).material.color.set(sw.isOpen ? '#b6f4a2' : '#ffffff');
       for(const [id,view] of this.bossSwitchViews){const boss=this.world.enemies[this.world.bossArenas[id].bossId-1];view.material.color.set(boss.isShielded?'#ffffff':'#a6eb79');}
       this.skillEffects.update(this.waves,this.adventure ? {kind:this.adventure.loadouts[0].weapon,until:Infinity,collectedIds:[]} : this.skillState,this.players,this.elapsed,this.cameraX,this.camera.right,this.adventure?.loadouts.map(l => l.weapon));
+      this.skillEffects.updateMagic(this.adventure?.magic?.active || []);
+      for(const supply of this.world.supplies || [])if(supply.bossId)this.supplyViews.get(supply.id).visible=!this.claimedSupplies.includes(supply.id)&&this.world.enemies[supply.bossId-1].isDefeated;
       for (const [shot, view] of this.enemyShotViews) if (!this.enemyShots.includes(shot)) { this.scene.remove(view); this.enemyShotViews.delete(shot); }
       for (const shot of this.enemyShots) {
         if (!this.enemyShotViews.has(shot)) this.enemyShotViews.set(shot, this.sprite(this.enemyShotMaterials[shot.image] || (shot.kind === 'bubble' ? this.skillEffects.materials.bubble : this.starMaterial), shot.x, shot.y, shot.size || .7, shot.size || .7, 1.5));

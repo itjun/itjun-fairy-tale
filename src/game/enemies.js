@@ -1,7 +1,7 @@
 import { damageEnemy } from './combat.js';
 import { RULES } from './physics.js';
 
-const SAVE_FIELDS=['id','x','y','hp','maxHp','direction','elapsed','isDefeated','defeatedAt','isDormant','slowUntil','lastShotBeat','lastActionBeat','isSummoned','boundUntil','guardHits','isHidden','isGuarding','isShielded','shieldUntil','isEnraged','attackIndex','attackTime','attackStage','warningX','warningY'];
+const SAVE_FIELDS=['windUntil','frozenUntil','freezeImmuneUntil','hasShell','id','x','y','hp','maxHp','direction','elapsed','isDefeated','defeatedAt','isDormant','slowUntil','lastShotBeat','lastActionBeat','isSummoned','boundUntil','guardHits','isHidden','isGuarding','isShielded','shieldUntil','isEnraged','attackIndex','attackTime','attackStage','warningX','warningY'];
 export function saveEnemy(enemy) { return Object.fromEntries(SAVE_FIELDS.filter(key=>enemy[key]!==undefined).map(key=>[key,enemy[key]])); }
 export function restoreEnemy(enemy, saved) { for(const key of SAVE_FIELDS) if(Object.hasOwn(saved,key))enemy[key]=saved[key]; }
 
@@ -27,7 +27,7 @@ export function touchEnemy(player, enemy, previousY, elapsed = enemy.elapsed) {
     return isDefeated ? 'stomp' : 'hit';
   }
   if (player.y >= top || player.y + 1.65 < enemy.y) return null;
-  player.protection = 2; player.knockTime = 0.25;
+  player.protection = 1; player.knockTime = 0.25;
   player.knockVx = player.x < enemy.x ? -4 : 4;
   player.vy = 5; player.isGrounded = false; player.ground = null; player.coyote = 0;
   return 'bump';

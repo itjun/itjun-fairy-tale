@@ -1,4 +1,5 @@
 import { heal, resourcesFor } from './expedition.js';
+import { addLife } from './characters.js';
 
 export function hazardState(hazard, elapsed) {
   const beat=(elapsed+hazard.phase)%hazard.period;
@@ -26,10 +27,8 @@ export function touchingHazard(player,hazard,elapsed){
 export function takeLifeSupply(world,claimed,player,survival,adventure,powers={}){
   const item=world.supplies?.find(s=>!claimed.includes(s.id)&&Math.abs(player.x-s.x)<1&&Math.abs(player.y+.8-s.y)<1.5);
   if(!item||survival.phase!=='alive')return null;
-  if(!heal(survival)){
-    if(!adventure||!powers.snack||resourcesFor(adventure).snack)return null;
-    adventure.resources.snack=1;
-  }
+  if(item.bossId && !world.enemies[item.bossId-1]?.isDefeated)return null;
+  if(item.kind==='medkit'){if(!heal(survival,25)){if(!adventure||!powers.snack||resourcesFor(adventure).snack)return null;adventure.resources.snack=1;}}else if(!addLife(survival))return null;
   claimed.push(item.id);return item;
 }
 export function mechanismSave(world){return world.platforms.filter(p=>p.collapseAt!==undefined||p.isSeesaw).map(p=>({id:p.id,...(p.collapseAt!==undefined?{collapseAt:p.collapseAt}:{}),...(p.isSeesaw?{slope:p.slope}:{})}));}

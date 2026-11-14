@@ -32,9 +32,9 @@ test('击杀和精英不弹奖励，通关可选补命，领取与回收不能�
   assert.equal(a.resources.kills,15);
   assert.deepEqual(j.queued,[]);assert.equal(a.resources.balance,0);
   queueReward(j,'finish:forest:42','nature','小关通关啦');
-  s.lives=5; openReward(a,j,s); const id=j.pending.id;
+  s.hp=50; openReward(a,j,s); const id=j.pending.id;
   assert.ok(j.pending.choices.some(c => c.type==='supply' && c.id==='heal'));
-  const choice=j.pending.choices.findIndex(c=>c.id==='heal'); assert.ok(chooseReward(a,j,choice,s)); assert.equal(s.lives,6);
+  const choice=j.pending.choices.findIndex(c=>c.id==='heal'); assert.ok(chooseReward(a,j,choice,s)); assert.equal(s.hp,100);assert.equal(s.lives,3);
   assert.equal(chooseReward(a,j,choice,s),false); assert.ok(j.claimed.includes(id));
   queueReward(j,'finish:forest:43','nature','小关通关啦');openReward(a,j,s); const balance=a.resources.balance;
   assert.ok(recycleReward(a,j)); assert.equal(a.resources.balance,balance+1); assert.equal(recycleReward(a,j),false);
@@ -51,15 +51,15 @@ test('奖励池耗尽仍有有效补给，三选项不产生空洞，旧候选�
   }
 });
 
-test('花瓣与点心补命，上限九条，死亡不补命，天赋与护甲按顺序消耗', () => {
+test('花瓣与点心回血不加命，死亡不恢复，天赋与护甲按顺序消耗', () => {
  const a=newAdventure(1),s=newSurvival('dad'),powers={petal:1,snack:1,armor:1,courage:1};a.resources.petals=12;a.resources.snack=1;
  assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'shield');assert.equal(a.resources.armorZones.length,0);
- assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'armor');assert.equal(s.lives,9);
- assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'hurt');assert.equal(s.lives,9);assert.equal(a.resources.snack,0);
- damageWithBuild(a,s,powers,'snow:1',0);assert.equal(s.lives,9);assert.equal(a.resources.petals,0);
- damageWithBuild(a,s,powers,'snow:1',0);assert.equal(s.lives,8);
- s.lives=1;assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'courage');assert.equal(s.lives,1);
- assert.equal(damageWithBuild(a,s,powers,'snow:1',0,true),'death');assert.equal(s.lives,0);
+ assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'armor');assert.equal(s.hp,100);
+ assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'hurt');assert.equal(s.hp,100);assert.equal(a.resources.snack,0);
+ damageWithBuild(a,s,powers,'snow:1',0);assert.equal(s.hp,100);assert.equal(a.resources.petals,0);
+ damageWithBuild(a,s,powers,'snow:1',0);assert.equal(s.hp,90);assert.equal(s.lives,3);
+ s.hp=10;assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'courage');assert.equal(s.hp,10);
+ s.lives=1;assert.equal(damageWithBuild(a,s,powers,'snow:1',0,true),'death');assert.equal(s.lives,0);assert.equal(s.hp,0);
  a.resources.petals=12;assert.equal(useRecovery(a,s,powers),false);assert.equal(s.lives,0);
 });
 
@@ -72,8 +72,8 @@ test('补给、护罩、支路、击败事件只结算一次，营地扣费保�
   world.enemies.filter(e=>e.zone===0).forEach(e=>{e.isDefeated=true;});
   assert.ok(completeEncounter(a,powers,world,0,'rainbow:2')); a.resources.wreathShield=0;
   assert.equal(completeEncounter(a,powers,world,0,'rainbow:2'),false); assert.equal(a.resources.wreathShield,0);
-  s.lives=4; a.resources.balance=10;
-  assert.ok(buyRecovery(a,s,powers,'rainbow:2:camp0')); assert.equal(a.resources.balance,7); assert.equal(s.lives,5);
+  s.hp=40; a.resources.balance=10;
+  assert.ok(buyRecovery(a,s,powers,'rainbow:2:camp0')); assert.equal(a.resources.balance,7); assert.equal(s.hp,65);
   assert.equal(buyRecovery(a,s,powers,'rainbow:2:camp0'),false); assert.equal(a.resources.balance,7);
   const restored=JSON.parse(JSON.stringify(a)); assert.equal(buyRecovery(restored,s,powers,'rainbow:2:camp0'),false);
   restored.resources.bindCooldown=5; tickResources(restored,0); assert.equal(restored.resources.bindCooldown,5);

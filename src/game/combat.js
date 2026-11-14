@@ -2,6 +2,7 @@
 export function damageEnemy(enemy, elapsed = enemy.elapsed, source) {
   enemy.lastDamage = 0; enemy.lastBlocked = 0;
   if (enemy.isDefeated || enemy.isHidden || enemy.isDormant) return false;
+  if(enemy.hasShell){enemy.hasShell=false;enemy.hitUntil=elapsed+.2;enemy.lastBlocked=Math.round(source?.damage || 12);return false;}
   const damage = enemy.combatVersion === 2 ? Math.max(1, Math.round(source?.damage || 12)) : 1;
   if (enemy.isGuarding && source && Math.sign(source.x-enemy.x) === enemy.direction) { enemy.guardHits = (enemy.guardHits || 0) + 1; if (enemy.guardHits % 2) { enemy.hitUntil = elapsed + 0.16; enemy.lastBlocked = damage; return false; } }
   const actual = enemy.isShielded ? Math.max(1, Math.round(damage * 0.7)) : damage;
@@ -56,14 +57,17 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   const contacts = enemies.filter(e => !e.isDefeated && !e.isHidden && !wave.hitIds.has(e.id)).map(enemy => ({
     enemy, time: contactTime(wave.x, wave.y, dx, dy, enemy, wave.kind === 'bubble' ? 0.65 : (wave.radius ?? 0.25)),
   })).filter(hit => hit.time !== null).sort((a, b) => a.time - b.time);
-  const fraction = wave.kind === 'bubble' && contacts.length ? contacts[0].time : 1;
+  const fraction = ['bubble','stars'].includes(wave.kind) && contacts.length ? contacts[0].time : 1;
   wave.x += dx * fraction; wave.y += dy * fraction; wave.remaining -= distance; wave.age += dt;
   if (wave.remaining <= 0) wave.isActive = false;
   let targets = contacts.map(hit => hit.enemy);
+  if (wave.kind === 'stars' && targets.length) { targets = targets.slice(0,1); wave.isActive = false; }
   if (wave.kind === 'bubble' && (contacts.length || !wave.isActive)) {
     wave.isActive = false;
     wave.burst = { x: wave.x, y: wave.y, radius: wave.burstRadius ?? 3.8 };
-    targets = enemies.filter(e => !e.isDefeated && Math.hypot(e.x - wave.x, e.y + e.height / 2 - wave.y) <= (wave.burstRadius ?? 3.8));
+    // 大型首领边缘已被直接击中，即使中心在爆圈之外也保留这次命中。
+    const directIds = new Set(targets.map(e=>e.id));
+    targets = enemies.filter(e => !e.isDefeated && (directIds.has(e.id) || Math.hypot(e.x - wave.x, e.y + e.height / 2 - wave.y) <= (wave.burstRadius ?? 3.8)));
   }
   return targets.filter(enemy => !wave.hitIds.has(enemy.id)).map(enemy => {
     wave.hitIds.add(enemy.id);

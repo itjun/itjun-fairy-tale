@@ -1,11 +1,11 @@
 // 先预告再行动；弹道只在附近更新，碰撞仍使用游戏原有的温柔击退与保护。
 export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles, options = {}) {
-  const active = options.bounds ? enemies.filter(e => !e.isDefeated && !e.isDormant && e.x > options.bounds.left && e.x < options.bounds.right)
+  const active = options.bounds ? enemies.filter(e => !e.isDefeated && !e.isDormant && !e.isBoss && Math.abs(e.y-players[0].y)<12 && e.x > options.bounds.left && e.x < options.bounds.right)
     .sort((a,b) => Math.abs(a.x-players[0].x)-Math.abs(b.x-players[0].x)).slice(0, options.maxAttackers || 4) : enemies;
   for (const enemy of enemies) {
     if (enemy.isDefeated || enemy.isDormant || enemy.isBoss) continue;
     enemy.isWaiting = !active.includes(enemy);
-    if (enemy.isWaiting || enemy.boundUntil > elapsed) { enemy.isWarning = false; continue; }
+    if (enemy.isWaiting || enemy.boundUntil > elapsed || enemy.frozenUntil > elapsed) { enemy.isWarning = false; continue; }
     enemy.elapsed += dt * (enemy.slowUntil > elapsed ? 0.35 : 1);
     const cycle = (enemy.elapsed + enemy.phase) % 3.6;
     const slow = enemy.slowUntil > elapsed ? 0.35 : 1;
@@ -17,6 +17,13 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
     const emit = (kind, vx, vy, y = enemy.baseY + 0.8, life = 4) => projectiles.push({ x: enemy.x, y, vx, vy, gravity: 0, age: 0, kind, life, id: `${enemy.id}:${beat}:${projectiles.length}`, isActive: true });
     enemy.y = enemy.baseY;
     enemy.isHidden = false; enemy.isGuarding = false;
+    if(enemy.behavior==='swoop'){enemy.y+=isActing?3-Math.sin((cycle-2.5)/1.1*Math.PI)*3:3;speed*=isActing?3.5:.08;}
+    if(enemy.behavior==='balloon'){enemy.y+=2.3+Math.sin(enemy.elapsed*.8)*2.3;speed*=.25;}
+    if(enemy.behavior==='iceslide'){speed*=enemy.hasShell?.08:isActing?3.6:.08;enemy.isGuarding=false;}
+    if(enemy.behavior==='twins'){enemy.isGuarding=cycle<1.7;speed=0;}
+    if(['inklob','breeze'].includes(enemy.behavior))speed=0;
+    if(enemy.behavior==='breeze'&&isActing)for(const other of active)if(other!==enemy&&Math.abs(other.x-enemy.x)<9){other.direction=Math.sign(target.x-other.x)||1;other.windUntil=elapsed+.5;}
+    if(enemy.windUntil>elapsed)speed*=1.35;
     if (enemy.behavior === 'glide') { enemy.y += isActing ? Math.max(0, 3 * (1 - (cycle - 2.5) / 1.1)) : 0; speed *= isActing ? 0.6 : 0.15; }
     if (enemy.behavior === 'inkhop') { enemy.y += isActing ? Math.sin((cycle-2.5)/1.1*Math.PI) * (beat % 2 ? 1.8 : 0.8) : 0; speed *= isActing ? 2 : 0.1; }
     if (enemy.behavior === 'guard') { enemy.isGuarding = cycle < 2.5; speed *= isActing ? 2.4 : 0.1; }
@@ -48,14 +55,14 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
       speed *= cycle < 2.5 ? 0.2 : 1.8;
     }
     if (['roll', 'charge', 'scuttle'].includes(enemy.behavior)) speed *= cycle < 2.5 ? 0.12 : enemy.behavior === 'charge' ? 4 : 2.7;
-    if (['bubble', 'fan', 'lob'].includes(enemy.behavior)) {
+    if (['bubble', 'fan', 'lob','inklob','twins'].includes(enemy.behavior)) {
       speed = 0;
       const beat = Math.floor((enemy.elapsed + enemy.phase) / 3.6);
       if (cycle > 2.5 && enemy.lastShotBeat !== beat && canAct()) {
         enemy.lastShotBeat = beat; claimAction();
         enemy.direction = Math.sign(target.x - enemy.x) || 1;
-        const slopes = enemy.behavior === 'fan' ? [-0.35, 0, 0.35] : [enemy.behavior === 'lob' ? 1.1 : 0];
-        for (const slope of slopes) projectiles.push({ x: enemy.x, y: enemy.y + 1, vx: enemy.direction * 4, vy: slope * 4, gravity: enemy.behavior === 'lob' ? 6 : 0, age: 0, kind: enemy.behavior, id: `${enemy.id}:${beat}:${slope}`, isActive: true });
+        const slopes = enemy.behavior === 'fan' ? [-0.35, 0, 0.35] : [['lob','inklob'].includes(enemy.behavior) ? 1.1 : 0];
+        for (const slope of slopes) projectiles.push({ x: enemy.x, y: enemy.y + 1, vx: enemy.direction * 4, vy: slope * 4, floorY:enemy.behavior==='inklob'?enemy.baseY+.1:undefined,gravity: ['lob','inklob'].includes(enemy.behavior) ? 6 : 0, age: 0, kind: enemy.behavior, id: `${enemy.id}:${beat}:${slope}`, isActive: true });
       }
     }
     if (enemy.isWarning && enemy.behavior !== 'float') speed = 0;
@@ -66,6 +73,7 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
   for (const shot of projectiles) {
     if (shot.turnAt !== undefined && !shot.isReturning && shot.age >= shot.turnAt) { shot.vx *= -1; shot.vy *= -1; shot.isReturning=true; }
     shot.age += dt; shot.vy -= shot.gravity * dt; shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+    if(shot.kind==='inklob' && shot.y<=shot.floorY){shot.kind='ink';shot.y=shot.floorY;shot.vx=0;shot.vy=0;shot.gravity=0;shot.age=0;shot.life=2.5;}
     if (shot.floorY !== undefined && shot.y < shot.floorY && shot.vy < 0) { shot.y=shot.floorY;shot.vy=Math.abs(shot.vy)*0.8;shot.bounces++;if(shot.bounces>3)shot.isActive=false; }
     if (shot.age > (shot.life || 4)) shot.isActive = false;
   }

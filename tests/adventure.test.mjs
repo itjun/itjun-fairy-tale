@@ -132,5 +132,5 @@ test('快速连点和双人上一位玩家的旧事件不会领走下一份奖�
  const a=newAdventure(42);a.weapons=Object.keys(WEAPONS);
  const choices=rewardChoices(a,'all-weapons','flight');
  assert.equal(choices.length,3);assert.equal(new Set(choices.map(c=>c.id)).size,3);
- assert.ok(choices.every(c=>['upgrade','timed'].includes(c.type)));
+ assert.ok(choices.every(c=>['upgrade','timed','weapon','spell','supply','legend','growth'].includes(c.type)));
  });

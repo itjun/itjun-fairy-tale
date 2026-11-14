@@ -1,6 +1,12 @@
 // 新冒险的内容目录与旧地图版本分开，服务端和游戏共用怪物奖励定义。
-export const ADVENTURE_GENERATION_VERSION = 5;
+export const ADVENTURE_GENERATION_VERSION = 6;
 export const MONSTERS = Object.freeze({
+  plane:{name:'纸飞机怪',points:25,family:'flight',behavior:'swoop',image:'monster-plane'},
+  balloon:{name:'气球团',points:25,family:'flight',behavior:'balloon',image:'monster-balloon'},
+  octopus:{name:'墨水章鱼',points:30,family:'bubble',behavior:'inklob',image:'monster-octopus'},
+  penguin:{name:'冰壳企鹅',points:30,family:'frost',behavior:'iceslide',image:'monster-penguin'},
+  twins:{name:'积木双子',points:25,family:'power',behavior:'twins',image:'monster-twins'},
+  dandelion:{name:'蒲公英怪',points:25,family:'nature',behavior:'breeze',image:'monster-dandelion'},
   jelly: { name: '果冻怪', points: 10, family: 'power', behavior: 'hop', image: 'enemy-jelly' },
   leaf: { name: '叶子怪', points: 15, family: 'flight', behavior: 'leap', image: 'enemy-leaf' },
   puff: { name: '云朵怪', points: 20, family: 'flight', behavior: 'float', image: 'enemy-puff' },
@@ -44,6 +50,7 @@ export const EXPANDED_THEME_MONSTERS = Object.freeze({
   cartoon: ['toy', 'candy', 'fish', 'firefly', 'paint', 'bell', 'ink', 'moth'],
 });
 export const WEAPONS = Object.freeze({
+  flame: { name:'彩笔火龙', shortName:'火龙', image:'weapon-flame', hint:'持续喷出短火焰，每 0.2 秒伤害 18，略微追随目标高度', damage:18, interval:0.2, family:'power' },
   blade: { name: '贯穿光刃', shortName: '光刃', image: 'light-wave', hint: '伤害 30，每 0.4 秒贯穿发射', damage:30, interval:0.4, family: 'power' },
   moonblade: { name: '圆月弯刀', shortName: '弯刀', image: 'weapon-moonblade', hint: '伤害 48，每 0.18 秒连发月牙，自动追敌，可叠加数量', damage:48, interval:0.18, family: 'flight' },
   bubble: { name: '魔法泡泡', shortName: '泡泡', image: 'magic-bubble', hint: '伤害 55，每 0.75 秒范围爆开', damage:55, interval:0.75, family: 'bubble' },
@@ -53,17 +60,17 @@ export const WEAPONS = Object.freeze({
   firefly: { name: '萤火法杖', shortName: '萤火', image: 'weapon-firefly', hint: '伤害 22，每 0.3 秒追踪前方目标', damage:22, interval:0.3, family: 'nature' },
 });
 export const UPGRADES = Object.freeze({
-  petal: { name: '花瓣护心', hint: '打败 12 只小怪，补 1 条生命', image: 'upgrade-petal', family: 'nature', category: 'survival' },
+  petal: { name: '花瓣护心', hint: '打败 12 只小怪，回血 10', image: 'upgrade-petal', family: 'nature', category: 'survival' },
   armor: { name: '叶片护甲', hint: '每片区域挡一次伤害，不能挡掉坑', image: 'monster-leafshield', family: 'nature', category: 'survival' },
   cotton: { name: '软软棉衣', hint: '受伤时不容易被撞飞', image: 'monster-wool', family: 'frost', category: 'survival' },
   safeLanding: { name: '安稳落脚', hint: '落下高台时，短暂保护自己', image: 'lift-leaf', family: 'flight', category: 'survival' },
-  courage: { name: '小小勇气', hint: '只剩 1 条生命时挡一次伤害，每小关一次', image: 'collectible-heart', family: 'power', category: 'survival' },
+  courage: { name: '小小勇气', hint: '血量不超过 20% 时挡一次伤害，每小关一次', image: 'collectible-heart', family: 'power', category: 'survival' },
   wreath: { name: '守护花环', hint: '清空一片区域，获得一次护罩', image: 'flower', family: 'nature', category: 'survival' },
   recycle: { name: '彩笔回收', hint: '放弃本次奖励，可换 3 片彩笔碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
   duplicate: { name: '重复变宝', hint: '重复本领可回收为 5 片碎片', image: 'upgrade-recycle', family: 'bubble', category: 'resource' },
   pocket: { name: '补给口袋', hint: '通关时额外得到 2 片碎片', image: 'icecream', family: 'nature', category: 'resource' },
-  thrift: { name: '节约巧手', hint: '休息点补 1 条生命，只花 3 片碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
-  snack: { name: '备用点心', hint: '满命时存一份补给，受伤后自动补命', image: 'icecream', family: 'bubble', category: 'resource' },
+  thrift: { name: '节约巧手', hint: '休息点回血 25，只花 3 片碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
+  snack: { name: '备用点心', hint: '满血时存一份点心，非致命受伤后回血 25', image: 'icecream', family: 'bubble', category: 'resource' },
   explorer: { name: '探路奖励', hint: '通关时，每条探索过的分路多得 1 片碎片，最多 3 片', image: 'collectible-star', family: 'flight', category: 'resource' },
   bind: { name: '泡泡束缚', hint: '每隔 5 秒，命中可困住小怪', image: 'magic-bubble', family: 'bubble', category: 'utility' },
   lure: { name: '花香诱饵', hint: '每隔 8 秒，攻击留下引开小怪的花', image: 'flower', family: 'nature', category: 'utility' },

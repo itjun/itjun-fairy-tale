@@ -42,7 +42,7 @@ test('宽平台只露出一部分时仍绘制，不因中心离开镜头就突�
   const cameraX=floor.x-25,character=new THREE.Mesh(game.planeGeometry,game.awningMaterial);
   Object.assign(game,{isReady:true,isPaused:true,lastTime:0,lastPublish:0,elapsed:0,cameraX,cameraY:4,
     camera:new THREE.OrthographicCamera(-12,12,9,-9,.1,150),players:[{x:cameraX-3,y:0,facing:1}],survival:{character:'dad'},
-    journey:{},combatLoot:{drops:[]},backdrops:[],bossSwitchViews:new Map(),skillEffects:{update(){}},waves:[],enemyShots:[],enemyShotViews:new Map(),
+    journey:{},combatLoot:{drops:[]},backdrops:[],bossSwitchViews:new Map(),skillEffects:{updateMagic(){},update(){}},waves:[],enemyShots:[],enemyShotViews:new Map(),
     playerViews:[character],characterMaterials:{dad:{standing:game.awningMaterial}},talentView:character,treasureViews:new Map(),renderer:{render(){}}});
   const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=()=>0;
   t.after(()=>{if(original===undefined)delete globalThis.requestAnimationFrame;else globalThis.requestAnimationFrame=original;});

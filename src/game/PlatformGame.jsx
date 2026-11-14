@@ -1,6 +1,9 @@
+import { CombatAudio } from './combat-audio.js';
+import { SPELLS } from '../../shared/combat-catalog.js';
 import { INITIAL_LIVES, CHARACTERS } from './characters.js';
 import { CharacterCamp } from './CharacterCamp.jsx';
-import { recommendedStarter } from './starter-build.js';
+import { DeathPanel } from './DeathPanel.jsx';
+import { recommendedStarter, isValidStarter } from './starter-build.js';
 import { LifeLootPanel } from './LifeLootPanel.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Star, Heart, Pause, Play, House, SpeakerHigh, SpeakerSlash, Trophy, Check } from '@phosphor-icons/react';
@@ -24,7 +27,12 @@ export function PlatformGame({ onExit, initialSound = true }) {
   const saved = useRef(initialSaved);
   const carriedAdventure = useRef(null), carriedSurvival = useRef(null);
   const [character, setCharacter] = useState(() => saved.current?.state.survival?.character || 'sister');
-  const [starterBuilds,setStarterBuilds]=useState(()=>Object.fromEntries(Object.keys(CHARACTERS).map(id=>[id,recommendedStarter(id)])));
+  const [starterBuilds,setStarterBuilds]=useState(()=>{
+    let stored; try { stored=JSON.parse(localStorage.getItem('garden-starter-builds-v2')); } catch {}
+    return Object.fromEntries(Object.keys(CHARACTERS).map(id=>[id,isValidStarter(stored?.[id])?stored[id]:recommendedStarter(id)]));
+  });
+  const restartBuild = useRef(null);
+  useEffect(()=>{try { localStorage.setItem('garden-starter-builds-v2',JSON.stringify(starterBuilds)); } catch {}},[starterBuilds]);
   const isAutoStart = useRef(false), isResumeSaved = useRef(true);
   const sound = useRef(initialSound), run = useRef(null), statusRef = useRef('loading'), isMounted = useRef(true);
   const [isSound, setIsSound] = useState(initialSound);
@@ -54,24 +62,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
     if (isMounted.current) setSync(isResumeSaved.current ? result : {isSaved:false,message:'积分已记录，但续关暂未保存，请腾出本机空间后重试'});
   }
   function playSound(type) {
-    if (!sound.current) return;
-    try {
-      const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!Audio) return;
-      audio.current ||= new Audio();
-      const context = audio.current;
-      if (context.state !== 'running') return;
-      const notes = type === 'skill' ? [523, 659, 784, 1046, 1318] : type === 'bubble' ? [392, 784] : type === 'stars' ? [880, 1175, 1568] : type === 'checkpoint' ? [523, 659, 784] : type === 'flower' ? [784, 1046] : type === 'fire' ? [440] : type === 'hit' ? [587] : [330];
-      notes.forEach((frequency, i) => {
-        const oscillator = context.createOscillator(), gain = context.createGain();
-        oscillator.frequency.setValueAtTime(frequency, context.currentTime + i * 0.1);
-        gain.gain.setValueAtTime(0.025, context.currentTime + i * 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + i * 0.1 + 0.2);
-        oscillator.connect(gain); gain.connect(context.destination);
-        oscillator.start(context.currentTime + i * 0.1); oscillator.stop(context.currentTime + i * 0.1 + 0.21);
-        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-      });
-    } catch { /* 音频不可用时仍可正常游玩。 */ }
+    audio.current ||= new CombatAudio(); audio.current.setMuted(!sound.current); audio.current.play(type);
   }
   useEffect(() => {
     isMounted.current = true;
@@ -112,7 +103,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
         onComplete: snapshot => { setStats(snapshot); changeStatus(snapshot.pendingReward ? 'reward' : 'completed'); persist(snapshot, 'completed'); },
         onReady: () => {
           if (saved.current) { const previous=saved.current; saved.current=null; game.restoreState(previous.state); run.current=previous.run; setCharacter(game.survival.character); persist(game.snapshot(), previous.run.status); changeStatus(game.survival.phase === 'over' ? 'ended' : game.survival.phase === 'fallen' ? 'fallen' : game.journey.pending ? 'reward' : game.combatLoot.pendingId!==null ? 'life-loot' : game.isCompleted ? 'completed' : 'paused'); }
-          else if (isAutoStart.current) { isAutoStart.current = false; start(); }
+          else if (isAutoStart.current) { isAutoStart.current = false; if(restartBuild.current){game.configureStarter(restartBuild.current);restartBuild.current=null;} start(); }
           else changeStatus('ready');
         }, onError: message => { setError(message); changeStatus('error'); }, onSound: playSound });
       engine.current = game;
@@ -124,7 +115,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
     return () => { game?.dispose(); engine.current = null; if (import.meta.env.DEV) delete window.__gardenEngine; document.body.classList.remove('is-platform-game'); };
   }, [seed, count, levelIndex]);
   useEffect(() => {
-    if (status !== 'playing') {
+    if (!['playing','fallen','ended','reward','life-loot'].includes(status)) {
       const target = menu.current?.querySelector(status === 'ready' ? '.level-choices button[aria-pressed=true]' : 'button:not(:disabled)');
       target?.focus({ preventScroll: true });
       if (status === 'ready') target?.scrollIntoView({ block: 'nearest' });
@@ -150,7 +141,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
     if (!run.current || ['completed', 'ended'].includes(run.current.status)) {
       run.current = { id: crypto.randomUUID(), levelId: level.id, startedAt: new Date().toISOString(), players: count, seed, scoringVersion: 3, generationVersion: engine.current.world.version, revision: 0, status: 'playing' };
     }
-    try { const Audio = window.AudioContext || window.webkitAudioContext; if (Audio && sound.current) { audio.current ||= new Audio(); audio.current.resume(); } } catch { /* 可静音游玩。 */ }
+    audio.current ||= new CombatAudio();audio.current.setMuted(!sound.current);audio.current.unlock();
     if (engine.current?.journey.pending) { changeStatus('reward'); persist(engine.current.snapshot(), 'paused'); return; }
     if (engine.current?.combatLoot.pendingId!==null) { changeStatus('life-loot'); persist(engine.current.snapshot(), 'paused'); return; }
     engine.current?.pause(false); changeStatus('playing'); persist(engine.current.snapshot(), 'playing');
@@ -174,9 +165,9 @@ export function PlatformGame({ onExit, initialSound = true }) {
       onLostPointerCapture: () => engine.current?.setTouch(action, false), onContextMenu: event => event.preventDefault(),
     };
   }
-  const isResult = ['completed', 'ended'].includes(status);
+  const isResult = status === 'completed';
   const skill = WEAPONS[stats.skill || 'blade'];
-  const isAdventureDialog = ['reward','workbench','camp','life-loot'].includes(status);
+  const isAdventureDialog = ['reward','workbench','camp','life-loot','fallen','ended'].includes(status);
   const person = CHARACTERS[stats.survival?.character || character];
   function selectReward(index, id, player) {
     if (!engine.current.selectReward(index, id, player)) return;
@@ -214,17 +205,18 @@ export function PlatformGame({ onExit, initialSound = true }) {
     <header className="adventure-header" inert={status !== 'playing'}>
       <button className="adventure-home" aria-label="回花园" onClick={exit}><ArrowLeft size={20} /><span>回花园</span></button>
       <div className="adventure-title"><small>{level.chapterName ? `第 ${levelIndex + 1} / 24 小关　${level.chapterName}` : '接着上次的冒险'}</small><h1>{level.name}</h1></div>
-      <div className="adventure-actions"><button aria-label={isSound ? '关闭探险声音' : '打开探险声音'} onClick={() => { sound.current = !isSound; setIsSound(!isSound); if (sound.current) { try { const Audio = window.AudioContext || window.webkitAudioContext; if (Audio) { audio.current ||= new Audio(); audio.current.resume(); } } catch {} } }}>{isSound ? <SpeakerHigh size={24} /> : <SpeakerSlash size={24} />}</button><button aria-label="暂停探险" disabled={status !== 'playing'} onClick={pause}><Pause size={24} weight="fill" /></button></div>
+      <div className="adventure-actions"><button aria-label={isSound ? '关闭探险声音' : '打开探险声音'} onClick={() => { sound.current = !isSound; setIsSound(!isSound); audio.current ||= new CombatAudio();audio.current.setMuted(!sound.current);if(sound.current)audio.current.unlock(); }}>{isSound ? <SpeakerHigh size={24} /> : <SpeakerSlash size={24} />}</button><button aria-label="暂停探险" disabled={status !== 'playing'} onClick={pause}><Pause size={24} weight="fill" /></button></div>
     </header>
     <div className="score-popups" aria-hidden="true">{stats.pickups?.map(pickup=><span key={pickup.id} className="score-popup" style={{left:`${Math.max(12,Math.min(88,pickup.x))}%`,top:`${Math.max(30,Math.min(75,pickup.y))}%`,animationPlayState:status==='playing'?'running':'paused'}}><img src={`./assets/${pickup.kind ? COLLECTIBLES[pickup.kind].image : "enemy-burst"}.png`} alt=""/>+{pickup.points} 分</span>)}</div>
     <aside className="adventure-score" aria-label="探险收集"><span><Trophy size={24} />积分 <b key={stats.score} className="score-total">{stats.score}</b>{stats.pickups?.length>0&&<em className="score-gain" key={stats.pickups.at(-1).id}>+{stats.pickups.at(-1).points}</em>}</span>{stats.adventure && <span className="resource-status"><img src="./assets/upgrade-recycle.png" alt=""/>碎片 <b>{stats.adventure.resources?.balance || 0}</b></span>}</aside>
-    <aside className="player-health" aria-label="玩家生命与成长"><div><img src={`./assets/${person.image}.png`} alt={person.name}/><span>生命 <b>{stats.survival?.lives ?? INITIAL_LIVES} / {stats.survival?.maxLives || INITIAL_LIVES}</b><progress aria-label="玩家生命" value={stats.survival?.lives ?? INITIAL_LIVES} max={stats.survival?.maxLives || INITIAL_LIVES} style={{width:`${Math.min(100,68+(stats.survival?.maxLives || 9)*1.4)}%`}}/></span></div>{stats.adventure?.resources?.reserveHearts>0&&<span className="reserve-health">备用 +{stats.adventure.resources.reserveHearts}</span>}<small>攻击 +{(stats.adventure?.growth?.power || 0)*10}%<span>成长材料 {stats.adventure?.growth?.collected || 0} / 4</span></small></aside>
-    {stats.boss && <aside className="boss-health" aria-label="BOSS 生命"><div><strong>{stats.boss.name}</strong><span>{stats.boss.hp} / {stats.boss.maxHp}</span><small>{stats.boss.isWorldBoss ? stats.boss.isEnraged?'大关 BOSS 第二阶段':'大关 BOSS':'小关 BOSS'}</small></div><progress aria-label={`${stats.boss.name}生命`} value={stats.boss.hp} max={stats.boss.maxHp}/>{stats.boss.arena.layout==='mechanism'&&<p>{stats.boss.isShielded?'护盾减伤 30%，踩星星机关打开护盾':`护盾已打开，还能攻击 ${stats.boss.shieldSeconds} 秒`}</p>}</aside>}
+    <aside className="player-health" aria-label="玩家血量与命数"><div><img src={`./assets/${person.image}.png`} alt={person.name}/><span>血量 <b>{stats.survival?.hp ?? 100} / {stats.survival?.maxHp || 100}</b><progress aria-label="玩家血量" value={stats.survival?.hp ?? 100} max={stats.survival?.maxHp || 100}/></span></div><span className="life-count"><img src="./assets/life-potion.png" alt=""/>血瓶 ×{stats.survival?.lives ?? INITIAL_LIVES}</span>{stats.adventure?.resources?.reserveHearts>0&&<span className="reserve-health">备用回血 +25</span>}<small>攻击 +{(stats.adventure?.growth?.power || 0)*10}%<span>成长材料 {stats.adventure?.growth?.collected || 0} / 4</span></small></aside>
+    {stats.boss && <aside className="boss-health" aria-label="BOSS 生命"><div><strong>{stats.boss.name}</strong><span>{stats.boss.hp} / {stats.boss.maxHp}</span><small>{stats.boss.isWorldBoss ? stats.boss.isEnraged?'大关 BOSS 第二阶段':'大关 BOSS':stats.boss.isMidBoss?'中段 BOSS':'小关 BOSS'}</small></div><progress aria-label={`${stats.boss.name}生命`} value={stats.boss.hp} max={stats.boss.maxHp}/>{stats.boss.arena.layout==='mechanism'&&<p>{stats.boss.isShielded?'护盾减伤 30%，踩星星机关打开护盾':`护盾已打开，还能攻击 ${stats.boss.shieldSeconds} 秒`}</p>}</aside>}
     {status==='playing'&&(stats.boss?.warning||stats.boss?.casting)&&<div className="boss-warning" role="status">{stats.boss.warning||stats.boss.casting}</div>}
     {status==='playing'&&stats.bossTarget&&<div className="boss-target" aria-hidden="true" style={{left:`${stats.bossTarget.x}%`,top:`${stats.bossTarget.y}%`}}><img src="./assets/enemy-burst.png" alt=""/><span>躲开这里</span></div>}
     <div className="damage-popups" aria-hidden="true">{stats.damageNumbers?.map(hit=><span key={hit.id} className={hit.isPlayer?'damage-number player-damage':'damage-number'} style={{left:`${Math.max(3,Math.min(95,hit.x))}%`,top:`max(var(--damage-min-top,22%),${Math.min(85,hit.y)}%)`}}>{hit.damage?`−${hit.damage}`:'格挡'}{hit.count>1&&<small>×{hit.count}</small>}{hit.damage>0&&hit.blocked>0&&<small>减伤 {hit.blocked}</small>}</span>)}</div>
     <div className="level-progress"><span>探险进度 {Math.round(stats.platform / (stats.totalProgress || 1) * 100)}%</span><progress value={stats.platform} max={stats.totalProgress || 1} aria-label="关卡进度" /></div>
     {status === 'playing' && <aside className="skill-status stacked-weapons" aria-label="同时使用的武器">{(stats.activeWeapons?.length ? stats.activeWeapons : [stats.skill || 'blade']).map(id=><span key={id} title={`${WEAPONS[id].name}：每枚伤害 ${stats.weaponStats?.[id] || WEAPONS[id].damage}，每次发射 ${stats.weaponCounts?.[id] || 1} 枚`}><img src={`./assets/${WEAPONS[id].image}.png`} alt=""/>{WEAPONS[id].shortName} <b>{stats.weaponStats?.[id] || WEAPONS[id].damage} ×{stats.weaponCounts?.[id] || 1}</b></span>)}</aside>}
+    {status==='playing'&&stats.adventure?.magic?.equipped.length>0&&<aside className="magic-charge" aria-label="充能大招">{stats.adventure.magic.equipped.map(id=><span key={id}><img src={`./assets/${SPELLS[id].image}.png`} alt=""/><b>{SPELLS[id].name}</b><progress aria-label={`${SPELLS[id].name}充能`} value={stats.adventure.magic.charges[id] || 0} max={SPELLS[id].charge}/><small>{stats.adventure.magic.active.some(e=>e.id===id)?'施放中':stats.adventure.magic.ready.includes(id)?'准备好了':`${Math.floor((stats.adventure.magic.charges[id] || 0)/SPELLS[id].charge*100)}%`}</small></span>)}</aside>}
     {status === 'playing' && Object.keys(stats.timedEffects || {}).length > 0 && <aside className="timed-effects" aria-label="限时道具">{Object.entries(stats.timedEffects).map(([id,seconds])=><span key={id}><img src={`./assets/${TIMED_ITEMS[id].image}.png`} alt=""/>{TIMED_ITEMS[id].name}<b>{Math.ceil(seconds)} 秒</b></span>)}</aside>}
     {status === 'playing' && stats.hazards?.filter(h=>h.isWarning && h.kind !== 'pendulum').map(h=><span className="hazard-warning" key={h.id} style={{left:`${h.x}%`,top:`${h.y}%`}}>{h.kind === 'thorns' ? '荆棘要伸出来啦' : h.kind === 'icicle' ? '冰块要落下啦' : '喷口要打开啦'}</span>)}
     {status === 'playing' && stats.room && <div className="room-label">{stats.room.name}</div>}
@@ -237,10 +229,17 @@ export function PlatformGame({ onExit, initialSound = true }) {
     {['playing', 'reward'].includes(status) && <div className="route-signs" aria-hidden={status !== 'playing'}>{stats.routeSigns?.map(sign => <div className="route-sign" key={sign.id} style={{left:`${Math.max(12,Math.min(82,sign.x))}%`,top:`${Math.max(13,Math.min(39,sign.y))}%`}}>{sign.routes.map(route => <span key={route.id}><strong>{route.name}{sign.chosen === route.id ? ' ✓' : ''}</strong><small>{route.label}</small></span>)}</div>)}</div>}
     {status === 'playing' && stats.camp && <button className="camp-open paper-action" onClick={openWorkbench}>休息点：搭配武器</button>}
     {status === 'reward' && stats.pendingReward && <RewardPanel key={`${stats.pendingReward.id}:${stats.pendingReward.player}`} reward={stats.pendingReward} adventure={stats.adventure} onChoose={selectReward} onRecycle={recyclePending} onExit={exit}/>}
-    {status === 'camp' && <CharacterCamp character={character} build={starterBuilds[character]} onBuild={build=>setStarterBuilds(previous=>({...previous,[character]:build}))} onSelect={id => { setCharacter(id); engine.current.selectCharacter(id); }} onBack={() => changeStatus('ready')} onStart={()=>{if(engine.current.configureStarter(starterBuilds[character]))start();}}/>}
+    {status === 'camp' && <CharacterCamp character={character} build={starterBuilds[character]} isSound={isSound} onBuild={build=>setStarterBuilds(previous=>({...previous,[character]:build}))} onSelect={id => { setCharacter(id); engine.current.selectCharacter(id); }} onBack={() => changeStatus('ready')} onStart={()=>{if(engine.current.configureStarter(starterBuilds[character]))start();}}/>}
     {status==='life-loot'&&stats.pendingLifeLoot!==null&&<LifeLootPanel key={stats.pendingLifeLoot} enemyId={stats.pendingLifeLoot} adventure={stats.adventure} survival={stats.survival} onChoose={chooseLifeLoot} onLeave={leaveLifeLoot} onExit={exit}/>}
     {status === 'playing' && <aside className="talent-status"><img src={`./assets/${person.image}.png`} alt=""/><span>{person.name}：{person.talent}<small>{person.name === '爸爸' ? stats.survival?.shieldRemaining > 0 ? `${Math.ceil(stats.survival.shieldRemaining)} 秒后恢复` : '护盾已准备好' : ['妈妈','姐姐'].includes(person.name) ? `${stats.survival?.attacks || 0}/4 次攻击` : '空中再按一次跳跃'}</small></span></aside>}
-    {status === 'workbench' && stats.adventure && <WorkbenchPanel character={character} adventure={stats.adventure} survival={stats.survival} supply={stats.campSupply} onBuy={buySupply} onWeapon={(p,id) => configure('weapon',p,id)} onUpgrade={(p,id) => configure('upgrade',p,id)} onClose={start}/>}
+    {status === 'workbench' && stats.adventure && <WorkbenchPanel isSound={isSound} character={character} adventure={stats.adventure} survival={stats.survival} supply={stats.campSupply} onBuy={buySupply} onSpell={id=>{if(engine.current.configureSpell(id))persist(engine.current.snapshot(),'paused');}} onWeapon={(p,id) => configure('weapon',p,id)} onUpgrade={(p,id) => configure('upgrade',p,id)} onClose={start}/>}
+    {['fallen','ended'].includes(status) && stats.survival && <DeathPanel survival={stats.survival} heldKeys={engine.current?.heldKeys || []} onContinue={()=>{if(!engine.current.revive())return false;start();return true;}} onRestart={()=>{
+      const game=engine.current;
+      restartBuild.current=structuredClone(game.adventure?.starter || recommendedStarter(game.survival.character));
+      setCharacter(game.survival.character);
+      if(run.current){const record=snapshotRun(game.snapshot(),'paused');if(record)queueRun({...record,status:'ended',revision:record.revision+1});}
+      restart(0,true);return true;
+    }}/>}
     {status !== 'playing' && !isAdventureDialog && <div className="adventure-overlay"><section ref={menu} onKeyDown={trapMenuFocus} className={`adventure-menu ${status==='ready'?'level-menu':''}`} role="dialog" aria-modal="true" aria-labelledby="adventure-heading">
       <span className="adventure-kicker">带着画里的自己，去看更大的世界</span>
       <h2 id="adventure-heading">{status === 'loading' ? '彩笔世界准备中…' : status === 'error' ? '画面需要一点帮助' : status === 'completed' ? `${level.chapterName || level.name}，挑战成功！` : status === 'ended' ? '生命用完了，这次冒险结束' : status === 'fallen' ? `扣掉一条命，还剩 ${stats.survival?.lives} 条` : status === 'paused' ? '坐下来，歇一小会儿' : '选一个小世界，出发吧'}</h2>
@@ -248,7 +247,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
         <div className="level-choices" aria-label="选择挑战关卡">{STAGES.map((item,index)=><button key={item.id} aria-pressed={index===levelIndex} onClick={()=>setLevelIndex(index)}><img src={`./assets/${item.image}.png`} alt={item.subtitle}/><span>第 {index+1} 关</span><strong>{item.chapterName}</strong><small>{item.name}</small><small>通关加 {item.bonus} 分</small></button>)}</div>
         <p className="level-source">{level.sources.length ? `这一关组合了原画 ${level.sources.join('、')} 的元素。` : level.story} {CAMPAIGNS[themeId].hint}</p>
         <div className="collectible-preview" aria-label="这一关的宝物">{LEVEL_COLLECTIBLES[themeId].map(id=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt=""/>{COLLECTIBLES[id].name} <b>{COLLECTIBLES[id].points} 分</b></span>)}</div>
-        <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd> 攻击</span></div><small className="game-reassurance">打赢 BOSS 再选奖励，武器和本领一起使用。初始生命 {INITIAL_LIVES} 点，收集材料提升生命上限和攻击，零命结束本次冒险。</small>
+        <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd> 攻击</span></div><small className="game-reassurance">打赢 BOSS 再选奖励，武器和本领一起使用。初始 {INITIAL_LIVES} 条命，每条血量 100。受伤扣血，血条耗尽后选择继续或重来。</small>
       </>}
       <div className="adventure-menu-actions">
         {['ready','paused'].includes(status)&&<button className="primary-button" onClick={() => status === 'ready' ? changeStatus('camp') : start()}><Play size={21} weight="fill"/>{status==='paused'?'继续探险':'选择角色'}<ArrowRight size={21}/></button>}

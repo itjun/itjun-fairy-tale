@@ -52,11 +52,11 @@ test('同一次发射各武器伤害不同，命中扣真实血量，往返与�
   assert.deepEqual(fireLoadout(p,.31,{left:-25,right:25},a).map(s=>s.kind),['firefly']);
 });
 
-test('收集四份材料增长单一生命条和全部武器攻击，补命使用新上限',()=>{
-  const a=newAdventure(1),s=newSurvival();s.lives=7;
+test('收集四份材料增长血量上限和全部武器攻击，命数不变',()=>{
+  const a=newAdventure(1),s=newSurvival();s.hp=70;
   for(let i=0;i<3;i++)assert.equal(collectGrowth(a,s),false);
-  assert.equal(collectGrowth(a,s),true);assert.equal(s.maxLives,10);assert.equal(s.lives,8);assert.equal(s.hp,undefined);assert.equal(a.growth.power,1);
-  heal(s,9);assert.equal(s.lives,10);takeDamage(s,false,2);assert.equal(s.lives,8);
+  assert.equal(collectGrowth(a,s),true);assert.equal(s.maxHp,120);assert.equal(s.hp,90);assert.equal(s.lives,3);assert.equal(a.growth.power,1);
+  heal(s,90);assert.equal(s.hp,120);takeDamage(s,false,20);assert.equal(s.hp,100);
   assert.equal(weaponDamage('blade',a.growth.power),33);assert.equal(weaponDamage('seed',a.growth.power),79);
 });
 
@@ -87,7 +87,7 @@ test('BOSS 未击败不能通关或伪造通关计分；完成后只奖励一次
   game.tick();assert.equal(game.isCompleted,undefined);assert.equal(game.journey.pending,null);
   const f=bossFixture('boss-finish','rainbow-3');f.run.status='completed';f.run.platform=game.world.zones.length;f.run.defeatedIds=[];assert.throws(()=>validateRun(f.run),/BOSS/);
   last.hp=0;last.isDefeated=true;game.defeatedIds.push(last.id);rescue(game.players[0],game.world.finish);game.tick();assert.ok(game.isCompleted);assert.equal(game.journey.pending.tier,'world');assert.equal(game.journey.pending.choices.length,4);assert.equal(game.journey.pending.pickCount,2);
-  assert.equal(game.adventure.resources.balance,12);assert.equal(game.survival.maxLives,13);assert.equal(game.adventure.growth.power,3);
+  assert.equal(game.adventure.resources.balance,12);assert.equal(game.survival.maxHp,180);assert.equal(game.adventure.growth.power,3);
   const frozen=game.adventure.effects.rainbowBoost;game.tick();assert.equal(game.adventure.effects.rainbowBoost,frozen);assert.equal(game.adventure.resources.balance,12);
 });
 
@@ -101,13 +101,13 @@ test('大关四选二必须两项不同，确认一次共同发放，恢复后�
 test('BOSS 血量、招式、护盾剩余时间与成长完整续存，非法状态拒绝',()=>{
   const g=headless('boss-play','forest-3');g.tick();const b=currentBoss(g.world);b.hp-=37;b.attackTime=.8;b.attackStage='warning';b.warningX=b.x-5;b.warningY=b.baseY+5.2;b.shieldUntil=5;g.adventure.growth.collected=2;g.elapsed=1;
   const f=bossFixture(),mem=storage();writeAdventure(f.run,g.exportState(),mem);const saved=readAdventure(mem);assert.ok(saved);const restored=headless('boss-play','forest-3');restored.restoreState(saved.state);
-  assert.equal(currentBoss(restored.world).hp,b.hp);assert.equal(currentBoss(restored.world).attackTime,.8);assert.equal(currentBoss(restored.world).shieldUntil,5);assert.equal(currentBoss(restored.world).warningX,b.x-5);assert.equal(currentBoss(restored.world).warningY,b.baseY+5.2);assert.deepEqual(restored.adventure.growth,g.adventure.growth);assert.equal(restored.survival.maxLives,12);
+  assert.equal(currentBoss(restored.world).hp,b.hp);assert.equal(currentBoss(restored.world).attackTime,.8);assert.equal(currentBoss(restored.world).shieldUntil,5);assert.equal(currentBoss(restored.world).warningX,b.x-5);assert.equal(currentBoss(restored.world).warningY,b.baseY+5.2);assert.deepEqual(restored.adventure.growth,g.adventure.growth);assert.equal(restored.survival.maxHp,160);
   const invalid=structuredClone(saved);invalid.state.enemies.find(e=>e.id===b.id).attackStage='skip';writeAdventure(invalid.run,invalid.state,mem);assert.equal(readAdventure(mem),null);
 });
 
 test('旧生命档先备份再升级，旧版地图和剩余生命不被重抽',()=>{
-  const f=rogueliteFixture(),mem=storage();f.state.survival.version=2;delete f.state.survival.maxLives;delete f.state.adventure.growth;
-  writeAdventure(f.run,f.state,mem);const original=mem.getItem('garden-active-adventure-v1');const saved=readAdventure(mem);assert.ok(saved);assert.equal(saved.state.version,4);assert.equal(saved.state.survival.lives,6);assert.equal(saved.state.survival.maxLives,9);
+  const f=rogueliteFixture(),mem=storage();f.state.survival.version=2;delete f.state.survival.maxLives;delete f.state.survival.hp;delete f.state.survival.maxHp;delete f.state.adventure.growth;
+  writeAdventure(f.run,f.state,mem);const original=mem.getItem('garden-active-adventure-v1');const saved=readAdventure(mem);assert.ok(saved);assert.equal(saved.state.version,4);assert.equal(saved.state.survival.lives,6);assert.equal(saved.state.survival.maxHp,100);
   writeAdventure(saved.run,saved.state,mem);assert.equal(mem.getItem('garden-active-adventure-v1-before-boss-growth'),original);
 });
 
@@ -168,9 +168,9 @@ test('每位 BOSS 会用技能威胁停留在地面或高台的玩家，并主�
     const ledges=g.world.platforms.filter(p=>p.zone===g.world.platforms[arena.floorId].zone && p.id!==arena.exitId);
     const perch=isHigh?ledges.reduce((a,b)=>a.y>b.y?a:b):g.world.platforms[arena.floorId];
     rescue(g.players[0],perch,isHigh?perch.x:arena.left+2);g.players[0].protection=0;
-    const initialLives=g.survival.lives,initialX=boss.x;let distance=0;
+    const initialLives=g.survival.hp,initialX=boss.x;let distance=0;
     for(let n=0;n<2400 && g.survival.phase==='alive';n++){g.elapsed+=1/120;g.tick();distance=Math.max(distance,Math.abs(boss.x-initialX));}
-    if(g.survival.lives===initialLives || distance<1)failures.push({stage:stage.id,boss:boss.name,isHigh,lost:initialLives-g.survival.lives,moved:Math.round(distance*10)/10});
+    if(g.survival.hp===initialLives || distance<1)failures.push({stage:stage.id,boss:boss.name,isHigh,lost:initialLives-g.survival.hp,moved:Math.round(distance*10)/10});
   }
   assert.deepEqual(failures,[], '停在平台不能永久躲过技能；BOSS 不能始终站在原地');
 });
@@ -180,12 +180,12 @@ test('高台树根锁定位置后可躲开，暂停冻结出招，击败立即�
   const run=isDodge=>{
     const g=headless('boss-high','forest-3'),boss=g.world.enemies.at(-1),p=g.players[0];p.protection=0;
     while(!boss.isWarning){g.elapsed+=1/120;g.tick();}
-    const target={x:boss.warningX,y:boss.warningY},initial=g.survival.lives;
+    const target={x:boss.warningX,y:boss.warningY},initial=g.survival.hp;
     g.isPaused=true;const frozen=JSON.stringify({boss,p,shots:g.enemyShots});for(let i=0;i<240;i++)g.tick();assert.equal(JSON.stringify({boss,p,shots:g.enemyShots}),frozen);g.isPaused=false;
     if(isDodge)g.keys.add('ArrowLeft');
     while(g.elapsed<3.4){if(g.elapsed>1.3)g.keys.clear();g.elapsed+=1/120;g.tick();}
     assert.equal(boss.warningX,target.x);assert.equal(boss.warningY,target.y);
-    const lost=initial-g.survival.lives;
+    const lost=initial-g.survival.hp;
     boss.hp=0;boss.isDefeated=true;g.rewardEnemy(boss);assert.ok(g.enemyShots.every(s=>s.bossId!==boss.id||!s.isActive));
     return lost;
   };

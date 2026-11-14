@@ -1,3 +1,4 @@
+import { createCombatWorld } from './combat-world.js';
 import { expandEncounters } from './encounters.js';
 import { createRogueliteWorld } from './roguelite-world.js';
 import { createBossWorld } from './boss-world.js';
@@ -184,6 +185,7 @@ export function validateCampaign(world) {
   return world.milestones.length === (world.version >= 4 ? world.zones.length : CAMPAIGNS[world.levelId].regions.length);
 }
 export function createCampaignWorld(seed, level, version = GENERATION_VERSION) {
+  if (version === 6) return createCombatWorld(seed, level);
   if (version === 5) return createBossWorld(seed, level);
   if (version === 4) return createRogueliteWorld(seed, level);
   if (version === 3) return expandEncounters(createCampaignWorld(seed, level, 2));

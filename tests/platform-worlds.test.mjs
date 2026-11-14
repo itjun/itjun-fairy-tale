@@ -74,7 +74,7 @@ test('小怪巡逻不会离台，踩头只触发一次，侧碰保护避免连�
   assert.equal(touchEnemy(player,enemy,player.y),null);
   const other=world.enemies[2];player.x=other.x-0.2;player.y=other.y;player.vy=0;
   assert.equal(touchEnemy(player,other,player.y),'bump');
-  assert.equal(player.protection,2);assert.equal(touchEnemy(player,other,player.y),null);
+  assert.equal(player.protection,1);assert.equal(touchEnemy(player,other,player.y),null);
   assert.equal(other.isDefeated,false);
 });
 

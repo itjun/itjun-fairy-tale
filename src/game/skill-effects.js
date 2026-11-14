@@ -6,7 +6,7 @@ export class SkillEffects {
   constructor(scene, geometry, materials, rewards, isReducedMotion) {
     this.scene = scene; this.geometry = geometry; this.materials = materials;
     this.isReducedMotion = isReducedMotion;
-    this.shots = new Map(); this.bursts = []; this.halos = [];
+    this.magicViews = new Map(); this.shots = new Map(); this.bursts = []; this.halos = [];
     this.rewards = rewards.map(reward => {
       const group = this.group();
       this.add(group, 'bubble', 2.5, 2.5);
@@ -28,6 +28,22 @@ export class SkillEffects {
     for (let i = 0; i < (this.isReducedMotion || isCompact ? 4 : 10); i++) this.add(group, 'stars', 0.6, 0.6);
     this.bursts.push({ group, at, isReward, isCompact });
   }
+  updateMagic(effects) {
+    for(const [id,group] of this.magicViews)if(!effects.some(e=>e.id===id)){this.scene.remove(group);this.magicViews.delete(id);}
+    for(const effect of effects){
+      let group=this.magicViews.get(effect.id);
+      if(!group){group=this.group();this.magicViews.set(effect.id,group);for(let i=0;i<8;i++)this.add(group,effect.id,effect.id==='thunder'?1.6:effect.id==='rain'?.35:.7,effect.id==='thunder'?.3:.7);if(effect.id==='rain')this.add(group,'cloud',6,1.5).position.set(0,6.5,0);}
+      group.position.set(effect.x,effect.y,.75);
+      group.children.forEach((mesh,i)=>{
+        if(i>=8)return;
+        const age=this.isReducedMotion?0:effect.age;
+        if(effect.id==='fire'){const angle=i*Math.PI/4+age;mesh.position.set(Math.cos(angle)*3.2,Math.sin(angle)*2.3,0);}
+        if(effect.id==='snow')mesh.position.set((age%1.5)/1.5*28-14,(i-3.5)*1.1,0);
+        if(effect.id==='rain')mesh.position.set((i-3.5)*2.8,6-(age*5+i)%8,0);
+        if(effect.id==='thunder')mesh.position.set((i-3.5)*.55,Math.sin(i*2+age*15)*.35,0);
+      });
+    }
+  }
   update(waves, state, players, elapsed, cameraX, halfWidth, playerKinds) {
     const kind = currentSkill(state, elapsed);
     for (const { reward, group } of this.rewards) {
@@ -39,16 +55,31 @@ export class SkillEffects {
         mesh.position.set(Math.cos(angle) * 1.4, Math.sin(angle) * 1.4, 0.1);
       });
     }
-    for (const [wave, group] of this.shots) if (!waves.includes(wave)) { this.scene.remove(group); this.shots.delete(wave); }
-    for (const wave of waves) {
-      if (wave.kind === 'pulse') continue;
+    // 高叠加只简化绘制，全部弹道仍由战斗层结算；按武器均分可见预算。
+    const byKind = new Map();
+    for (const wave of waves) if (wave.isActive && (wave.kind !== 'pulse' || wave.source==='flame' && wave.delay>.8) && Math.abs(wave.x-cameraX)<=halfWidth+5) {
+      if (!byKind.has(wave.kind)) byKind.set(wave.kind,[]);
+      byKind.get(wave.kind).push(wave);
+    }
+    const visible = new Set(), budget = Math.max(1,Math.floor(120 / (byKind.size || 1)));
+    for (const shots of byKind.values()) {
+      const stride = Math.max(1,Math.ceil(shots.length/budget));
+      for (let i=0;i<shots.length;i+=stride) visible.add(shots[i]);
+    }
+    for (const [wave, group] of this.shots) if (!visible.has(wave)) { this.scene.remove(group); this.shots.delete(wave); }
+    for (const wave of visible) {
       let group = this.shots.get(wave);
       if (!group) {
         group = this.group(); this.shots.set(wave, group);
-        if (wave.kind === 'blade') {
+        if (wave.kind === 'pulse' && wave.source==='flame') {
+          this.add(group,'dragon',2.8,2.3);
+          this.add(group,'flame',3.2,1.2).position.x=2;
+        } else if (wave.kind === 'blade') {
           this.add(group, 'blade', 3.8, 1.5);
           this.add(group, 'blade', 2.6, 0.95).position.x = -1.6;
           this.add(group, 'blade', 1.5, 0.55).position.x = -2.9;
+        } else if(wave.kind==='flame'){
+          this.add(group,'flame',3.5,1.25);
         } else if (wave.kind==='moonblade') {
           this.add(group,'moonblade',1.6,1.6);
           for(let i=0;i<2;i++)this.add(group,'stars',.24-i*.07,.24-i*.07).position.set(-.65-i*.4,0,0);

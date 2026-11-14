@@ -79,26 +79,20 @@ test('陷阱预告不伤人，启动才命中；坍塌与跷跷板状态恢复�
   stepMechanisms(clone,{},8.3,.1);assert.equal(clone.platforms[0].isEnabled,true);
 });
 
-test('补命道具只领一次，满命可留下或用已装备本领存一份备用',()=>{
-  const world={supplies:[{id:'life:0',x:0,y:1}]},p={x:0,y:0},s=newSurvival(),a=newAdventure(1),claimed=[];
-  assert.equal(takeLifeSupply(world,claimed,p,s,a),null);s.lives=8;
-  assert.ok(takeLifeSupply(world,claimed,p,s,a));assert.equal(s.lives,9);s.lives=8;
-  assert.equal(takeLifeSupply(world,claimed,p,s,a),null);assert.equal(s.lives,8);
-  s.lives=9;a.upgrades.snack=1;
-  assert.equal(takeLifeSupply(world,[],p,s,a,upgradePower(a)),null);
-  a.loadouts[0].upgrades.push('snack');
-  assert.ok(takeLifeSupply(world,[],p,s,a,upgradePower(a)));assert.equal(a.resources.snack,1);assert.equal(s.lives,9);
-  assert.equal(takeLifeSupply(world,[],p,s,a,upgradePower(a)),null);
+test('生命血瓶只领一次，满血也能加命，当前血量不变',()=>{
+  const world={supplies:[{id:'life:0',kind:'life',x:0,y:1}]},p={x:0,y:0},s=newSurvival(),a=newAdventure(1),claimed=[];
+  assert.ok(takeLifeSupply(world,claimed,p,s,a));assert.equal(s.lives,4);assert.equal(s.hp,100);
+  s.hp=60;assert.equal(takeLifeSupply(world,claimed,p,s,a),null);assert.equal(s.hp,60);assert.equal(s.lives,4);
 });
 
-test('生命上限成长后地图补给继续回血，满血才存备用且不超过上限',()=>{
-  const world={supplies:[{id:'life:0',x:0,y:1}]},p={x:0,y:0},s=newSurvival(),a=newAdventure(1);
-  s.maxLives=12;s.lives=9;
-  assert.ok(takeLifeSupply(world,[],p,s,a,upgradePower(a)));assert.equal(s.lives,10);
+test('回血药包不加命，血量上限成长后也不溢出；满血可存备用点心',()=>{
+  const world={supplies:[{id:'medkit:0',kind:'medkit',x:0,y:1}]},p={x:0,y:0},s=newSurvival(),a=newAdventure(1);
+  s.maxHp=160;s.hp=140;
+  assert.ok(takeLifeSupply(world,[],p,s,a));assert.equal(s.hp,160);assert.equal(s.lives,3);
+  assert.equal(takeLifeSupply(world,[],p,s,a),null);
   a.upgrades.snack=1;a.loadouts[0].upgrades.push('snack');
-  assert.ok(takeLifeSupply(world,[],p,s,a,upgradePower(a)));assert.equal(s.lives,11);assert.equal(a.resources.snack,0);
-  assert.ok(takeLifeSupply(world,[],p,s,a,upgradePower(a)));assert.equal(s.lives,12);
-  assert.ok(takeLifeSupply(world,[],p,s,a,upgradePower(a)));assert.equal(s.lives,12);assert.equal(a.resources.snack,1);
+  assert.ok(takeLifeSupply(world,[],p,s,a,upgradePower(a)));assert.equal(s.hp,160);assert.equal(a.resources.snack,1);
+  assert.equal(takeLifeSupply(world,[],p,s,a,upgradePower(a)),null);
 });
 
 test('多武器同时发射，专属强化正确隔离，限时效果到期只移除自身',()=>{
@@ -130,10 +124,10 @@ test('通关才弹一次奖励，连续帧与重开不重复，暂停和通关�
   assert.equal(restored.adventure.effects.rainbowBoost,remaining);
 });
 
-test('生命旧档先备份再去掉体力，24 小关服务端计分与历史主题同时兼容',()=>{
+test('真实命数旧档先备份再按比例迁移血量，24 小关服务端计分与历史主题同时兼容',()=>{
   const f=rogueliteFixture('rogue-stack'),storage=memory();f.state.survival={...f.state.survival,version:1,hp:2};
   writeAdventure(f.run,f.state,storage);const original=storage.getItem('garden-active-adventure-v1');const saved=readAdventure(storage);assert.ok(saved);
-  assert.equal(saved.state.survival.hp,undefined);assert.equal(saved.state.survival.lives,6);assert.deepEqual(saved.state.adventure.effects,{rainbowBoost:40,frostTreat:75});
+  assert.equal(saved.state.survival.hp,67);assert.equal(saved.state.survival.lives,6);assert.deepEqual(saved.state.adventure.effects,{rainbowBoost:40,frostTreat:75});
   writeAdventure(saved.run,saved.state,storage);assert.equal(storage.getItem('garden-active-adventure-v1-before-life-only'),original);
   const db=openStore(':memory:');try{for(const stage of STAGES){const row={...saved.run,id:crypto.randomUUID(),levelId:stage.id};assert.equal(db.save(row).levelId,stage.id);}}finally{db.close();}
 });
