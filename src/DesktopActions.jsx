@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
 import { CornersOut, SignOut, ArrowsClockwise } from '@phosphor-icons/react';
+export function DesktopRestState() {
+  useEffect(() => {
+    window.gardenDesktop?.updateSafe(true);
+    return () => window.gardenDesktop?.updateSafe(false);
+  }, []);
+  return null;
+}
+
 export function DesktopActions() {
   const [update, setUpdate] = useState(null);
   useEffect(() => {
@@ -8,8 +16,7 @@ export function DesktopActions() {
     let active = true;
     const unsubscribe = bridge.onUpdate(setUpdate);
     bridge.updateState().then(state => { if (active) setUpdate(state); });
-    bridge.updateSafe(true);
-    return () => { active = false; unsubscribe(); bridge.updateSafe(false); };
+    return () => { active = false; unsubscribe(); };
   }, []);
   if (!window.gardenDesktop) return null;
   return <div className="desktop-actions">

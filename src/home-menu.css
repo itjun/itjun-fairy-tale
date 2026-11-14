@@ -1,0 +1,87 @@
+#root .home-shell { max-width:none; padding:0; margin:0; }
+.home-menu { position:relative; height:100dvh; min-height:460px; overflow:hidden; isolation:isolate; background:#fff0d5; }
+.home-artworks,.home-slide { position:absolute; inset:0; pointer-events:none; }
+.home-slide { opacity:0; transition:opacity 1.5s ease; }
+.home-slide.is-current { opacity:1; }
+.home-paper { position:absolute; inset:0; }
+/* 将原画左上角的空白纸纹铺满视口，画面边缘融入同一张画纸。 */
+.home-slide img { position:absolute; left:50%; top:50%; width:100%; height:auto; max-width:none; transform:translate(-50%,-50%); mask-image:linear-gradient(to bottom,transparent,#000 2%,#000 98%,transparent),linear-gradient(to right,transparent,#000 2%,#000 98%,transparent); mask-composite:intersect; }
+@media(min-aspect-ratio:1672/941) {
+  .home-slide img { width:auto; height:100%; }
+}
+.home-title { position:absolute; top:clamp(28px,7vh,80px); left:clamp(28px,6vw,100px); }
+.home-title h1 { font-size:clamp(40px,5.3vw,76px); font-weight:400; color:#a83e66; letter-spacing:.12em; margin:0; }
+.home-title p { margin:12px 0 0; font-size:clamp(14px,1.4vw,20px); color:#685d50; letter-spacing:.1em; }
+.home-navigation { position:absolute; left:clamp(28px,6vw,100px); bottom:clamp(38px,9vh,100px); display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+#root .home-menu-button { text-align:left; padding:10px 22px; min-height:52px; min-width:180px; font-size:clamp(23px,2.4vw,32px); color:#514f45; border:2px solid transparent; }
+#root .home-menu-button.home-play { color:#304a2b; border-image:var(--green-button) 128 fill / 14px / 0 stretch; }
+#root .home-menu-button:hover,#root .home-menu-button:focus-visible { color:#a83e66; background:#fffaf1b3; }
+.home-slideshow { position:absolute; right:clamp(18px,3vw,48px); bottom:24px; display:flex; align-items:center; gap:2px; padding:4px 8px 4px 16px; background:#fffaf1e8; border-radius:6px; color:#514f45; }
+.home-art-caption { display:flex; align-items:center; gap:14px; font-size:15px; margin-right:8px; }
+.home-art-caption small { font-size:13px; }
+.home-slideshow button { width:44px; height:44px; display:grid; place-items:center; }
+.home-page { min-height:100dvh; padding:clamp(24px,4vw,64px) clamp(24px,7vw,100px); background:#faf8f1; }
+.home-page-header,.home-page-content { max-width:1100px; margin-inline:auto; }
+.home-page-header { padding-bottom:28px; border-bottom:1px solid #ded9c9; }
+.home-page-header h1 { margin:30px 0 0; font-weight:400; font-size:clamp(32px,4vw,52px); color:#a83e66; outline:none; }
+.home-back { display:inline-flex; align-items:center; gap:12px; min-height:44px; padding:4px 0; font-size:19px; }
+.home-page-content { padding-top:28px; }
+#root .home-page :is(.quest-card,.quiet-button,.achievement-list button) { border:0; border-image:none; border-radius:0; background:none; box-shadow:none; }
+#root .home-page :is(.quest-card,.quiet-button,.achievement-list button):hover { background:#eeeadd; transform:none; }
+.home-options .home-page-header,.home-options .home-page-content { max-width:none; }
+.home-options .home-page-header { display:flex; align-items:center; justify-content:space-between; flex-direction:row-reverse; padding-bottom:24px; }
+.home-options .home-page-header h1 { margin:0; font-size:36px; }
+.home-options .home-page-content { padding-top:24px; }
+.home-options-layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; align-items:start; }
+.home-options-categories { display:flex; flex-direction:column; gap:8px; }
+.home-options-categories button { min-height:88px; padding:20px; text-align:left; font-size:24px; }
+.home-options-categories button[aria-pressed="true"] { background:#eeeadd; color:#a83e66; }
+.home-options-categories button:hover { background:#eeeadd; transform:none; }
+.home-options-grid { display:grid; grid-template-columns:minmax(0,1fr); }
+#root .home-options .home-options-grid .quiet-button { display:flex; align-items:center; justify-content:flex-start; width:100%; min-height:96px; padding:24px 12px; border-bottom:1px solid #ded9c9; font-size:24px; line-height:1.5; text-align:left; gap:18px; }
+.home-options-grid .quiet-button svg { width:28px; height:28px; flex-shrink:0; }
+.home-options-grid .desktop-actions,.home-options-grid .garden-backup { display:contents; }
+.home-options-grid .desktop-update-status,.home-options-grid .garden-backup-note { grid-column:1 / -1; text-align:left; font-size:16px; line-height:1.7; color:#777761; margin:24px 12px 0; }
+.home-options-grid .desktop-update-status { order:1; }
+.home-options-grid .garden-backup-note { order:2; }
+.home-save-warning { position:fixed; top:12px; right:16px; max-width:300px; padding:14px; background:#fffaf1; color:#8f2948; z-index:2; }
+.home-games .quest-list { grid-template-columns:1fr; margin:0 0 22px; gap:0; }
+#root .home-games .quest-card { min-height:138px; padding:24px 12px; border-bottom:1px solid #ded9c9; }
+.home-games .quest-icon { background:none; width:76px; height:76px; }
+.home-games .quest-icon svg { width:48px; height:48px; }
+.home-games .quest-copy strong { font-size:30px; font-weight:400; }
+.home-games .quest-copy>span { font-size:17px; }
+.home-games .quest-card>svg { margin-left:auto; }
+.home-gallery .modal-subtitle,.home-collection .modal-subtitle { margin-top:0; }
+.home-gallery .artwork-view { width:min(100%,74dvh); }
+.home-collection .achievement-list { margin:32px 0; }
+#root .home-collection .achievement-list button { padding:32px 12px; }
+.home-collection .achievement-list strong { font-size:24px; }
+.home-collection .achievement-list span { font-size:17px; }
+.garden-return { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 0; }
+.garden-return h1 { margin:0; font-size:30px; }
+body.is-desktop :is(.home-title,.garden-return,.home-page-header) { -webkit-app-region:drag; }
+@media(max-width:600px) {
+  .home-slide img { width:140%; height:auto; left:35%; top:40%; }
+  .home-title { top:32px; }
+  .home-navigation { bottom:108px; gap:6px; }
+  .home-slideshow { right:16px; bottom:18px; }
+  .home-art-caption { font-size:13px; gap:8px; }
+  .home-games .quest-card { flex-direction:row; text-align:left; padding:16px; }
+  .home-games .quest-copy>span { font-size:13px; }
+  .home-page { padding:24px 20px; }
+  .home-page-header { padding-bottom:20px; }
+  .home-options-layout { grid-template-columns:minmax(0,1fr); gap:16px; }
+  .home-options-categories { flex-direction:row; gap:4px; }
+  .home-options-categories button { flex:1; min-height:56px; padding:12px 4px; font-size:18px; text-align:center; }
+  #root .home-games .quest-card { padding:18px 0; min-height:110px; }
+  .home-games .quest-copy strong { font-size:25px; }
+  .home-games .quest-icon { width:48px; height:48px; }
+  .home-collection .achievement-list { grid-template-columns:1fr; }
+}
+@media(max-height:550px) and (min-width:601px) {
+  .home-title { top:22px; }
+  .home-title h1 { font-size:40px; }
+  .home-navigation { bottom:24px; gap:2px; }
+  #root .home-menu-button { font-size:23px; min-height:44px; padding:6px 18px; }
+}

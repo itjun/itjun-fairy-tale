@@ -15,5 +15,5 @@ export function GardenBackup({ progress, onImport }) {
     catch (error) { setMessage(error instanceof SyntaxError ? '文件读不懂，请选择导出的 JSON 进度文件。' : error.message); }
     event.target.value = '';
   }
-  return <details className="garden-backup"><summary>家长工具 · 带走花园进度</summary><p role="status">{message}</p><div className="desktop-actions"><button className="quiet-button" onClick={download}><DownloadSimple size={18} />导出花园进度</button><button className="quiet-button" onClick={() => file.current.click()}><UploadSimple size={18} />导入花园进度</button><input ref={file} type="file" accept=".json,application/json" hidden onChange={upload} /></div></details>;
+  return <div className="garden-backup"><button className="quiet-button" onClick={download}><DownloadSimple size={18} />导出花园进度</button><button className="quiet-button" onClick={() => file.current.click()}><UploadSimple size={18} />导入花园进度</button><input ref={file} type="file" accept=".json,application/json" hidden onChange={upload} /><p className="garden-backup-note" role="status">{message}</p></div>;
 }
