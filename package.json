@@ -13,6 +13,7 @@
     "start": "npm run build && electron .",
     "desktop:run": "electron .",
     "desktop:test": "node scripts/test-desktop.mjs",
+    "test:gamepad": "node scripts/test-gamepad-desktop.mjs",
     "icons": "node scripts/build-icons.mjs",
     "pack:mac": "npm run build && electron-builder --mac --publish never",
     "pack:win": "npm run build && electron-builder --win --publish never",

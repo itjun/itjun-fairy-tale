@@ -38,7 +38,7 @@ export function RewardPanel({ reward, adventure, onChoose, onRecycle, onExit }) 
         <span className="rarity-seal">{RARITIES[choice.rarity || 'common'].name}</span><span className="reward-category">{CATEGORY_LABELS[item.category]}</span><strong className="reward-name">{item.name}</strong><img src={`./assets/${item.image}.png`} alt=""/><span className="reward-copy"><span>{item.hint}</span>{item.legend&&<b className="legend-effect">{item.legend}</b>}<small>{choice.type === 'timed' ? `${item.duration} 秒有效游玩时间` : choice.type === 'weapon' ? '与现有武器一起发射' : choice.type === 'supply' || choice.type === 'salvage' ? '确认后领取' : choice.type==='spell' && rank>=3 ? '保留 3 级，解锁传奇效果' : rank ? `升级到 ${rank + 1} 级` : '与现有本领叠加'}</small></span><span className="reward-pick">{isSelected ? '已选这个' : '选这个'}</span>
       </button>;
     })}</div>
-    <footer><span>彩笔碎片 {adventure.resources?.balance || 0}</span><button aria-pressed={selection === 'recycle'} onClick={() => setSelection('recycle')}>这次换碎片 +{upgradePower(adventure, reward.player).recycle ? 3 : 1}</button><button className="reward-confirm primary-button" disabled={!isReady} onClick={confirm}>选好了，领取奖励</button><button onClick={onExit}>保存回花园</button></footer>
+    <footer><span>彩笔碎片 {adventure.resources?.balance || 0}</span><button aria-pressed={selection === 'recycle'} onClick={() => setSelection('recycle')}>这次换碎片 +{upgradePower(adventure, reward.player).recycle ? 3 : 1}</button><button className="reward-confirm primary-button" disabled={!isReady} onClick={confirm}>选好了，领取奖励</button><button data-gamepad-back onClick={onExit}>保存回花园</button></footer>
   </section>;
 }
 export function trapFocus(event) {
@@ -109,7 +109,7 @@ export function WorkbenchPanel({ character = 'sister', isSound = true, adventure
         return <button key={id} aria-pressed={loadout.upgrades.includes(id)} onClick={() => { if (!onUpgrade(player, id)) setNotice(isCompatible ? '这个本领还没学会。' : `换上${WEAPONS[item.weapon].name}，就能用这个本领。`); else setNotice(''); }}><img src={`./assets/${item.image}.png`} alt=""/><strong>{item.name}{rank > 1 ? ` ${rank}级` : ''}</strong><small>{isCompatible ? item.hint : `适合${WEAPONS[item.weapon].name}`}</small></button>;
       })}</div>
       <p className="workbench-notice" role="status">{notice || '点一下装上，再点一下取下。'}</p>
-      <button className="paper-action workbench-depart" onClick={onClose}>带上出发 <ArrowRight size={24}/></button>
+      <button className="paper-action workbench-depart" data-gamepad-back onClick={onClose}>带上出发 <ArrowRight size={24}/></button>
     </div>
   </section>;
 }

@@ -1,0 +1,18 @@
+html[data-input-mode="gamepad"] :focus { outline: 4px dashed #58753a !important; outline-offset: 5px; }
+html[data-input-mode="gamepad"] [tabindex="-1"]:focus { outline: none !important; }
+.gamepad-notice { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 2000; max-width: 85vw; padding: 9px 18px; background: #fff8e9; color: #4e583b; border: 2px solid #9d9b71; border-radius: 9px; pointer-events: none; font-size: 18px; }
+.gamepad-guide { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1800; padding: 7px 16px; background: #fff8e9ee; color: #4e583b; text-align: center; font-size: 16px; pointer-events: none; }
+body:has([data-game-status="playing"]) .gamepad-guide { display: none; }
+html[data-input-mode="gamepad"] body:not(:has([data-game-status="playing"])) { padding-bottom: 42px; }
+.gamepad-settings { grid-column: 1 / -1; padding: 18px 0; text-align: left; }
+.gamepad-settings h2 { font-size: 25px; }
+.gamepad-settings p, .gamepad-settings small { overflow-wrap: anywhere; }
+.gamepad-settings dl { display: grid; grid-template-columns: minmax(120px, 1fr) 3fr; gap: 10px 20px; font-size: 18px; }
+.gamepad-settings dd { margin: 0; }
+.gamepad-settings label { display: flex; align-items: center; gap: 14px; margin: 20px 0; }
+.gamepad-settings button { margin: 0 18px 16px 0; padding: 8px 15px; }
+.gamepad-settings small { display: block; line-height: 1.8; }
+.gamepad-stamp-cursor { position: absolute; width: 44px; height: 44px; border: 3px dashed #58753a; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; background: #fff8e980; z-index: 6; }
+.world:not(:focus) .gamepad-stamp-cursor { display: none; }
+@media (max-width: 700px) { .gamepad-guide { font-size: 13px; } .gamepad-settings dl { grid-template-columns: 1fr 2fr; } }
+html[data-input-mode="gamepad"] :is(button, a, input, select, [data-gamepad-canvas]) { scroll-margin-block: 12px 72px; }

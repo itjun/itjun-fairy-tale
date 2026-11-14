@@ -8,7 +8,7 @@ export function HomePage({ title, onBack, backLabel = '返回主菜单', classNa
     if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); onBack(); }
   }}>
     <header className="home-page-header">
-      <button className="home-back" onClick={onBack}><ArrowLeft size={24} />{backLabel}</button>
+      <button data-gamepad-back className="home-back" onClick={onBack}><ArrowLeft size={24} />{backLabel}</button>
       <h1 ref={heading} tabIndex={-1}>{title}</h1>
     </header>
     <div className="home-page-content">{children}</div>

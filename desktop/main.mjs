@@ -104,7 +104,7 @@ function menuTask(task) { return () => { task().catch(error => dialog.showErrorB
 async function createWindow() {
   const area = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({ width: Math.min(1280,area.width-48), height: Math.min(800,area.height-48), minWidth: Math.min(720,area.width-48), minHeight: Math.min(540,area.height-48), show: false, frame: false, fullscreen: false, fullscreenable: true, backgroundColor: '#faf8f1', title: '花园王国', icon: join(root, 'build/icon.png'), autoHideMenuBar: true,
-    webPreferences: { preload: join(root, 'desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false, backgroundThrottling: process.env.GARDEN_DESKTOP_SMOKE !== '1' } });
+    webPreferences: { preload: join(root, 'desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, autoplayPolicy: 'no-user-gesture-required', spellcheck: false, backgroundThrottling: process.env.GARDEN_DESKTOP_SMOKE !== '1' } });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
   win.webContents.on('will-attach-webview', event => event.preventDefault());

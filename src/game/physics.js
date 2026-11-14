@@ -44,7 +44,7 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   const targetVx = input.direction * RULES.speed * (input.speedMultiplier ?? 1);
   player.vx = player.knockTime > 0 ? player.knockVx : player.isGrounded && player.ground?.isIce ? player.vx + Math.max(-12*dt, Math.min(12*dt,targetVx-player.vx)) : targetVx;
   if (player.isGrounded && player.ground?.conveyor) player.x += player.ground.conveyor * dt;
-  if (input.direction) player.facing = input.direction;
+  if (input.direction) player.facing = Math.sign(input.direction);
   let isJumped = false;
   if (player.buffer > 0 && player.coyote > 0) {
     player.vy = RULES.jump; player.buffer = 0; player.coyote = 0; player.isGrounded = false; isJumped = true;

@@ -42,7 +42,7 @@ export class GardenEngine {
     this.collectedIds = []; this.pickups = [];
     this.isCompleted = false; this.furthestPlatform = 0; this.isDisposed = false;
     this.isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.isPaused = true; this.keys = new Set(); this.touch = new Set(); this.jumps = [false, false];
+    this.isPaused = true; this.keys = new Set(); this.touch = new Set(); this.gamepad = new Set(); this.gamepadDirection = 0; this.jumps = [false, false];
     this.collected = 0; this.distance = 0; this.checkpoint = 0; this.elapsed = 0;
     this.players = [createPlayer(this.world.start)];
     if(adventure)for(const effect of this.adventure.magic.active){effect.x=this.players[0].x;effect.y=this.players[0].y+1;effect.hitIds=[];}
@@ -287,7 +287,16 @@ export class GardenEngine {
     if (isPressed) { if (['jump', 'drop'].includes(action) && !this.touch.has(action)) this.jumps[0] = true; this.touch.add(action); }
     else this.touch.delete(action);
   }
-  clearInput() { this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; }
+  setGamepadInput(input) {
+    if (this.isPaused) return;
+    const actions = input?.actions || new Set();
+    if (actions.has('confirm') && !this.gamepad.has('jump')) this.jumps[0] = true;
+    this.gamepad = new Set([...actions].map(action => action === 'confirm' ? 'jump' : action === 'down' ? 'drop' : action));
+    this.gamepadDirection = input?.direction || 0;
+  }
+  releaseGamepad() { this.gamepad?.clear(); this.gamepadDirection = 0; }
+  hasControl(action) { return this.touch.has(action) || this.gamepad?.has(action); }
+  clearInput() { this.releaseGamepad(); this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; }
   pause(isPaused) { if (!isPaused && (this.survival.phase !== 'alive'||this.combatLoot?.pendingId!=null)) return; this.isPaused = isPaused; if(isPaused)this.callbacks.onSound('pause'); this.clearInput(); this.accumulator = 0; }
   requestPause() { if (!this.isPaused) { this.pause(true); this.callbacks.onPause(); } }
   returnToSafety() {
@@ -395,15 +404,15 @@ export class GardenEngine {
     this.waves = [...this.waves.filter(w => w.isActive), ...spawned];
     this.players.forEach((player, index) => {
       const isSingle = this.players.length === 1;
-      const left = index === 0 ? this.keys.has('KeyA') || this.touch.has('left') || isSingle && this.keys.has('ArrowLeft') : this.keys.has('ArrowLeft');
-      const right = index === 0 ? this.keys.has('KeyD') || this.touch.has('right') || isSingle && this.keys.has('ArrowRight') : this.keys.has('ArrowRight');
-      const down = index === 0 ? this.keys.has('KeyS') || this.touch.has('drop') || isSingle && this.keys.has('ArrowDown') : this.keys.has('ArrowDown');
+      const left = index === 0 ? this.keys.has('KeyA') || this.hasControl('left') || isSingle && this.keys.has('ArrowLeft') : this.keys.has('ArrowLeft');
+      const right = index === 0 ? this.keys.has('KeyD') || this.hasControl('right') || isSingle && this.keys.has('ArrowRight') : this.keys.has('ArrowRight');
+      const down = index === 0 ? this.keys.has('KeyS') || this.hasControl('drop') || isSingle && this.keys.has('ArrowDown') : this.keys.has('ArrowDown');
       const previousY = player.y, wasGrounded = player.isGrounded;
       const powers = this.adventure ? upgradePower(this.adventure, index) : {};
       const speedMultiplier = (player.inkUntil > this.elapsed ? 0.65 : 1) * (1 + (!player.isGrounded ? (powers.air || 0) * 0.05 : 0) + (player.hasteUntil > this.elapsed ? 0.12 : 0));
-      if (powers.feather && !player.isGrounded && player.vy < -3 && (this.keys.has('Space') || this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.touch.has('jump'))) player.vy = -3;
+      if (powers.feather && !player.isGrounded && player.vy < -3 && (this.keys.has('Space') || this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.hasControl('jump'))) player.vy = -3;
       player.fallPeak = Math.max(player.fallPeak ?? player.y, player.y);
-      const result = stepPlayer(player, { direction: Number(right) - Number(left), speedMultiplier, isDoubleJump: this.survival.character === 'little', jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, STEP, { ...this.world, isFiniteLife: true, minY: Math.max(this.world.minY,player.safe.y-14) });
+      const result = stepPlayer(player, { direction: (this.keys.has('KeyA') || this.keys.has('KeyD') || this.keys.has('ArrowLeft') || this.keys.has('ArrowRight') || this.touch.has('left') || this.touch.has('right')) ? Number(right) - Number(left) : (this.gamepadDirection || 0), speedMultiplier, isDoubleJump: this.survival.character === 'little', jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, STEP, { ...this.world, isFiniteLife: true, minY: Math.max(this.world.minY,player.safe.y-14) });
       this.jumps[index] = false;
       constrainBossArena(this.world,player);
       if (player.isGrounded) {
@@ -443,9 +452,9 @@ export class GardenEngine {
         this.waves.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right }, 'firefly', powers));
       }
       while (this.visited.has(this.furthestPlatform+1)) this.furthestPlatform++;
-      const isFiring = index === 0 ? this.keys.has('KeyJ') || this.touch.has('attack') : this.keys.has('Enter');
+      const isFiring = index === 0 ? this.keys.has('KeyJ') || this.hasControl('attack') : this.keys.has('Enter');
       if(this.adventure){
-        const magic=stepMagic(this.adventure,this.survival,player,this.world.enemies,this.enemyShots,STEP,this.elapsed,isFiring,{left:this.cameraX-this.camera.right,right:this.cameraX+this.camera.right});
+        const magic=stepMagic(this.adventure,this.survival,player,this.world.enemies,this.enemyShots,STEP,this.elapsed,isFiring || this.gamepad?.has('spell'),{left:this.cameraX-this.camera.right,right:this.cameraX+this.camera.right});
         for(const hit of magic.hits)this.recordHit(hit);
         for(const effect of this.adventure.magic.active)this.callbacks.onSound(`${effect.id}:loop`);
         for(const event of magic.events)this.callbacks.onSound(`${event.id}:${event.type}`);

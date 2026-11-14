@@ -1,3 +1,5 @@
+import { registerGamepadPlayer, vibrateGamepad } from '../input/gamepad.js';
+import { useGamepad } from '../input/GamepadSupport.jsx';
 import { CombatAudio } from './combat-audio.js';
 import { SPELLS } from '../../shared/combat-catalog.js';
 import { INITIAL_LIVES, CHARACTERS } from './characters.js';
@@ -22,6 +24,7 @@ import './boss.css';
 const initialStats = { flowers: 0, distance: 0, gardens: 0, score: 0, platform: 0, seconds: 0, message: '', positions: [], platforms: 0 };
 function makeSeed(previous) { const value=crypto.getRandomValues(new Uint32Array(1))[0]; return value===previous ? (value+1)>>>0 : value; }
 export function PlatformGame({ onExit, initialSound = true }) {
+  const gamepadState = useGamepad();
   const host = useRef(null), engine = useRef(null), menu = useRef(null), audio = useRef(null);
   const [initialSaved] = useState(readAdventure);
   const saved = useRef(initialSaved);
@@ -62,6 +65,8 @@ export function PlatformGame({ onExit, initialSound = true }) {
     if (isMounted.current) setSync(isResumeSaved.current ? result : {isSaved:false,message:'积分已记录，但续关暂未保存，请腾出本机空间后重试'});
   }
   function playSound(type) {
+    if (['player-hurt', 'life-lost'].includes(type)) vibrateGamepad('hurt');
+    else if (type.endsWith(':hit') || type.endsWith(':defeat')) vibrateGamepad('hit');
     audio.current ||= new CombatAudio(); audio.current.setMuted(!sound.current); audio.current.play(type);
   }
   useEffect(() => {
@@ -99,7 +104,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
         },
         onReward: () => { changeStatus('reward'); persist(game.snapshot(), 'paused'); },
         onLifeLoot: () => { changeStatus('life-loot'); persist(game.snapshot(), 'paused'); },
-        onPause: () => { changeStatus('paused'); persist(game.snapshot(), 'paused'); },
+        onPause: () => { setStats(game.snapshot()); changeStatus('paused'); persist(game.snapshot(), 'paused'); },
         onComplete: snapshot => { setStats(snapshot); changeStatus(snapshot.pendingReward ? 'reward' : 'completed'); persist(snapshot, 'completed'); },
         onReady: () => {
           if (saved.current) { const previous=saved.current; saved.current=null; game.restoreState(previous.state); run.current=previous.run; setCharacter(game.survival.character); persist(game.snapshot(), previous.run.status); changeStatus(game.survival.phase === 'over' ? 'ended' : game.survival.phase === 'fallen' ? 'fallen' : game.journey.pending ? 'reward' : game.combatLoot.pendingId!==null ? 'life-loot' : game.isCompleted ? 'completed' : 'paused'); }
@@ -158,6 +163,13 @@ export function PlatformGame({ onExit, initialSound = true }) {
     changeStatus('loading');
     setLevelIndex(index); setSeed(previous=>makeSeed(previous));
   }
+  useEffect(() => registerGamepadPlayer({
+    isActive: () => statusRef.current === 'playing' && !engine.current?.isPaused,
+    input: input => engine.current?.setGamepadInput(input),
+    release: () => engine.current?.releaseGamepad(),
+    pause: () => engine.current?.requestPause(),
+    interact: () => { if (statusRef.current === 'playing') openWorkbench(); },
+  }), []);
   function touchProps(action) {
     return {
       onPointerDown: event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); engine.current?.setTouch(action, true); },
@@ -203,7 +215,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
   return <div className="platform-game" data-game-status={status} data-adventure={!!stats.adventure} data-level={level.id} data-player-positions={JSON.stringify(stats.positions)} data-platform-count={stats.platforms} data-route={level.id} data-enemy-count={stats.enemies} data-boss-active={!!stats.boss}>
     <div className="game-canvas" ref={host} />
     <header className="adventure-header" inert={status !== 'playing'}>
-      <button className="adventure-home" aria-label="回花园" onClick={exit}><ArrowLeft size={20} /><span>回花园</span></button>
+      <button className="adventure-home" aria-label="回花园" data-gamepad-back={!['playing', 'paused'].includes(status) || undefined} onClick={exit}><ArrowLeft size={20} /><span>回花园</span></button>
       <div className="adventure-title"><small>{level.chapterName ? `第 ${levelIndex + 1} / 24 小关　${level.chapterName}` : '接着上次的冒险'}</small><h1>{level.name}</h1></div>
       <div className="adventure-actions"><button aria-label={isSound ? '关闭探险声音' : '打开探险声音'} onClick={() => { sound.current = !isSound; setIsSound(!isSound); audio.current ||= new CombatAudio();audio.current.setMuted(!sound.current);if(sound.current)audio.current.unlock(); }}>{isSound ? <SpeakerHigh size={24} /> : <SpeakerSlash size={24} />}</button><button aria-label="暂停探险" disabled={status !== 'playing'} onClick={pause}><Pause size={24} weight="fill" /></button></div>
     </header>
@@ -224,7 +236,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
     {status === 'playing' && stats.skillNotice && <div key={stats.skillNotice.id} className="skill-celebration" role="status"><img src={`./assets/${SKILLS[stats.skillNotice.kind].image}.png`} alt=""/><div><strong>获得{SKILLS[stats.skillNotice.kind].name}！</strong><span>{SKILLS[stats.skillNotice.kind].hint}</span></div></div>}
     {status === 'playing' && stats.guide && <div className="treasure-guide"><img src="./assets/collectible-star.png" alt=""/>{stats.guide.direction}</div>}
     {stats.message && !stats.boss?.warning && !stats.boss?.casting && <div className="adventure-message" role="status">{stats.message}</div>}
-    <div className="adventure-bottom" inert={status !== 'playing'}><span>{'← → 移动　空格 跳跃　J 攻击　↓ + 空格 下跳'}<small className={sync.isSaved?'':'save-pending'}>{sync.message}</small></span></div>
+    <div className="adventure-bottom" inert={status !== 'playing'}><span>{gamepadState.mode === 'gamepad' ? '左摇杆／方向键 移动　A 跳跃　X / RT 攻击　Y 大招　↓ + A 下跳　≡ 暂停　View 休息点' : '← → 移动　空格 跳跃　J 攻击　↓ + 空格 下跳'}<small className={sync.isSaved?'':'save-pending'}>{sync.message}</small></span></div>
     {status === 'playing' && <div className="touch-controls" aria-label="触屏操作"><div><button aria-label="向左走" {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label="向右走" {...touchProps('right')}><ArrowRight size={30} /></button></div><div><button aria-label="向下跳台" {...touchProps('drop')}><ArrowDown size={27}/></button><button aria-label={`发射${skill.name}`} {...touchProps('attack')}><span>{skill.shortName}</span></button><button className="touch-jump" aria-label="跳跃" {...touchProps('jump')}><ArrowUp size={29} /><span>跳</span></button></div></div>}
     {['playing', 'reward'].includes(status) && <div className="route-signs" aria-hidden={status !== 'playing'}>{stats.routeSigns?.map(sign => <div className="route-sign" key={sign.id} style={{left:`${Math.max(12,Math.min(82,sign.x))}%`,top:`${Math.max(13,Math.min(39,sign.y))}%`}}>{sign.routes.map(route => <span key={route.id}><strong>{route.name}{sign.chosen === route.id ? ' ✓' : ''}</strong><small>{route.label}</small></span>)}</div>)}</div>}
     {status === 'playing' && stats.camp && <button className="camp-open paper-action" onClick={openWorkbench}>休息点：搭配武器</button>}
@@ -247,14 +259,14 @@ export function PlatformGame({ onExit, initialSound = true }) {
         <div className="level-choices" aria-label="选择挑战关卡">{STAGES.map((item,index)=><button key={item.id} aria-pressed={index===levelIndex} onClick={()=>setLevelIndex(index)}><img src={`./assets/${item.image}.png`} alt={item.subtitle}/><span>第 {index+1} 关</span><strong>{item.chapterName}</strong><small>{item.name}</small><small>通关加 {item.bonus} 分</small></button>)}</div>
         <p className="level-source">{level.sources.length ? `这一关组合了原画 ${level.sources.join('、')} 的元素。` : level.story} {CAMPAIGNS[themeId].hint}</p>
         <div className="collectible-preview" aria-label="这一关的宝物">{LEVEL_COLLECTIBLES[themeId].map(id=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt=""/>{COLLECTIBLES[id].name} <b>{COLLECTIBLES[id].points} 分</b></span>)}</div>
-        <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd> 攻击</span></div><small className="game-reassurance">打赢 BOSS 再选奖励，武器和本领一起使用。初始 {INITIAL_LIVES} 条命，每条血量 100。受伤扣血，血条耗尽后选择继续或重来。</small>
+        <div className="key-guide">{gamepadState.mode === 'gamepad' ? <span>左摇杆／方向键 移动　A 跳跃　X / RT 攻击　≡ 暂停</span> : <><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd> 攻击</span></>}</div><small className="game-reassurance">打赢 BOSS 再选奖励，武器和本领一起使用。初始 {INITIAL_LIVES} 条命，每条血量 100。受伤扣血，血条耗尽后选择继续或重来。</small>
       </>}
       <div className="adventure-menu-actions">
-        {['ready','paused'].includes(status)&&<button className="primary-button" onClick={() => status === 'ready' ? changeStatus('camp') : start()}><Play size={21} weight="fill"/>{status==='paused'?'继续探险':'选择角色'}<ArrowRight size={21}/></button>}
+        {['ready','paused'].includes(status)&&<button className="primary-button" data-gamepad-resume={status === 'paused' || undefined} data-gamepad-back={status === 'paused' || undefined} onClick={() => status === 'ready' ? changeStatus('camp') : start()}><Play size={21} weight="fill"/>{status==='paused'?'继续探险':'选择角色'}<ArrowRight size={21}/></button>}
         {status === 'fallen' && <button className="primary-button" onClick={() => { if (engine.current.revive()) start(); }}>从这里继续</button>}
         {isResult&&<><button className="primary-button" onClick={()=>restart(status==='completed'?(levelIndex+(legacyLevelId ? 3 : 1))%STAGES.length:0, status==='completed')}>{status==='completed'?(levelIndex===STAGES.length-1?'再从彩虹花园出发':'去下一关'):'新冒险'}<ArrowRight size={20}/></button></>}
         {status==='error'&&<button className="primary-button" onClick={()=>restart()}>重新打开</button>}
-        <button className="text-button" onClick={exit}><House size={18}/>回到我的花园</button>
+        <button className="text-button" data-gamepad-back={!['playing', 'paused'].includes(status) || undefined} onClick={exit}><House size={18}/>回到我的花园</button>
       </div>
     </section></div>}
   </div>;
