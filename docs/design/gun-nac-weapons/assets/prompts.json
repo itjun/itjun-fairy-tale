@@ -1,0 +1,51 @@
+{
+  "tool": "built-in image_gen",
+  "style": "child wax crayon, rough purple/black outlines, transparent sprite, no text or scene",
+  "assets": [
+    {
+      "name": "weapon-flame",
+      "prompt": "a little friendly orange and yellow dragon in side view facing RIGHT, rounded snout breathing a short stream of soft orange crayon flame, cyan wings, purple thick outline",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-14c28a50-9179-4a44-a25f-478070f21aae.png"
+    },
+    {
+      "name": "monster-plane",
+      "prompt": "one friendly folded paper airplane creature pointing RIGHT, pale blue paper with yellow stripe and two simple eyes, purple thick crayon outline",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-cddd71db-846f-4844-ad77-0c2290c65464.png"
+    },
+    {
+      "name": "monster-balloon",
+      "prompt": "one friendly pink and blue round balloon cluster creature, three small balloons tied together with curly strings, smiling eyes",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-e1c67f76-711c-49e6-82e9-2857c52599ec.png"
+    },
+    {
+      "name": "monster-octopus",
+      "prompt": "one friendly small purple ink octopus with six short curled arms holding a blue ink drop, simple dot eyes, no scary teeth",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-18cbf48a-6806-41bf-b4a5-3c49ee1778b4.png"
+    },
+    {
+      "name": "monster-penguin",
+      "prompt": "one small friendly penguin in a translucent cyan ice shell like a cracked egg, black crayon body, yellow beak and feet, front three-quarter view",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-b95646f4-1a08-49fa-9df0-c46b58aa876d.png"
+    },
+    {
+      "name": "monster-twins",
+      "prompt": "one little smiling block toy creature with a square orange head and blue rectangular body, tiny yellow square shield in one hand, toy block construction, full body",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-866967fd-e7cd-409f-b282-914349acd487.png"
+    },
+    {
+      "name": "monster-dandelion",
+      "prompt": "one smiling dandelion puff creature with cream fluffy circular seed head, green leaf arms and stem feet, three loose seeds blowing to its right",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-4770a8df-c9e9-4648-a3d8-02002c7d1a17.png"
+    },
+    {
+      "name": "supply-medkit",
+      "prompt": "one plump cream cloth healing pouch with green leaf emblem, tied pink bow on top, blue and purple crayon outline, no red cross",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-7a2e4969-9433-4d98-b93d-600ba5445505.png"
+    },
+    {
+      "name": "flame-stream",
+      "prompt": "Transparent short warm fire stream facing right; child wax crayon, thick black/orange outlines and uneven red/orange/yellow strokes; no dragon, glow, text or scene.",
+      "path": "/Users/itjun/.codex/generated_images/01a1d873-51b9-7c12-a82b-1e05a696f9ec/exec-2fba2dc4-e418-4007-874e-0d8b4e075e2d.png"
+    }
+  ]
+}
