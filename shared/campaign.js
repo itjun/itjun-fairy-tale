@@ -1,4 +1,6 @@
 import { expandEncounters } from './encounters.js';
+import { createRogueliteWorld } from './roguelite-world.js';
+import { createBossWorld } from './boss-world.js';
 import { expandAdventureWorld } from './adventure-world.js';
 import { randomGenerator } from './random.js';
 import { COLLECTIBLES, LEVEL_COLLECTIBLES, collectionPoints } from './collectibles.js';
@@ -7,7 +9,7 @@ import { COLLECTIBLES, LEVEL_COLLECTIBLES, collectionPoints } from './collectibl
 export const GENERATION_VERSION = 1;
 export const ENEMY_POINTS = Object.freeze({ jelly: 10, leaf: 15, puff: 20 });
 export const CAMPAIGNS = Object.freeze({
-  rainbow: { index: 0, steps: 31, name: '花田与彩虹山丘', regions: ['花田缓坡', '拱桥花径', '彩虹山丘'], kinds: ['hill', 'arches', 'terraces'], hint: '跟着旗子翻过花丘，J 发射光刃。' },
+  rainbow: { index: 0, steps: 31, name: '花田与彩虹山丘', regions: ['花田缓坡', '拱桥花径', '彩虹山丘'], kinds: ['hill', 'arches', 'terraces'], hint: '跟着旗子翻过花丘，J 使用已装备的武器。' },
   family: { index: 1, steps: 34, name: '街巷与屋顶穿行', regions: ['门前街道', '遮阳棚', '屋顶小桥', '钟楼广场'], kinds: ['awnings', 'roofs', 'alleys'], hint: '从遮阳棚跳上屋顶，再沿小巷穿过小镇。' },
   sweet: { index: 2, steps: 37, name: '城堡机关探险', regions: ['糖果庭院', '饼干大厅', '星星开桥', '冰淇淋地窖', '屋顶花园'], kinds: ['conveyor', 'gate', 'cellar'], hint: '踩亮星星打开桥，弹簧花送你回到屋顶。' },
   beach: { index: 3, steps: 39, name: '群岛与移动木筏', regions: ['沙滩小湾', '浅滩踏石', '木筏航道', '沙堡岛', '木栈群岛', '灯塔岛'], kinds: ['islands', 'raft', 'pier'], hint: '搭上小木筏，沿群岛找到灯塔。' },
@@ -169,8 +171,8 @@ export function validateCampaign(world) {
     const a = world.platforms[edge.from], b = world.platforms[edge.to];
     if (!a || !b) return false;
     if (['jump','board'].includes(edge.kind) && !isJumpable(a,b)) return false;
-    if (edge.kind==='spring' && (b.y-a.y>6.3 || Math.abs(b.x-a.x)>5 || !world.springs.some(s=>s.platformId===a.id&&s.power>=18))) return false;
-    if (edge.kind==='drop' && (b.y>=a.y || Math.abs(b.x-a.x)>6)) return false;
+    if (edge.kind==='spring' && (b.y-a.y>6.3 || Math.abs(b.x-a.x)>5.00001 || !world.springs.some(s=>s.platformId===a.id&&s.power>=18))) return false;
+    if (edge.kind==='drop' && (b.y>=a.y || Math.abs(b.x-a.x)>(world.version>=4 ? (a.width+b.width)/2+2.5 : 6))) return false;
     if (edge.kind==='gate' && (!isJumpable(a,b) || !world.switches.some(s=>s.platformId===a.id&&s.bridgeId===b.id))) return false;
     if (edge.kind==='ride') {
       if(!a.isMoving || !['x','y'].includes(a.axis) || a.travel>12 || a.period<4) return false;
@@ -179,9 +181,11 @@ export function validateCampaign(world) {
     }
   }
   if(world.switches.some(s=>!world.platforms[s.platformId]||world.platforms[s.platformId].isMoving||!world.platforms[s.bridgeId]))return false;
-  return world.milestones.length === CAMPAIGNS[world.levelId].regions.length;
+  return world.milestones.length === (world.version >= 4 ? world.zones.length : CAMPAIGNS[world.levelId].regions.length);
 }
 export function createCampaignWorld(seed, level, version = GENERATION_VERSION) {
+  if (version === 5) return createBossWorld(seed, level);
+  if (version === 4) return createRogueliteWorld(seed, level);
   if (version === 3) return expandEncounters(createCampaignWorld(seed, level, 2));
   if (version === 2) return expandAdventureWorld(createCampaignWorld(seed, level, 1));
   if (version !== GENERATION_VERSION) throw new Error('这局地图版本暂不支持');

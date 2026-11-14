@@ -16,7 +16,8 @@ export function validateRun(input) {
   if (!Number.isFinite(started) || started < Date.UTC(2020, 0, 1) || started > Date.now() + 300000) throw new InputError('游玩时间不正确');
   const scoringVersion = input.scoringVersion === undefined ? 1 : integer(input.scoringVersion, 1, 3, '计分规则');
   const seed = integer(input.seed, 0, 4294967295, '地图编号');
-  const generationVersion = scoringVersion === 3 ? integer(input.generationVersion, GENERATION_VERSION, 3, '地图版本') : 0;
+  const generationVersion = scoringVersion === 3 ? integer(input.generationVersion, GENERATION_VERSION, 5, '地图版本') : 0;
+  if (level.themeId && generationVersion < 4) throw new InputError('小关需要使用新版地图');
   const world = scoringVersion === 3 ? createCampaignWorld(seed, level, generationVersion) : null;
   const treasureCount = world?.treasures.length ?? level.platforms;
   const flowers = integer(input.flowers, 0, treasureCount, '小花数量');
@@ -35,6 +36,7 @@ export function validateRun(input) {
   }
   const platform = integer(input.platform, 0, world?.zones.length ?? level.platforms, '跳台进度');
   if (!['playing', 'paused', 'ended', 'completed'].includes(input.status)) throw new InputError('记录状态不正确');
+  if (input.status === 'completed' && world?.bossArenas?.some(arena => !defeatedIds.includes(arena.bossId))) throw new InputError('还没有打赢全部 BOSS');
   if (input.status === 'completed' && !(world ? flowers >= world.requiredFlowers && platform === world.zones.length : hasCompleted(level, flowers, platform))) throw new InputError('还没完成关卡目标');
   const collection = scoringVersion === 2 ? collectionForPlatforms(level.id, seed, collectedIds, level.platforms) : flowers;
   return { id: input.id, levelId: level.id, startedAt: new Date(started).toISOString(), players: integer(input.players, 1, 2, '玩家数量'), seed, scoringVersion, generationVersion, collectedIds, defeatedIds, flowers, platform, seconds: integer(input.seconds, 0, 604800, '游玩时长'), revision: integer(input.revision, 1, 10000000, '记录版本'), status: input.status, score: world ? campaignScore(world, collectedIds, defeatedIds, input.status === 'completed', level.bonus).score : calculateScore(collection, input.status === 'completed', level) };

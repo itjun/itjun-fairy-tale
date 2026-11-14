@@ -10,6 +10,21 @@ export const LEVELS = Object.freeze([
   { id: 'forest', route: 'canopy', name: '蘑菇森林', subtitle: '去猫头鹰的树屋做客', image: 'level-forest', sources: [], backdropWidth: 30, backdropY: -1.5, backdropOffset: 4, story: '跟着萤火虫，穿过大树，找到松鼠的小树屋。', platforms: 12, requiredFlowers: 7, bonus: 90, gapMin: 1, gapRange: 0.8, rise: 1.3, color: '#347d73', side: '#b8c5a0', topColor: '#aed7a0', finish: 'collectible-mushroom' },
   { id: 'cartoon', route: 'canopy', name: '卡通梦工场', subtitle: '跟机器人和恐龙去冒险', image: 'level-cartoon', sources: [], backdropWidth: 30, backdropY: -1.5, backdropOffset: 4, story: '机器人、恐龙和小火箭，邀请你参加气球派对。', platforms: 12, requiredFlowers: 8, bonus: 100, gapMin: 1.1, gapRange: 0.8, rise: 1.4, color: '#b4556c', side: '#dcb8e9', surface: 'paper-texture', topColor: '#efb5de', finish: 'collectible-balloon' },
 ]);
-export function findLevel(id) { return LEVELS.find(level => level.id === id); }
+const CHAPTERS = [
+  [['花丘分岔','hills'],['拱桥花径','arches'],['彩虹断谷','clouds']],
+  [['街巷绕行','streets'],['屋内穿梭','houses'],['钟楼竖井','clock']],
+  [['庭院开桥','gates'],['饼干迷廊','cookies'],['地窖回环','cellar']],
+  [['潮汐浅滩','tides'],['木筏群岛','rafts'],['灯塔内外','lighthouse']],
+  [['风谷跨越','wind'],['风车高塔','windmill'],['山脊分路','ridge']],
+  [['冰面制动','ice'],['冰洞下降','icecave'],['雪山回升','snowpeak']],
+  [['树根回环','roots'],['树干攀登','trunk'],['树冠横渡','canopy']],
+  [['积木拼桥','blocks'],['玩具工厂','factory'],['火箭高塔','rocket']],
+];
+export const STAGES = Object.freeze(LEVELS.flatMap((level, worldIndex) => CHAPTERS[worldIndex].map(([chapterName, structure], chapter) => ({
+  ...level, id: `${level.id}-${chapter + 1}`, themeId: level.id, worldIndex, chapter, chapterName, structure,
+  index: worldIndex * 3 + chapter, roomCount: 3 + worldIndex + chapter, bonus: level.bonus + chapter * 25,
+}))));
+export function findLevel(id) { return LEVELS.find(level => level.id === id) || STAGES.find(level => level.id === id); }
+export function themeFor(level) { return LEVELS.find(theme => theme.id === (level.themeId || level.id)); }
 export function calculateScore(flowers, isCompleted, level) { return (typeof flowers === 'number' ? flowers * 10 : collectionPoints(flowers)) + (isCompleted ? level.bonus : 0); }
 export function hasCompleted(level, flowers, platform) { return flowers >= level.requiredFlowers && platform >= level.platforms; }
