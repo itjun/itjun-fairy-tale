@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell, screen } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, protocol, session, shell, screen } from 'electron';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -14,30 +14,70 @@ app.setName('花园王国');
 if (process.env.GARDEN_DESKTOP_PROFILE) app.setPath('userData', resolve(process.env.GARDEN_DESKTOP_PROFILE));
 protocol.registerSchemesAsPrivileged([{ scheme: 'garden', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 let win, store, databasePath, closeRequest, updater, installing = false, mayExit = false;
+let tray, trayMenu, isRestarting = false;
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
 
 function trusted(event) { return win && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame && isAppUrl(event.senderFrame.url); }
 async function finishExit() {
+  if (mayExit || closeRequest?.phase === 'finishing') return;
+  if (closeRequest) closeRequest.phase = 'finishing';
   clearTimeout(closeRequest?.timer);
   if (installing) {
     try { await updater.apply(); }
     catch (error) { installing = false; closeRequest = null; updater.cancelInstall(); dialog.showErrorBox('更新未完成，游戏已保留', error.message); return; }
   }
+  session.defaultSession.flushStorageData();
+  if (isRestarting) {
+    try { app.relaunch(); }
+    catch (error) { isRestarting = false; closeRequest = null; dialog.showErrorBox('游戏暂时无法重启', error.message); return; }
+  }
   mayExit = true; app.quit();
 }
 async function closeFailed() {
+  if (!closeRequest || closeRequest.phase !== 'saving') return;
   clearTimeout(closeRequest?.timer);
-  closeRequest = null;
+  closeRequest.phase = 'confirming';
+  isRestarting = false;
   if (installing) { installing = false; updater.cancelInstall(); }
   const { response } = await dialog.showMessageBox(win, { type: 'warning', title: '积分还没有保存好', message: '要留下来重试保存吗？', detail: '留在游戏中可以重试。直接退出后，尚未写入的积分会在下次打开时尝试补存。', buttons: ['留在游戏', '仍然退出'], defaultId: 0, cancelId: 0 });
   if (response === 1) finishExit();
+  else closeRequest = null;
 }
 function requestClose() {
   if (mayExit || closeRequest) return;
   const token = randomUUID();
-  closeRequest = { token, timer: setTimeout(() => { void closeFailed(); }, 10000) };
+  closeRequest = { token, phase: 'saving', timer: setTimeout(() => { void closeFailed(); }, 10000) };
   win.webContents.send('garden:prepare-close', token);
+}
+function requestRestart() {
+  if (mayExit || closeRequest || installing) return;
+  isRestarting = true;
+  requestClose();
+}
+function toggleFullscreen() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show(); win.focus();
+  win.setFullScreen(!win.isFullScreen());
+}
+function createTray() {
+  const image = nativeImage.createFromPath(join(root, 'build/icon.png')).resize({ width: 18, height: 18 });
+  tray = new Tray(image);
+  tray.setToolTip('花园王国');
+  trayMenu = Menu.buildFromTemplate([
+    { id: 'garden-fullscreen', label: '全屏游玩', type: 'checkbox', checked: win.isFullScreen(), click: toggleFullscreen },
+    { id: 'garden-restart', label: '重新启动', click: requestRestart },
+    { type: 'separator' },
+    { id: 'garden-quit', label: '退出游戏', click: requestClose },
+  ]);
+  tray.setContextMenu(trayMenu);
+  const updateFullscreenMenu = () => {
+    trayMenu.getMenuItemById('garden-fullscreen').checked = win.isFullScreen();
+    tray.setContextMenu(trayMenu);
+  };
+  win.on('enter-full-screen', updateFullscreenMenu);
+  win.on('leave-full-screen', updateFullscreenMenu);
 }
 async function backupScores() {
   const { canceled, filePath } = await dialog.showSaveDialog(win, { title: '备份成绩本', defaultPath: `花园王国成绩-${new Date().toISOString().slice(0, 10)}.sqlite`, filters: [{ name: 'SQLite 成绩本', extensions: ['sqlite'] }] });
@@ -63,14 +103,19 @@ async function importScores() {
 function menuTask(task) { return () => { task().catch(error => dialog.showErrorBox('成绩本操作未完成', error.message)); }; }
 async function createWindow() {
   const area = screen.getPrimaryDisplay().workAreaSize;
-  win = new BrowserWindow({ width: Math.min(1280,area.width-48), height: Math.min(800,area.height-48), minWidth: Math.min(720,area.width-48), minHeight: Math.min(540,area.height-48), show: false, frame: false, fullscreen: false, fullscreenable: false, backgroundColor: '#faf8f1', title: '花园王国', icon: join(root, 'build/icon.png'), autoHideMenuBar: true,
+  win = new BrowserWindow({ width: Math.min(1280,area.width-48), height: Math.min(800,area.height-48), minWidth: Math.min(720,area.width-48), minHeight: Math.min(540,area.height-48), show: false, frame: false, fullscreen: false, fullscreenable: true, backgroundColor: '#faf8f1', title: '花园王国', icon: join(root, 'build/icon.png'), autoHideMenuBar: true,
     webPreferences: { preload: join(root, 'desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false, backgroundThrottling: process.env.GARDEN_DESKTOP_SMOKE !== '1' } });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
   win.webContents.on('will-attach-webview', event => event.preventDefault());
   win.on('close', event => { if (!mayExit) { event.preventDefault(); requestClose(); } });
   win.once('ready-to-show', () => { win.show(); });
+  createTray();
   await win.loadURL(APP_ORIGIN + '/');
+  if (!app.isPackaged && process.env.GARDEN_DESKTOP_MENU_SMOKE === '1') {
+    try { const { runMenuSmoke } = await import('./menu-smoke.mjs'); await runMenuSmoke({ win, tray, trayMenu, requestClose }); }
+    catch (error) { console.error(error); app.exit(1); }
+  }
   if (!app.isPackaged && process.env.GARDEN_DESKTOP_SMOKE === '1') {
     try { const { runSmoke } = await import('./smoke.mjs'); await runSmoke({ win, databasePath, requestClose }); }
     catch (error) { console.error(error); app.exit(1); }
@@ -80,7 +125,7 @@ async function createWindow() {
 if (hasLock) {
   app.on('second-instance', () => { if (win?.isMinimized()) win.restore(); win?.show(); win?.focus(); });
   app.on('before-quit', event => { if (!mayExit && win && !win.isDestroyed()) { event.preventDefault(); requestClose(); } });
-  app.on('will-quit', () => { updater?.stop(); store?.close(); });
+  app.on('will-quit', () => { tray?.destroy(); updater?.stop(); store?.close(); });
   process.on('SIGTERM', () => { if (win) requestClose(); else app.quit(); });
   app.on('activate', () => { win?.show(); win?.focus(); });
   app.whenReady().then(async () => {
@@ -109,14 +154,14 @@ if (hasLock) {
     ipcMain.on('garden:update-safe', (event, safe) => { if (trusted(event)) updater.setSafe(safe === true); });
     ipcMain.handle('garden:quit', event => { if (trusted(event)) requestClose(); });
     ipcMain.on('garden:close-ready', (event, result) => {
-      if (!trusted(event) || !closeRequest || result?.token !== closeRequest.token) return;
+      if (!trusted(event) || closeRequest?.phase !== 'saving' || result?.token !== closeRequest.token) return;
       clearTimeout(closeRequest.timer);
       if (result.isSaved === true) finishExit(); else void closeFailed();
     });
-    updater = new UpdateManager({ app, notify: state => { if (win && !win.isDestroyed()) win.webContents.send('garden:update-state', state); }, requestInstall: () => { installing = true; requestClose(); } });
+    updater = new UpdateManager({ app, notify: state => { if (win && !win.isDestroyed()) win.webContents.send('garden:update-state', state); }, requestInstall: () => { if (closeRequest || mayExit) { updater.cancelInstall(); return; } installing = true; requestClose(); } });
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ label: '花园王国', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { label: '保存并退出', accelerator: 'Cmd+Q', click: requestClose }] }] : []),
-      { label: '游戏', submenu: [{ label: '放大 / 还原窗口', click: () => { if(win.isMaximized())win.unmaximize();else win.maximize(); } }, { label: '保存并退出', accelerator: process.platform === 'darwin' ? undefined : 'Alt+F4', click: requestClose }] },
+      { label: '游戏', submenu: [{ label: '全屏游玩', accelerator: process.platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11', click: toggleFullscreen }, { label: '放大 / 还原窗口', click: () => { if(win.isMaximized())win.unmaximize();else win.maximize(); } }, { label: '重新启动', click: requestRestart }, { label: '退出游戏', accelerator: process.platform === 'darwin' ? undefined : 'Alt+F4', click: requestClose }] },
       { label: '成绩本', submenu: [{ label: '备份成绩本…', click: menuTask(backupScores) }, { label: '导入成绩本…', click: menuTask(importScores) }, { label: '打开存档文件夹', click: () => shell.openPath(dataDir) }] },
       { role: 'editMenu', label: '编辑' },
       { label: '更新', submenu: [{ label: '检查新版本', click: () => void updater.check() }] },
