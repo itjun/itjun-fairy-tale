@@ -3,7 +3,7 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
   const active = options.bounds ? enemies.filter(e => !e.isDefeated && !e.isDormant && e.x > options.bounds.left && e.x < options.bounds.right)
     .sort((a,b) => Math.abs(a.x-players[0].x)-Math.abs(b.x-players[0].x)).slice(0, options.maxAttackers || 4) : enemies;
   for (const enemy of enemies) {
-    if (enemy.isDefeated || enemy.isDormant) continue;
+    if (enemy.isDefeated || enemy.isDormant || enemy.isBoss) continue;
     enemy.isWaiting = !active.includes(enemy);
     if (enemy.isWaiting || enemy.boundUntil > elapsed) { enemy.isWarning = false; continue; }
     enemy.elapsed += dt * (enemy.slowUntil > elapsed ? 0.35 : 1);
@@ -64,7 +64,9 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
     if (enemy.x <= enemy.minX) { enemy.x = enemy.minX; enemy.direction = 1; }
   }
   for (const shot of projectiles) {
+    if (shot.turnAt !== undefined && !shot.isReturning && shot.age >= shot.turnAt) { shot.vx *= -1; shot.vy *= -1; shot.isReturning=true; }
     shot.age += dt; shot.vy -= shot.gravity * dt; shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+    if (shot.floorY !== undefined && shot.y < shot.floorY && shot.vy < 0) { shot.y=shot.floorY;shot.vy=Math.abs(shot.vy)*0.8;shot.bounces++;if(shot.bounces>3)shot.isActive=false; }
     if (shot.age > (shot.life || 4)) shot.isActive = false;
   }
 }

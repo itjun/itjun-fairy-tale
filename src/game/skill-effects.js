@@ -21,12 +21,12 @@ export class SkillEffects {
     const mesh = new THREE.Mesh(this.geometry, this.materials[kind]);
     mesh.scale.set(width, height, 1); group.add(mesh); return mesh;
   }
-  burst(x, y, at, isReward = false) {
+  burst(x, y, at, isReward = false, isCompact = false) {
     if (this.bursts.length >= 24) this.scene.remove(this.bursts.shift().group);
     const group = this.group(); group.position.set(x, y, 1.4);
     this.add(group, 'bubble', 1, 1);
-    for (let i = 0; i < (this.isReducedMotion ? 4 : 10); i++) this.add(group, 'stars', 0.6, 0.6);
-    this.bursts.push({ group, at, isReward });
+    for (let i = 0; i < (this.isReducedMotion || isCompact ? 4 : 10); i++) this.add(group, 'stars', 0.6, 0.6);
+    this.bursts.push({ group, at, isReward, isCompact });
   }
   update(waves, state, players, elapsed, cameraX, halfWidth, playerKinds) {
     const kind = currentSkill(state, elapsed);
@@ -49,6 +49,9 @@ export class SkillEffects {
           this.add(group, 'blade', 3.8, 1.5);
           this.add(group, 'blade', 2.6, 0.95).position.x = -1.6;
           this.add(group, 'blade', 1.5, 0.55).position.x = -2.9;
+        } else if (wave.kind==='moonblade') {
+          this.add(group,'moonblade',1.6,1.6);
+          for(let i=0;i<2;i++)this.add(group,'stars',.24-i*.07,.24-i*.07).position.set(-.65-i*.4,0,0);
         } else {
           this.add(group, wave.kind, wave.kind === 'bubble' ? 2.1 : 1.1, wave.kind === 'bubble' ? 2.1 : 1.1);
           for (let i = 0; i < 3; i++) {
@@ -59,6 +62,10 @@ export class SkillEffects {
       }
       group.position.set(wave.x, wave.y, 1.1); group.scale.x = wave.direction;
       if (wave.kind === 'stars' && !this.isReducedMotion) group.children[0].rotation.z = elapsed * 6;
+      if (wave.kind === 'moonblade') {
+        group.scale.x=1;group.rotation.z=Math.atan2(wave.headingY,wave.headingX);
+        if(!this.isReducedMotion)group.children[0].rotation.z=-wave.age*10;
+      }
     }
     players.forEach((player, i) => {
       if (!this.halos[i]) {
@@ -74,8 +81,8 @@ export class SkillEffects {
     });
     this.bursts = this.bursts.filter(burst => {
       const age = elapsed - burst.at;
-      if (age >= 1.1) { this.scene.remove(burst.group); return false; }
-      const radius = this.isReducedMotion ? 2 : 0.7 + age * (burst.isReward ? 4.5 : 3.4);
+      if (age >= (burst.isCompact ? .4 : 1.1)) { this.scene.remove(burst.group); return false; }
+      const radius = burst.isCompact ? .5+age*1.5 : this.isReducedMotion ? 2 : 0.7 + age * (burst.isReward ? 4.5 : 3.4);
       burst.group.children[0].scale.setScalar(radius * 2);
       burst.group.children.slice(1).forEach((mesh, i, all) => {
         const angle = i / all.length * Math.PI * 2;

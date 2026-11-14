@@ -22,7 +22,7 @@ test('八关扩展怪物种类与密度，安全营地不刷怪，旧地图仍�
   assert.equal(seen.size, 24); assert.ok(after / before > 1.5 && after / before < 1.8);
 });
 
-test('奖励持续出现，每只精英独立领取，残血有立即恢复，回收不能两头领', async () => {
+test('击杀和精英不弹奖励，通关可选补命，领取与回收不能两头领', async () => {
   const { GardenEngine } = await import('../src/game/engine.js');
   const a = newAdventure(42), s = newSurvival(), j = newJourney(), world = createCampaignWorld(42,'forest',3);
   const game = Object.assign(Object.create(GardenEngine.prototype), { adventure:a, survival:s, journey:j, world, levelKey:'forest:42', elapsed:3, players:[{}], defeatedIds:[], pickups:[], callbacks:{onSound(){}}, publish(){} });
@@ -30,20 +30,20 @@ test('奖励持续出现，每只精英独立领取，残血有立即恢复，�
   enemies[0].isElite = true; enemies[1].isElite = true;
   for (const enemy of enemies) { enemy.isDefeated = true; game.rewardEnemy(enemy); game.rewardEnemy(enemy); }
   assert.equal(a.resources.kills,15);
-  assert.ok(j.queued.some(e => e.id === 'kills:6')); assert.ok(j.queued.some(e => e.id === 'kills:14'));
-  assert.ok(j.queued.some(e => e.id === `elite:forest:42:${enemies[0].id}`)); assert.ok(j.queued.some(e => e.id === `elite:forest:42:${enemies[1].id}`));
-  s.hp=1; openReward(a,j,s); const id=j.pending.id;
+  assert.deepEqual(j.queued,[]);assert.equal(a.resources.balance,0);
+  queueReward(j,'finish:forest:42','nature','小关通关啦');
+  s.lives=5; openReward(a,j,s); const id=j.pending.id;
   assert.ok(j.pending.choices.some(c => c.type==='supply' && c.id==='heal'));
-  const choice=j.pending.choices.findIndex(c=>c.id==='heal'); assert.ok(chooseReward(a,j,choice,s)); assert.equal(s.hp,2);
+  const choice=j.pending.choices.findIndex(c=>c.id==='heal'); assert.ok(chooseReward(a,j,choice,s)); assert.equal(s.lives,6);
   assert.equal(chooseReward(a,j,choice,s),false); assert.ok(j.claimed.includes(id));
-  openReward(a,j,s); const balance=a.resources.balance;
+  queueReward(j,'finish:forest:43','nature','小关通关啦');openReward(a,j,s); const balance=a.resources.balance;
   assert.ok(recycleReward(a,j)); assert.equal(a.resources.balance,balance+1); assert.equal(recycleReward(a,j),false);
 });
 
 test('奖励池耗尽仍有有效补给，三选项不产生空洞，旧候选保存不改变', () => {
   const a=newAdventure(4), s=newSurvival(); a.weapons=Object.keys(WEAPONS);
   Object.entries(UPGRADES).forEach(([id,d]) => {a.upgrades[id]=d.maxRank || 1;});
-  a.loadouts[0].upgrades=['duplicate']; s.hp=1;
+  a.loadouts[0].upgrades=['duplicate']; s.lives=1;
   for(let i=0;i<50;i++) {
     const choices=rewardChoices(a,`exhausted:${i}`,'nature',0,s), j=newJourney();
     j.pending={id:`exhausted:${i}`,family:'nature',title:'奖励',player:0,choices};
@@ -51,30 +51,29 @@ test('奖励池耗尽仍有有效补给，三选项不产生空洞，旧候选�
   }
 });
 
-test('花瓣与点心恢复体力不补命，死亡不回血，爸爸天赋和护甲按顺序消耗', () => {
-  const a=newAdventure(1), s=newSurvival('dad'), powers={petal:1,snack:1,armor:1,courage:1};
-  a.resources.petals=6; a.resources.snack=1;
-  assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'shield'); assert.equal(a.resources.armorZones.length,0);
-  assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'armor'); assert.equal(s.hp,3);
-  assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'hurt'); assert.equal(s.hp,3); assert.equal(a.resources.snack,0);
-  damageWithBuild(a,s,powers,'snow:1',0); assert.equal(s.hp,3); assert.equal(a.resources.petals,0);
-  damageWithBuild(a,s,powers,'snow:1',0); assert.equal(s.hp,2);
-  assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'courage'); assert.equal(s.hp,1);
-  assert.equal(damageWithBuild(a,s,powers,'snow:1',0,true),'death'); assert.equal(s.lives,8);
-  a.resources.petals=12; assert.equal(useRecovery(a,s,powers),false); assert.equal(s.hp,0);
+test('花瓣与点心补命，上限九条，死亡不补命，天赋与护甲按顺序消耗', () => {
+ const a=newAdventure(1),s=newSurvival('dad'),powers={petal:1,snack:1,armor:1,courage:1};a.resources.petals=12;a.resources.snack=1;
+ assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'shield');assert.equal(a.resources.armorZones.length,0);
+ assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'armor');assert.equal(s.lives,9);
+ assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'hurt');assert.equal(s.lives,9);assert.equal(a.resources.snack,0);
+ damageWithBuild(a,s,powers,'snow:1',0);assert.equal(s.lives,9);assert.equal(a.resources.petals,0);
+ damageWithBuild(a,s,powers,'snow:1',0);assert.equal(s.lives,8);
+ s.lives=1;assert.equal(damageWithBuild(a,s,powers,'snow:1',0),'courage');assert.equal(s.lives,1);
+ assert.equal(damageWithBuild(a,s,powers,'snow:1',0,true),'death');assert.equal(s.lives,0);
+ a.resources.petals=12;assert.equal(useRecovery(a,s,powers),false);assert.equal(s.lives,0);
 });
 
 test('补给、护罩、支路、击败事件只结算一次，营地扣费保存并跨关保留', () => {
   const a=newAdventure(2),s=newSurvival(), powers={pocket:1,explorer:1,wreath:1,thrift:1};
   const world=createCampaignWorld(2,'rainbow',3),enemy=world.enemies[0]; enemy.isElite=true;
-  s.hp=2; recordDefeat(a,s,powers,enemy,'rainbow:2'); assert.equal(s.hp,3);
+  s.lives=7; recordDefeat(a,s,powers,enemy,'rainbow:2'); assert.equal(s.lives,7);
   const before=structuredClone(a); assert.equal(recordDefeat(a,s,powers,enemy,'rainbow:2'),null); assert.deepEqual(a,before);
-  assert.ok(completeRoute(a,powers,'rainbow:2',0)); assert.equal(completeRoute(a,powers,'rainbow:2',0),false);
+  assert.equal(completeRoute(a,powers,'rainbow:2',0),false); assert.equal(completeRoute(a,powers,'rainbow:2',0),false);
   world.enemies.filter(e=>e.zone===0).forEach(e=>{e.isDefeated=true;});
   assert.ok(completeEncounter(a,powers,world,0,'rainbow:2')); a.resources.wreathShield=0;
   assert.equal(completeEncounter(a,powers,world,0,'rainbow:2'),false); assert.equal(a.resources.wreathShield,0);
-  s.hp=1; a.resources.balance=10;
-  assert.ok(buyRecovery(a,s,powers,'rainbow:2:camp0')); assert.equal(a.resources.balance,7); assert.equal(s.hp,2);
+  s.lives=4; a.resources.balance=10;
+  assert.ok(buyRecovery(a,s,powers,'rainbow:2:camp0')); assert.equal(a.resources.balance,7); assert.equal(s.lives,5);
   assert.equal(buyRecovery(a,s,powers,'rainbow:2:camp0'),false); assert.equal(a.resources.balance,7);
   const restored=JSON.parse(JSON.stringify(a)); assert.equal(buyRecovery(restored,s,powers,'rainbow:2:camp0'),false);
   restored.resources.bindCooldown=5; tickResources(restored,0); assert.equal(restored.resources.bindCooldown,5);

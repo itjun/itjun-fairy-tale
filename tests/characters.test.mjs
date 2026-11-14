@@ -9,15 +9,19 @@ import { GardenEngine } from '../src/game/engine.js';
 import { createCampaignWorld } from '../shared/campaign.js';
 
 function storage(){ const map=new Map();return {getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v)}; }
-test('三格体力、九条命；扣命先进入死亡状态，重复伤害不能再扣，零命不能复活',()=>{
- const s=newSurvival('mom');
- for(let lives=8;lives>=0;lives--){assert.equal(takeDamage(s),'hurt');assert.equal(s.hp,2);assert.equal(takeDamage(s),'hurt');assert.equal(takeDamage(s),'death');assert.equal(s.lives,lives);assert.equal(takeDamage(s,true),false);assert.ok(isValidSurvival(s));assert.equal(reviveSurvival(s),lives>0);if(lives)assert.equal(s.hp,3);}
- assert.equal(s.phase,'over');assert.equal(s.hp,0);
+test('九条生命；受伤直接扣命，掉坑暂停，零命结束且不能复活',()=>{
+ const s=newSurvival('mom');assert.equal(s.hp,undefined);
+ assert.equal(takeDamage(s),'hurt');assert.equal(s.lives,8);assert.equal(s.phase,'alive');
+ assert.equal(takeDamage(s,true),'death');assert.equal(s.lives,7);assert.equal(s.phase,'fallen');
+ assert.equal(takeDamage(s),false);assert.equal(reviveSurvival(s),true);assert.equal(s.lives,7);
+ while(s.lives>1){assert.equal(takeDamage(s),'hurt');assert.ok(isValidSurvival(s));}
+ assert.equal(takeDamage(s),'death');assert.equal(s.phase,'over');assert.equal(s.lives,0);
+ assert.equal(takeDamage(s),false);assert.equal(reviveSurvival(s),false);assert.ok(isValidSurvival(s));
 });
-test('爸爸护盾只挡怪物伤害，冷却和攻击计数序列化保留，掉坑直接扣命',()=>{
- const s=newSurvival('dad');assert.equal(takeDamage(s),'shield');assert.equal(s.hp,3);assert.equal(s.shieldRemaining,20);
- assert.equal(takeDamage(s),'hurt');assert.equal(s.hp,2);
- const restored=JSON.parse(JSON.stringify(s));assert.equal(takeDamage(restored,true),'death');assert.equal(restored.lives,8);assert.equal(restored.shieldRemaining,20);
+test('爸爸护盾先挡伤害，冷却与生命序列化保留，掉坑直接扣命',()=>{
+ const s=newSurvival('dad');assert.equal(takeDamage(s),'shield');assert.equal(s.lives,9);assert.equal(s.shieldRemaining,20);
+ assert.equal(takeDamage(s),'hurt');assert.equal(s.lives,8);
+ const restored=JSON.parse(JSON.stringify(s));assert.equal(takeDamage(restored,true),'death');assert.equal(restored.lives,7);assert.equal(restored.shieldRemaining,20);
  assert.ok(reviveSurvival(restored));assert.equal(restored.shieldRemaining,20);
 });
 test('妈妈姐姐按真实发射累计，每四次触发一次；花朵只在首次命中减速附近小怪',()=>{
@@ -41,7 +45,7 @@ test('旧双人存档迁移为单人，原记录备份和完整背包保留，�
  assert.equal(migrated.run.players,2);assert.equal(migrated.state.players.length,1);assert.equal(migrated.state.adventure.loadouts.length,1);assert.equal(migrated.state.journey.pending.player,0);assert.deepEqual(migrated.state.adventure.weapons,original.state.adventure.weapons);
  writeAdventure(migrated.run,migrated.state,mem);assert.equal(mem.getItem('garden-active-adventure-v1-before-single-player'),raw);assert.deepEqual(readAdventure(mem),migrated);
 });
-test('死亡、零命、体力和累计存档恢复原样，非法状态不能进入游戏',()=>{
+test('死亡、零命和累计存档恢复原样，非法状态不能进入游戏',()=>{
  for(const mode of ['workbench','fallen','over']){const f=adventureFixture(mode),mem=storage();writeAdventure(f.run,f.state,mem);assert.deepEqual(readAdventure(mem),f);}
  const nine=adventureFixture('workbench'),nineStorage=storage();nine.state.survival.lives=9;writeAdventure(nine.run,nine.state,nineStorage);assert.equal(readAdventure(nineStorage).state.survival.lives,9);nine.state.survival.lives=10;writeAdventure(nine.run,nine.state,nineStorage);assert.equal(readAdventure(nineStorage),null);
  const f=adventureFixture('over'),mem=storage();f.state.survival.hp=3;writeAdventure(f.run,f.state,mem);assert.equal(readAdventure(mem),null);
@@ -54,16 +58,16 @@ function headless(){
 test('引擎同帧掉坑和怪物接触只扣一命，死亡停住；零命不能解除暂停',()=>{
  const g=headless(),p=g.players[0];p.y=-100;p.isGrounded=false;p.safe=g.world.start;g.world.enemies[0].x=p.x;g.world.enemies[0].y=p.y;
  let saves=0;g.callbacks.onLifeChange=()=>saves++;g.tick();assert.equal(g.survival.lives,8);assert.equal(g.survival.phase,'fallen');assert.equal(g.isPaused,true);assert.equal(saves,1);
- g.tick();assert.equal(g.survival.lives,8);assert.equal(g.revive(),true);assert.equal(p.x,g.world.start.x);assert.equal(g.survival.hp,3);
+ g.tick();assert.equal(g.survival.lives,8);assert.equal(g.revive(),true);assert.equal(p.x,g.world.start.x);assert.equal(g.survival.hp,undefined);
  while(g.survival.lives > 0){g.hurt(true);g.revive();}g.pause(false);assert.equal(g.isPaused,true);assert.equal(g.revive(),false);
 });
 test('远离检查点死亡在原处复活，扣命一次且保留奖励与构筑',()=>{
  const g=headless(),p=g.players[0],platform=g.platforms.find(p=>!p.isMoving && !p.isCheckpoint && p.isEnabled!==false && p.x>50);
- rescue(p,platform,platform.x+0.5);g.survival.hp=1;
+ rescue(p,platform,platform.x+0.5);
  g.collectedIds=[1];g.defeatedIds=[2];g.visited=new Set([1]);
  const adventure=structuredClone(g.adventure),journey=structuredClone(g.journey),x=p.x;
- g.hurt();assert.equal(g.survival.lives,8);assert.equal(g.survival.phase,'fallen');
- assert.equal(g.revive(),true);assert.equal(p.x,x);assert.equal(p.y,platform.y);assert.equal(p.isGrounded,true);assert.equal(p.protection,2);assert.equal(g.survival.hp,3);assert.equal(g.survival.lives,8);
+ g.hurt(true);assert.equal(g.survival.lives,8);assert.equal(g.survival.phase,'fallen');
+ assert.equal(g.revive(),true);assert.equal(p.x,x);assert.equal(p.y,platform.y);assert.equal(p.isGrounded,true);assert.equal(p.protection,2);assert.equal(g.survival.hp,undefined);assert.equal(g.survival.lives,8);
  assert.notEqual(p.x,g.platforms[g.checkpointId].x);assert.deepEqual(g.adventure,adventure);assert.deepEqual(g.journey,journey);assert.deepEqual(g.collectedIds,[1]);assert.deepEqual(g.defeatedIds,[2]);assert.deepEqual([...g.visited],[1]);assert.equal(g.revive(),false);
 });
 test('掉坑回到最后站稳的边缘，空中死亡落到脚下，移动台死亡可原地继续',()=>{
@@ -85,6 +89,6 @@ test('死亡后保存重开仍在附近继续，旧存档用最近安全平台�
 });
 test('引擎接触伤害保护避免同帧连扣，暂停不推进护盾冷却',()=>{
  const g=headless(),p=g.players[0];g.world.enemies=g.world.enemies.slice(0,2).map(e=>({...e,x:p.x,y:p.y,baseY:p.y,minX:p.x,maxX:p.x,speed:0,behavior:'walk',isDormant:false,isDefeated:false}));
- g.tick();assert.equal(g.survival.hp,2);g.tick();assert.equal(g.survival.hp,2);
+ g.tick();assert.equal(g.survival.lives,8);g.tick();assert.equal(g.survival.lives,8);
  g.survival.character='dad';g.survival.shieldRemaining=10;g.pause(true);const before=structuredClone(g.survival);assert.deepEqual(g.snapshot().survival,before);
 });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Chart, LineController, LineElement, PointElement, LinearScale, Tooltip, Legend, Filler } from 'chart.js';
 import { ArrowLeft, Trophy, Flower, CalendarBlank, ArrowsClockwise } from '@phosphor-icons/react';
-import { LEVELS } from '../../shared/levels.js';
+import { LEVELS as WORLDS, STAGES } from '../../shared/levels.js';
 import { flushScores, pendingCount } from './client.js';
 import './scores.css';
 Chart.register(LineController, LineElement, PointElement, LinearScale, Tooltip, Legend, Filler);
@@ -9,6 +9,7 @@ Chart.defaults.font.family = "GardenHand, KaiTi, serif";
 function dayString(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function presetDates(preset) { const end = new Date(), start = new Date(); start.setDate(start.getDate() - (preset === '7' ? 6 : preset === '30' ? 29 : 0)); if (preset === 'all') start.setFullYear(2020, 0, 1); return { from: dayString(start), to: dayString(end) }; }
 const timeText = value => new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const LEVELS = [...WORLDS, ...STAGES.map(stage=>({...stage,name:`${stage.name} / ${stage.chapterName}`}))];
 const names = Object.fromEntries(LEVELS.map(level => [level.id, level.name]));
 function statusText(run) { if (run.status === 'completed') return '已通关'; if (run.status === 'ended') return '已结束'; return Date.now() - Date.parse(run.updatedAt) > 60000 ? '中途离开' : run.status === 'paused' ? '休息中' : '游玩中'; }
 function ScoreChart({ data, view }) {

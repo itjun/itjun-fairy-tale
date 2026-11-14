@@ -6,22 +6,23 @@ export const CHARACTERS = Object.freeze({
   little: { name: '妹妹', image: 'little-player', attack: 'little-attack', height: 1.9, talent: '轻盈二段跳', icon: 'lift-leaf', hint: '跳起来后，再按一次跳跃，还能跳一次。', detail: '落地后恢复，按住不会自动连跳。' },
 });
 export function newSurvival(character = 'sister') {
-  return { version: 1, character, hp: 3, lives: INITIAL_LIVES, phase: 'alive', shieldRemaining: 0, attacks: 0, revision: 0 };
+  return { version: 3, character, lives: INITIAL_LIVES, maxLives: INITIAL_LIVES, phase: 'alive', shieldRemaining: 0, attacks: 0, revision: 0 };
 }
 export function isValidSurvival(s) {
-  return !!s && s.version === 1 && !!CHARACTERS[s.character] && Number.isInteger(s.hp) && s.hp >= 0 && s.hp <= 3 && Number.isInteger(s.lives) && s.lives >= 0 && s.lives <= INITIAL_LIVES && ['alive','fallen','over'].includes(s.phase) && (s.phase === 'alive' ? s.hp > 0 && s.lives > 0 : s.hp === 0 && (s.phase === 'over' ? s.lives === 0 : s.lives > 0)) && Number.isFinite(s.shieldRemaining) && s.shieldRemaining >= 0 && s.shieldRemaining <= 20 && Number.isInteger(s.attacks) && s.attacks >= 0 && s.attacks < 4 && Number.isInteger(s.revision) && s.revision >= 0;
+  return !!s && [1,2,3].includes(s.version) && !!CHARACTERS[s.character] && (s.version >= 2 ? s.hp === undefined : Number.isInteger(s.hp) && s.hp >= 0 && s.hp <= 3 && (s.phase === 'alive' ? s.hp > 0 : s.hp === 0)) && (s.version < 3 || Number.isInteger(s.maxLives) && s.maxLives >= INITIAL_LIVES && s.maxLives <= 99) && Number.isInteger(s.lives) && s.lives >= 0 && s.lives <= (s.version >= 3 ? s.maxLives : INITIAL_LIVES) && ['alive','fallen','over'].includes(s.phase) && (s.phase === 'over' ? s.lives === 0 : s.lives > 0) && Number.isFinite(s.shieldRemaining) && s.shieldRemaining >= 0 && s.shieldRemaining <= 20 && Number.isInteger(s.attacks) && s.attacks >= 0 && s.attacks < 4 && Number.isInteger(s.revision) && s.revision >= 0;
 }
-export function takeDamage(s, isFall = false) {
+export function migrateSurvival(s) { const migrated = structuredClone(s); delete migrated.hp; migrated.maxLives ||= INITIAL_LIVES; migrated.version = 3; return migrated; }
+export function takeDamage(s, isFall = false, amount = 1) {
   if (s.phase !== 'alive') return false;
   s.revision++;
   if (!isFall && s.character === 'dad' && s.shieldRemaining <= 0) { s.shieldRemaining = 20; return 'shield'; }
-  s.hp = isFall ? 0 : Math.max(0, s.hp - 1);
-  if (s.hp === 0) { s.lives--; s.phase = s.lives ? 'fallen' : 'over'; return 'death'; }
+  s.lives = Math.max(0, s.lives - (isFall ? 1 : amount));
+  if (!s.lives || isFall) { s.phase = s.lives ? 'fallen' : 'over'; return 'death'; }
   return 'hurt';
 }
 export function reviveSurvival(s) {
   if (s.phase !== 'fallen' || s.lives <= 0) return false;
-  s.hp = 3; s.phase = 'alive'; s.revision++; return true;
+  s.phase = 'alive'; s.revision++; return true;
 }
 export function recordAttack(s) {
   if (s.phase !== 'alive' || !['mom','sister'].includes(s.character)) return false;

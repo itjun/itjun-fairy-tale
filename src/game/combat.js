@@ -1,8 +1,12 @@
 // 固定步长内用线段扫过目标，光波再快也不会穿过小怪。
 export function damageEnemy(enemy, elapsed = enemy.elapsed, source) {
-  if (enemy.isDefeated || enemy.isHidden) return false;
-  if (enemy.isGuarding && source && Math.sign(source.x-enemy.x) === enemy.direction) { enemy.guardHits = (enemy.guardHits || 0) + 1; if (enemy.guardHits % 2) { enemy.hitUntil = elapsed + 0.16; return false; } }
-  enemy.hp = Math.max(0, (enemy.hp ?? 1) - 1);
+  enemy.lastDamage = 0; enemy.lastBlocked = 0;
+  if (enemy.isDefeated || enemy.isHidden || enemy.isDormant) return false;
+  const damage = enemy.combatVersion === 2 ? Math.max(1, Math.round(source?.damage || 12)) : 1;
+  if (enemy.isGuarding && source && Math.sign(source.x-enemy.x) === enemy.direction) { enemy.guardHits = (enemy.guardHits || 0) + 1; if (enemy.guardHits % 2) { enemy.hitUntil = elapsed + 0.16; enemy.lastBlocked = damage; return false; } }
+  const actual = enemy.isShielded ? Math.max(1, Math.round(damage * 0.7)) : damage;
+  enemy.lastBlocked = damage - actual; enemy.lastDamage = Math.min(enemy.hp ?? 1, actual);
+  enemy.hp = Math.max(0, (enemy.hp ?? 1) - actual);
   enemy.hitUntil = elapsed + 0.16;
   if (enemy.hp) return false;
   enemy.isDefeated = true; enemy.defeatedAt = elapsed;
@@ -46,9 +50,9 @@ function contactTime(x, y, dx, dy, enemy, radius) {
 
 export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   if (!wave.isActive) return [];
-  const source = { x: wave.x };
+  const source = { x: wave.x, damage: wave.damage };
   const distance = Math.min(wave.remaining, wave.speed * dt);
-  const dx = wave.direction * distance, dy = wave.slope * distance;
+  const dx = (wave.kind==='moonblade'?wave.headingX:wave.direction) * distance, dy = (wave.kind==='moonblade'?wave.headingY:wave.slope) * distance;
   const contacts = enemies.filter(e => !e.isDefeated && !e.isHidden && !wave.hitIds.has(e.id)).map(enemy => ({
     enemy, time: contactTime(wave.x, wave.y, dx, dy, enemy, wave.kind === 'bubble' ? 0.65 : (wave.radius ?? 0.25)),
   })).filter(hit => hit.time !== null).sort((a, b) => a.time - b.time);
@@ -63,7 +67,8 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   }
   return targets.filter(enemy => !wave.hitIds.has(enemy.id)).map(enemy => {
     wave.hitIds.add(enemy.id);
-    return { enemy, isDefeated: damageEnemy(enemy, elapsed, source) };
+    const isDefeated = damageEnemy(enemy, elapsed, source);
+    return { enemy, isDefeated, damage:enemy.lastDamage, blocked:enemy.lastBlocked };
   });
 }
 export function moveCampaignPlatforms(lifts, elapsed) {

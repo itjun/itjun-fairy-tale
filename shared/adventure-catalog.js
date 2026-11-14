@@ -1,5 +1,5 @@
 // 新冒险的内容目录与旧地图版本分开，服务端和游戏共用怪物奖励定义。
-export const ADVENTURE_GENERATION_VERSION = 3;
+export const ADVENTURE_GENERATION_VERSION = 5;
 export const MONSTERS = Object.freeze({
   jelly: { name: '果冻怪', points: 10, family: 'power', behavior: 'hop', image: 'enemy-jelly' },
   leaf: { name: '叶子怪', points: 15, family: 'flight', behavior: 'leap', image: 'enemy-leaf' },
@@ -44,26 +44,27 @@ export const EXPANDED_THEME_MONSTERS = Object.freeze({
   cartoon: ['toy', 'candy', 'fish', 'firefly', 'paint', 'bell', 'ink', 'moth'],
 });
 export const WEAPONS = Object.freeze({
-  blade: { name: '贯穿光刃', shortName: '光刃', image: 'light-wave', hint: '穿过平台和沿途小怪', family: 'power' },
-  bubble: { name: '魔法泡泡', shortName: '泡泡', image: 'magic-bubble', hint: '炸开泡泡，击中周围小怪', family: 'bubble' },
-  stars: { name: '彩虹星雨', shortName: '星雨', image: 'collectible-star', hint: '星星散开，打到高低的小怪', family: 'flight' },
-  boomerang: { name: '回旋星镖', shortName: '星镖', image: 'weapon-boomerang', hint: '飞出去，还会飞回来', family: 'flight' },
-  seed: { name: '花种弹', shortName: '花种', image: 'weapon-seed', hint: '抛出花种，落地开花', family: 'nature' },
-  firefly: { name: '萤火法杖', shortName: '萤火', image: 'weapon-firefly', hint: '小萤光追着前方小怪飞', family: 'nature' },
+  blade: { name: '贯穿光刃', shortName: '光刃', image: 'light-wave', hint: '伤害 30，每 0.4 秒贯穿发射', damage:30, interval:0.4, family: 'power' },
+  moonblade: { name: '圆月弯刀', shortName: '弯刀', image: 'weapon-moonblade', hint: '伤害 48，每 0.18 秒连发月牙，自动追敌，可叠加数量', damage:48, interval:0.18, family: 'flight' },
+  bubble: { name: '魔法泡泡', shortName: '泡泡', image: 'magic-bubble', hint: '伤害 55，每 0.75 秒范围爆开', damage:55, interval:0.75, family: 'bubble' },
+  stars: { name: '彩虹星雨', shortName: '星雨', image: 'collectible-star', hint: '每星伤害 32，每 0.65 秒发射 1 颗，可叠加数量', damage:32, interval:0.65, family: 'flight' },
+  boomerang: { name: '回旋星镖', shortName: '星镖', image: 'weapon-boomerang', hint: '每程伤害 34，每 0.8 秒发射，往返可各命中一次', damage:34, interval:0.8, family: 'flight' },
+  seed: { name: '花种弹', shortName: '花种', image: 'weapon-seed', hint: '伤害 72，每 1 秒抛射，落地开花', damage:72, interval:1, family: 'nature' },
+  firefly: { name: '萤火法杖', shortName: '萤火', image: 'weapon-firefly', hint: '伤害 22，每 0.3 秒追踪前方目标', damage:22, interval:0.3, family: 'nature' },
 });
 export const UPGRADES = Object.freeze({
-  petal: { name: '花瓣护心', hint: '打败 6 只小怪，恢复 1 格体力', image: 'upgrade-petal', family: 'nature', category: 'survival' },
+  petal: { name: '花瓣护心', hint: '打败 12 只小怪，补 1 条生命', image: 'upgrade-petal', family: 'nature', category: 'survival' },
   armor: { name: '叶片护甲', hint: '每片区域挡一次伤害，不能挡掉坑', image: 'monster-leafshield', family: 'nature', category: 'survival' },
   cotton: { name: '软软棉衣', hint: '受伤时不容易被撞飞', image: 'monster-wool', family: 'frost', category: 'survival' },
   safeLanding: { name: '安稳落脚', hint: '落下高台时，短暂保护自己', image: 'lift-leaf', family: 'flight', category: 'survival' },
-  courage: { name: '小小勇气', hint: '只剩 1 格体力时保护一次，每关一次', image: 'collectible-heart', family: 'power', category: 'survival' },
+  courage: { name: '小小勇气', hint: '只剩 1 条生命时挡一次伤害，每小关一次', image: 'collectible-heart', family: 'power', category: 'survival' },
   wreath: { name: '守护花环', hint: '清空一片区域，获得一次护罩', image: 'flower', family: 'nature', category: 'survival' },
   recycle: { name: '彩笔回收', hint: '放弃本次奖励，可换 3 片彩笔碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
   duplicate: { name: '重复变宝', hint: '重复本领可回收为 5 片碎片', image: 'upgrade-recycle', family: 'bubble', category: 'resource' },
-  pocket: { name: '补给口袋', hint: '精英额外给碎片和一份恢复点心', image: 'icecream', family: 'nature', category: 'resource' },
-  thrift: { name: '节约巧手', hint: '休息点回体力，只花 3 片碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
-  snack: { name: '备用点心', hint: '满血时存一份点心，受伤后自动吃', image: 'icecream', family: 'bubble', category: 'resource' },
-  explorer: { name: '探路奖励', hint: '首次走完分岔路线，多得 3 片碎片', image: 'collectible-star', family: 'flight', category: 'resource' },
+  pocket: { name: '补给口袋', hint: '通关时额外得到 2 片碎片', image: 'icecream', family: 'nature', category: 'resource' },
+  thrift: { name: '节约巧手', hint: '休息点补 1 条生命，只花 3 片碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },
+  snack: { name: '备用点心', hint: '满命时存一份补给，受伤后自动补命', image: 'icecream', family: 'bubble', category: 'resource' },
+  explorer: { name: '探路奖励', hint: '通关时，每条探索过的分路多得 1 片碎片，最多 3 片', image: 'collectible-star', family: 'flight', category: 'resource' },
   bind: { name: '泡泡束缚', hint: '每隔 5 秒，命中可困住小怪', image: 'magic-bubble', family: 'bubble', category: 'utility' },
   lure: { name: '花香诱饵', hint: '每隔 8 秒，攻击留下引开小怪的花', image: 'flower', family: 'nature', category: 'utility' },
   breeze: { name: '清风推开', hint: '受伤时推开附近小怪', image: 'collectible-rainbow', family: 'flight', category: 'utility' },
@@ -92,4 +93,9 @@ export const UPGRADES = Object.freeze({
 export const FAMILY_LABELS = { power: '光刃强化', bubble: '泡泡强化', flight: '星雨强化', frost: '冰霜强化', nature: '花种强化' };
 
 export const CATEGORY_LABELS = { attack: '攻击', survival: '生存', resource: '资源', utility: '探索' };
+export const TIMED_ITEMS = Object.freeze({
+  rainbowBoost: { name: '彩虹祝福', hint: '所有武器双重发射，持续 60 秒', image: 'collectible-rainbow', duration: 60, powers: { double: 1 }, family: 'power', category: 'attack' },
+  frostTreat: { name: '冰霜点心', hint: '所有武器附带冰霜，持续 90 秒', image: 'upgrade-frost', duration: 90, powers: { frost: 2 }, family: 'frost', category: 'attack' },
+  quickTreat: { name: '轻快点心', hint: '所有武器加快发射，持续 90 秒', image: 'icecream', duration: 90, powers: { rapid: 2 }, family: 'flight', category: 'attack' },
+});
 export function upgradeCategory(id) { return UPGRADES[id]?.category || ({ shield: 'survival', magnet: 'resource', air: 'utility', haste: 'utility' }[id]) || 'attack'; }

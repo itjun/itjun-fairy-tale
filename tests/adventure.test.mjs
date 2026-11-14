@@ -52,23 +52,23 @@ test('候选由种子固定，双人依次选择，共享收集但分别装备�
  openReward(a,j);const pending=structuredClone(j.pending);
  assert.deepEqual(pending.choices,rewardChoices(a,'zone:1','flight'));
  assert.equal(chooseReward(a,j,999),false);assert.equal(a.revision,0);
- assert.equal(chooseReward(a,j,1),true);assert.equal(j.pending.player,1);assert.equal(a.loadouts[1].weapon,'blade');
+ assert.equal(chooseReward(a,j,1),true);assert.equal(j.pending.player,1);assert.equal(a.loadouts[1].weapon,'moonblade');
  assert.equal(chooseReward(a,j,0),true);assert.equal(j.pending,null);assert.deepEqual(j.claimed,['zone:1']);
  assert.equal(queueReward(j,'zone:1','flight','重复'),false);assert.equal(chooseReward(a,j,0),false);
  assert.ok(isValidAdventure(a,2));
  const nextLevel=structuredClone(a);assert.deepEqual(nextLevel,a);assert.equal(newJourney().pending,null);
 });
 
-test('搭配限三个且不丢弃已收集的技能，武器专属强化按武器生效',()=>{
+test('搭配可超过三个且不丢弃已收集的技能，武器专属强化按武器生效',()=>{
  const a=newAdventure(1);a.weapons.push('bubble');Object.assign(a.upgrades,{frost:1,magnet:2,rapid:1,linger:1,shield:1});
  for(const id of ['frost','magnet','rapid'])assert.ok(toggleUpgrade(a,0,id));
- assert.equal(toggleUpgrade(a,0,'shield'),false);assert.equal(toggleUpgrade(a,0,'linger'),false);
- assert.ok(toggleUpgrade(a,0,'rapid'));assert.ok(equipWeapon(a,0,'bubble'));assert.ok(toggleUpgrade(a,0,'linger'));
- assert.equal(upgradePower(a).linger,1);equipWeapon(a,0,'blade');assert.equal(upgradePower(a).linger,undefined);
+ assert.ok(toggleUpgrade(a,0,'shield'));assert.ok(toggleUpgrade(a,0,'linger'));assert.equal(upgradePower(a).linger,undefined);assert.equal(a.loadouts[0].upgrades.length,5);
+ assert.ok(toggleUpgrade(a,0,'rapid'));assert.ok(equipWeapon(a,0,'bubble'));
+ assert.equal(upgradePower(a).linger,1);equipWeapon(a,0,'bubble');assert.equal(upgradePower(a).linger,undefined);
  assert.equal(a.upgrades.linger,1);
 });
 
-test('六种武器确实命中，光刃贯穿、星镖往返、花种范围、追踪与组合有效',()=>{
+test('各种武器确实命中，光刃贯穿、星镖往返、花种范围、追踪与组合有效',()=>{
  for(const weapon of Object.keys(WEAPONS)) {
   const enemies=[monster(1,6),monster(2,13)],player={x:0,y:0,facing:1};
   let waves=fireAdventureWeapon(player,0,{left:-20,right:20},weapon,{frost:1,area:1});let hits=0;
@@ -80,7 +80,7 @@ test('六种武器确实命中，光刃贯穿、星镖往返、花种范围、�
   }
   assert.ok(hits>0,weapon);assert.ok(enemies.some(e=>e.slowUntil>0),weapon);
  }
- const p={x:0,y:0,facing:1};const stars=fireAdventureWeapon(p,0,{left:0,right:20},'stars',{fan:2,double:1});assert.equal(stars.length,22);
+ const p={x:0,y:0,facing:1};const stars=fireAdventureWeapon(p,0,{left:0,right:20},'stars',{fan:2,double:1});assert.equal(stars.length,10);
  const targets=[monster(1,6)],[blade]=fireAdventureWeapon({...p,nextShot:0},1,{left:0,right:20},'blade');
  for(let i=1;i<180;i++)stepAdventureWave(blade,targets,[],1/120,i/120+1);
  assert.equal(targets[0].hp,19);
@@ -132,5 +132,5 @@ test('快速连点和双人上一位玩家的旧事件不会领走下一份奖�
  const a=newAdventure(42);a.weapons=Object.keys(WEAPONS);
  const choices=rewardChoices(a,'all-weapons','flight');
  assert.equal(choices.length,3);assert.equal(new Set(choices.map(c=>c.id)).size,3);
- assert.ok(choices.every(c=>c.type==='upgrade'));
+ assert.ok(choices.every(c=>['upgrade','timed'].includes(c.type)));
  });
