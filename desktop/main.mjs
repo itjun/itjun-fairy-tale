@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell, screen } from 'electron';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -62,16 +62,14 @@ async function importScores() {
 }
 function menuTask(task) { return () => { task().catch(error => dialog.showErrorBox('成绩本操作未完成', error.message)); }; }
 async function createWindow() {
-  win = new BrowserWindow({ width: 1280, height: 800, minWidth: 720, minHeight: 540, show: false, fullscreen: true, backgroundColor: '#faf8f1', title: '花园王国', icon: join(root, 'build/icon.png'), autoHideMenuBar: true,
+  const area = screen.getPrimaryDisplay().workAreaSize;
+  win = new BrowserWindow({ width: Math.min(1280,area.width-48), height: Math.min(800,area.height-48), minWidth: Math.min(720,area.width-48), minHeight: Math.min(540,area.height-48), show: false, frame: false, fullscreen: false, fullscreenable: false, backgroundColor: '#faf8f1', title: '花园王国', icon: join(root, 'build/icon.png'), autoHideMenuBar: true,
     webPreferences: { preload: join(root, 'desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, spellcheck: false, backgroundThrottling: process.env.GARDEN_DESKTOP_SMOKE !== '1' } });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
   win.webContents.on('will-attach-webview', event => event.preventDefault());
-  win.webContents.on('before-input-event', (event, input) => {
-    if (input.type === 'keyDown' && input.key === 'F11') { event.preventDefault(); win.setFullScreen(!win.isFullScreen()); }
-  });
   win.on('close', event => { if (!mayExit) { event.preventDefault(); requestClose(); } });
-  win.once('ready-to-show', () => { win.show(); win.setFullScreen(true); });
+  win.once('ready-to-show', () => { win.show(); });
   await win.loadURL(APP_ORIGIN + '/');
   if (!app.isPackaged && process.env.GARDEN_DESKTOP_SMOKE === '1') {
     try { const { runSmoke } = await import('./smoke.mjs'); await runSmoke({ win, databasePath, requestClose }); }
@@ -105,7 +103,7 @@ if (hasLock) {
     session.defaultSession.setPermissionCheckHandler(() => false);
     // All game resources are local. External navigation and network access are unnecessary.
     session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (_details, callback) => callback({ cancel: true }));
-    ipcMain.handle('garden:fullscreen', event => { if (trusted(event)) win.setFullScreen(!win.isFullScreen()); });
+    ipcMain.handle('garden:maximize', event => { if (trusted(event)) { if(win.isMaximized())win.unmaximize();else win.maximize(); } });
     ipcMain.handle('garden:update-state', event => trusted(event) ? updater.state : null);
     ipcMain.handle('garden:check-update', event => trusted(event) ? updater.check() : null);
     ipcMain.on('garden:update-safe', (event, safe) => { if (trusted(event)) updater.setSafe(safe === true); });
@@ -118,7 +116,7 @@ if (hasLock) {
     updater = new UpdateManager({ app, notify: state => { if (win && !win.isDestroyed()) win.webContents.send('garden:update-state', state); }, requestInstall: () => { installing = true; requestClose(); } });
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ label: '花园王国', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { label: '保存并退出', accelerator: 'Cmd+Q', click: requestClose }] }] : []),
-      { label: '游戏', submenu: [{ label: '全屏 / 窗口', accelerator: process.platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11', click: () => win.setFullScreen(!win.isFullScreen()) }, { label: '保存并退出', accelerator: process.platform === 'darwin' ? undefined : 'Alt+F4', click: requestClose }] },
+      { label: '游戏', submenu: [{ label: '放大 / 还原窗口', click: () => { if(win.isMaximized())win.unmaximize();else win.maximize(); } }, { label: '保存并退出', accelerator: process.platform === 'darwin' ? undefined : 'Alt+F4', click: requestClose }] },
       { label: '成绩本', submenu: [{ label: '备份成绩本…', click: menuTask(backupScores) }, { label: '导入成绩本…', click: menuTask(importScores) }, { label: '打开存档文件夹', click: () => shell.openPath(dataDir) }] },
       { role: 'editMenu', label: '编辑' },
       { label: '更新', submenu: [{ label: '检查新版本', click: () => void updater.check() }] },

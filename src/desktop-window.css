@@ -1,0 +1,3 @@
+/* 使用现有标题和页头留白拖动窗口，不新增任何窗体条。 */
+body.is-desktop :is(.header,.adventure-title,.character-camp>header h2,.mini-header h1,.score-heading h1,.adventure-menu h2) { -webkit-app-region:drag; }
+body.is-desktop :is(button,a,input,select,textarea) { -webkit-app-region:no-drag; }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop this game's old processes, build, install locally and launch fullscreen."""
+"""Stop this game's old processes, build, install locally and launch in a frameless window."""
 import argparse
 import json
 import os
@@ -147,7 +147,7 @@ def main():
         executable = target / f'{NAME}.exe'
         if not executable.exists(): raise RuntimeError('安装未完成：找不到游戏程序')
         if not args.no_launch: subprocess.Popen([str(executable)], cwd=target)
-    print('构建、安装完成。' + ('' if args.no_launch else ' 已启动全屏游戏。'), flush=True)
+    print('构建、安装完成。' + ('' if args.no_launch else ' 已启动无边框窗口游戏。'), flush=True)
 
 
 if __name__ == '__main__':

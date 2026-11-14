@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('gardenDesktop', {
     ipcRenderer.on('garden:update-state', listener);
     return () => ipcRenderer.removeListener('garden:update-state', listener);
   },
-  toggleFullscreen: () => ipcRenderer.invoke('garden:fullscreen'),
+  toggleMaximize: () => ipcRenderer.invoke('garden:maximize'),
   quit: () => ipcRenderer.invoke('garden:quit'),
   onPrepareClose: callback => {
     const listener = (_event, token) => callback(token);

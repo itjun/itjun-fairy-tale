@@ -14,8 +14,8 @@ for (const phase of ['play', 'reopen']) {
   });
 }
 const result = JSON.parse(await readFile(join(profile, 'result.json'), 'utf8'));
-assert.equal(result.isFullscreen, true);
+assert.equal(result.isFullscreen, false);
 assert.equal(result.reopened, true);
 assert.ok(result.total > 0);
-console.log('Desktop fullscreen / game / close-save / restart persistence passed:', result);
+console.log('Desktop frameless window / game / close-save / restart persistence passed:', result);
 console.log('Isolated screenshots and database:', profile);
