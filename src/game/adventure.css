@@ -92,7 +92,17 @@
 .reward-choice[data-category=survival]:not([data-rarity]) { border-image:url('/assets/ui-button-pink.png') 128 / 12px / 0 stretch!important; }
 .reward-choice[data-category=resource]:not([data-rarity]) { border-image:url('/assets/ui-button-green.png') 128 / 12px / 0 stretch!important; }
 .reward-choice:focus-visible { outline:4px solid #733b76; outline-offset:3px; }
-.reward-choice[aria-pressed=true] { outline:4px solid #733b76; outline-offset:3px; }
+.reward-choice[aria-pressed=true]:not([data-rarity=legendary]):not([data-rarity=epic]) { outline:4px solid #733b76; outline-offset:3px; }
+#root .reward-choice[aria-pressed=true][data-rarity=legendary],
+#root .reward-choice[aria-pressed=true][data-rarity=epic] { border-image:none; border-style:solid; border-width:8px; border-radius:22px 28px 18px 26px; outline:none; box-shadow:none; }
+#root .reward-choice[aria-pressed=true][data-rarity=legendary] { background:#f6c431; border-color:#b87a14; color:#4d320c; }
+#root .reward-choice[aria-pressed=true][data-rarity=epic] { background:#c56ee4; border-color:#7a3aa0; color:#3c1d4e; }
+#root .reward-choice[aria-pressed=true][data-rarity=legendary]::after,
+#root .reward-choice[aria-pressed=true][data-rarity=epic]::after { content:none; }
+#root .reward-choice[aria-pressed=true][data-rarity=legendary] :is(.rarity-seal,.reward-category,.reward-name,.reward-copy,.reward-copy small,.legend-effect) { color:#5a370c; }
+#root .reward-choice[aria-pressed=true][data-rarity=epic] :is(.rarity-seal,.reward-category,.reward-name,.reward-copy,.reward-copy small,.legend-effect) { color:#3e204c; }
+#root .reward-choice[aria-pressed=true][data-rarity=legendary] .rarity-seal,
+#root .reward-choice[aria-pressed=true][data-rarity=epic] .rarity-seal { background:#fff8e8d0; }
 .reward-panel:focus { outline:none; }
 .reward-panel footer .reward-confirm { text-decoration:none; padding:10px 20px; }
 .reward-panel footer button[aria-pressed=true] { font-weight:bold; }
