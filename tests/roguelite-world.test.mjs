@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { STAGES } from '../shared/levels.js';
 import { createCampaignWorld, validateCampaign } from '../shared/campaign.js';
 import { createPlayer, stepPlayer } from '../src/game/physics.js';
+import { moveCampaignPlatforms } from '../src/game/combat.js';
 import { hazardState, touchingHazard, stepMechanisms, takeLifeSupply, mechanismSave, restoreMechanisms } from '../src/game/hazards.js';
 import { newSurvival } from '../src/game/characters.js';
 import { newAdventure, newJourney, chooseReward, upgradePower, tickEffects } from '../src/game/adventure.js';
@@ -29,6 +30,29 @@ test('24 小关各有结构语法，新局改变房间与分路，同一种子�
     assert.ok(signatures.size>15,stage.id);
   }
   assert.ok(roomKinds.size>=20);assert.equal(hazards.size,5);
+});
+
+test('升降台竖井不被其他平台挡住，乘着它能上去也能回到下方',()=>{
+  for(const stage of STAGES)for(let seed=0;seed<12;seed++){
+    const world=createCampaignWorld(seed,stage,4);
+    for(const lift of world.lifts){
+      if(lift.axis!=='y')continue;
+      for(const platform of world.platforms){
+        if(platform.id===lift.id)continue;
+        const overlapsX=Math.abs(platform.x-lift.baseX)<(platform.width+lift.width)/2-0.05;
+        const blocksShaft=platform.y>lift.baseY+0.25&&platform.y<lift.baseY+lift.travel-0.05;
+        assert.equal(overlapsX&&blocksShaft,false,`${stage.id}/${seed} 平台 ${platform.id} 挡住升降台 ${lift.id}`);
+      }
+      moveCampaignPlatforms(world.lifts,0);
+      const player=createPlayer(lift);
+      for(let frame=1;frame<=120*lift.period;frame++){
+        moveCampaignPlatforms(world.lifts,frame/120);
+        stepPlayer(player,{direction:0},world.platforms,1/120,{minX:-10000,minY:-10000});
+        assert.equal(player.ground?.id,lift.id,`${stage.id}/${seed} 第 ${frame} 帧被平台 ${player.ground?.id} 接走`);
+      }
+      assert.ok(player.y<lift.baseY+0.5,`${stage.id}/${seed} 一个来回后回到下方`);
+    }
+  }
 });
 
 test('全部小关主路与支路连接都能用基础跳跃、下跳、弹簧或升降台通过',()=>{

@@ -2,11 +2,12 @@ import { isValidProjectiles } from './projectile-state.js';
 import { newSurvival, isValidSurvival, migrateSurvival } from './characters.js';
 import { createCampaignWorld, GENERATION_VERSION } from '../../shared/campaign.js';
 import { createSkillRewards, isValidSkillState } from './skills.js';
-import { isValidAdventure, isValidJourney, migrateAdventure, migratePendingReward } from './adventure.js';
+import { isValidAdventure, isValidJourney, migrateAdventure, migratePendingReward, weaponPressure } from './adventure.js';
+import { bossRole, bossTargetHp } from '../../shared/boss-health.js';
 import { WEAPONS } from '../../shared/adventure-catalog.js';
 import { isValidBossState } from './bosses.js';
 import { isValidCombatLoot } from './combat-loot.js';
-import { STAGES } from '../../shared/levels.js';
+import { findStage } from '../../shared/levels.js';
 const KEY = ['garden','active','adventure','v1'].join('-');
 export function writeAdventure(run,state,storage=localStorage) {
   const original = storage.getItem(KEY);
@@ -23,7 +24,7 @@ export function readAdventure(storage=localStorage) {
     const saved=JSON.parse(storage.getItem(KEY));
     if(!saved) return null;
     const {run,state}=saved;
-    if(run.scoringVersion!==3 || ![1,2,3,4,5,6].includes(run.generationVersion) || !['playing','paused','completed','ended'].includes(run.status) || ![1,2].includes(run.players) || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.version!==run.generationVersion || state.seed!==run.seed || state.levelId!==run.levelId) return null;
+    if(run.scoringVersion!==3 || ![1,2,3,4,5,6,7,8].includes(run.generationVersion) || !['playing','paused','completed','ended'].includes(run.status) || ![1,2].includes(run.players) || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.version!==run.generationVersion || state.seed!==run.seed || state.levelId!==run.levelId) return null;
     const count = state.survival ? 1 : run.players;
     if (state.survival && (!isValidSurvival(state.survival) || state.isCompleted && state.survival.phase !== 'alive' || run.status === 'ended' && state.survival.phase !== 'over')) return null;
     if (!state.survival && run.status === 'ended') return null;
@@ -40,19 +41,20 @@ export function readAdventure(storage=localStorage) {
     if(!isIds(state.collectedIds,world.treasures.length)||!isIds(state.defeatedIds,world.enemies.length)||!isIds(state.visited,world.zones.length)||!isIds(state.switches,world.switches.length-1,0))return null;
     if(!Array.isArray(state.enemies)||state.enemies.length!==world.enemies.length||state.enemies.some((e,i)=>e.id!==i+1||![e.x,e.y,e.hp,e.elapsed,e.direction].every(Number.isFinite)))return null;
     if(state.version>=5) {
-      const stage=STAGES.find(s=>s.id===world.stageId);
+      const stage=findStage(world.stageId);
       for(const enemy of state.enemies) {
         const current=world.enemies[enemy.id-1];
         if(!current.isBoss)continue;
         const oldMax=current.isWorldBoss?660+stage.worldIndex*650:240+stage.index*90;
+        const target=bossTargetHp(stage,bossRole(current),weaponPressure(state.adventure),state.version);
         const savedMax=enemy.maxHp ?? oldMax;
-        if(![oldMax,current.maxHp].includes(savedMax)||enemy.hp<0||enemy.hp>savedMax)return null;
-        // 保留已经打掉的比例，读档后直接使用适龄血量，不重置战斗。
-        if(savedMax!==current.maxHp)enemy.hp=Math.ceil(enemy.hp/savedMax*current.maxHp);
-        enemy.maxHp=current.maxHp;
+        if(![oldMax,current.maxHp,target].includes(savedMax)||enemy.hp<0||enemy.hp>savedMax)return null;
+        // 旧血量按剩余比例换到单武器血量；已经按当前武器加厚的战斗保持原进度。
+        if(savedMax!==current.maxHp&&savedMax!==target)enemy.hp=Math.ceil(enemy.hp/savedMax*current.maxHp);
+        enemy.maxHp=savedMax===target?target:current.maxHp;
       }
     }
-    if (state.version >= 2 && state.enemies.some((e,i) => e.hp < 0 || e.hp > world.enemies[i].hp || e.elapsed < 0 || ![-1,1].includes(e.direction) || typeof e.isDefeated !== 'boolean' || e.isDefeated !== state.defeatedIds.includes(e.id))) return null;
+    if (state.version >= 2 && state.enemies.some((e,i) => e.hp < 0 || e.hp > (world.enemies[i].isBoss ? Math.max(world.enemies[i].hp, e.maxHp || 0) : world.enemies[i].hp) || e.elapsed < 0 || ![-1,1].includes(e.direction) || typeof e.isDefeated !== 'boolean' || e.isDefeated !== state.defeatedIds.includes(e.id))) return null;
     if (state.version >= 3) {
       const isOptionalNumber = (value, max) => value === undefined || Number.isFinite(value) && value >= 0 && value <= max;
       if (state.enemies.some(e => !isOptionalNumber(e.windUntil,state.elapsed+.6) || !isOptionalNumber(e.boundUntil, state.elapsed+2) || !isOptionalNumber(e.guardHits, 100000) || !isOptionalNumber(e.frozenUntil,state.elapsed+1.1) || !isOptionalNumber(e.freezeImmuneUntil,state.elapsed+4.1) || ['isHidden','isGuarding','isSummoned','isDormant','hasShell'].some(k => e[k] !== undefined && typeof e[k] !== 'boolean'))) return null;

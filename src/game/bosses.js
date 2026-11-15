@@ -1,3 +1,7 @@
+import { findStage } from '../../shared/levels.js';
+import { bossBaseline, bossRole, bossTargetHp } from '../../shared/boss-health.js';
+import { weaponPressure } from './adventure.js';
+
 export const BOSS_WARNINGS = {
   aimed:'瞄准你了，离开标记位置！', fan:'要散射了，换个高度躲开！', roots:'脚下要冒出来了，离开标记位置！',
   charge:'要冲过来了，跳起来或换一层！', rain:'要落下来了，离开标记位置！',
@@ -45,7 +49,18 @@ function releaseBossSkill(boss, arena, skill, shots) {
   // 远处或高台上的玩家也要躲开冲锋时甩出的主题弹道。
   if(skill.kind==='charge') aim(0,{size:1.4});
 }
-export function stepBosses(world, player, dt, elapsed, shots) {
+export function applyBossToughness(boss, stage, pressure, version = 6) {
+  if (!boss?.isBoss || boss.isDefeated || boss.isDormant) return;
+  const baseline = bossBaseline(stage, bossRole(boss), version);
+  const target = bossTargetHp(stage, bossRole(boss), pressure, version);
+  if (boss.maxHp !== baseline || target === baseline) return;
+  const ratio = baseline > 0 ? Math.min(1, boss.hp / boss.maxHp) : 1;
+  boss.maxHp = target;
+  boss.hp = Math.max(0, Math.ceil(ratio * target));
+}
+export function stepBosses(world, player, dt, elapsed, shots, adventure) {
+  const stage=findStage(world.stageId);
+  const pressure=adventure?weaponPressure(adventure):1;
   for (const arena of world.bossArenas || []) {
     const boss=world.enemies[arena.bossId-1];
     if (boss.isDefeated) { for(const shot of shots)if(shot.bossId===boss.id)shot.isActive=false;continue; }
@@ -54,6 +69,7 @@ export function stepBosses(world, player, dt, elapsed, shots) {
       if (previous && !world.enemies[previous.bossId-1].isDefeated || player.x < arena.left || player.x > arena.right || Math.abs(player.y-arena.y)>9) continue;
       boss.isDormant=false;boss.isShielded=arena.layout==='mechanism';boss.attackTime=0;
     }
+    if (stage) applyBossToughness(boss, stage, pressure, world.version || 6);
     boss.elapsed+=dt;
     if (boss.isWorldBoss && !boss.isEnraged && boss.hp <= boss.maxHp/2) { boss.isEnraged=true;boss.attackStage='rest';boss.attackTime=0; }
     if (arena.layout==='mechanism') {

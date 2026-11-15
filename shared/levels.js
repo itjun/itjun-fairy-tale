@@ -24,7 +24,26 @@ export const STAGES = Object.freeze(LEVELS.flatMap((level, worldIndex) => CHAPTE
   ...level, id: `${level.id}-${chapter + 1}`, themeId: level.id, worldIndex, chapter, chapterName, structure,
   index: worldIndex * 3 + chapter, roomCount: 3 + worldIndex + chapter, bonus: level.bonus + chapter * 25,
 }))));
-export function findLevel(id) { return LEVELS.find(level => level.id === id) || STAGES.find(level => level.id === id); }
+// 第 8 版新冒险：每个主题只留一关。旧的 24 小关仍给第 4～7 版存档使用。
+const WORLD_RULES = [
+  ['弹簧云丘', 'spring-cloud'],
+  ['屋顶钟摆', 'roof-pendulum'],
+  ['开桥传送', 'gate-belt'],
+  ['木筏喷泉', 'tide'],
+  ['跷板升降', 'rise'],
+  ['冰面停步', 'ice'],
+  ['爬上树屋', 'climb'],
+  ['机关接力', 'relay'],
+];
+export const WORLD_ACTS = Object.freeze(LEVELS.map((level, worldIndex) => {
+  const [chapterName, structure] = WORLD_RULES[worldIndex];
+  return {
+    ...level, id: `${level.id}-world`, themeId: level.id, worldIndex, chapter: 0, chapterName, structure,
+    index: worldIndex, roomCount: 3, bonus: level.bonus + 50,
+  };
+}));
+export function findStage(id) { return STAGES.find(stage => stage.id === id) || WORLD_ACTS.find(stage => stage.id === id); }
+export function findLevel(id) { return LEVELS.find(level => level.id === id) || findStage(id); }
 export function themeFor(level) { return LEVELS.find(theme => theme.id === (level.themeId || level.id)); }
 export function calculateScore(flowers, isCompleted, level) { return (typeof flowers === 'number' ? flowers * 10 : collectionPoints(flowers)) + (isCompleted ? level.bonus : 0); }
 export function hasCompleted(level, flowers, platform) { return flowers >= level.requiredFlowers && platform >= level.platforms; }

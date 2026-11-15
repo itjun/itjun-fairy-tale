@@ -1,4 +1,5 @@
 import { createBossWorld } from './boss-world.js';
+import { bossBaseline } from './boss-health.js';
 import { MONSTERS } from './adventure-catalog.js';
 import { STAGES } from './levels.js';
 import { randomGenerator } from './random.js';
@@ -39,7 +40,7 @@ export function createCombatWorld(seed,level) {
   world.platforms.push(floor);world.mainPath.splice(pathIndex+1,0,floor.id);
   for(const edge of world.edges)if(edge.from===previous.id&&world.platforms[edge.to].x>floor.x)edge.from=floor.id;
   world.edges.push({from:previous.id,to:floor.id,kind:'jump'});
-  const template=world.enemies.find(e=>e.isBoss),kind=NEW_MONSTERS[world.themeId][stage.index%3],hp=140+stage.worldIndex*18;
+  const template=world.enemies.find(e=>e.isBoss),kind=NEW_MONSTERS[world.themeId][stage.index%3],hp=bossBaseline(stage,'mid');
   const boss={...structuredClone(template),...MONSTERS[kind],kind,id:world.enemies.length+1,name:`${MONSTERS[kind].name}队长`,image:MONSTERS[kind].image,isMidBoss:true,isWorldBoss:false,arenaId:0,platformId:floor.id,zone:middle.id,x:floor.x+6,y:floor.y,baseY:floor.y,minX:floor.x-10,maxX:floor.x+11,width:3,height:3.8,hp,maxHp:hp,points:65,warningX:floor.x,skills:template.skills.slice(0,1)};
   // 中段在短走廊里练一种主题招式，终点仍使用组合招式。
   boss.skills=[{...boss.skills[0],kind:['charge','lob','fan'][stage.index%3]}];boss.patterns=boss.skills.map(s=>s.kind);

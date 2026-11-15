@@ -17,6 +17,56 @@ export const ROOM_GRAMMARS = Object.freeze({
 const SURFACES = { rainbow:'bank', family:'roof', sweet:'cookie', beach:'rock', meadow:'bank', snow:'ice', forest:'root', cartoon:'blocks' };
 const HAZARDS = { rainbow:'thorns', family:'pendulum', sweet:'steam', beach:'geyser', meadow:'pendulum', snow:'icicle', forest:'thorns', cartoon:'steam' };
 
+// 高处支路若横在升降台行程里，人会被这块平台接住，升降台降回去就下不来。
+export function openLiftShafts(world) {
+  const pad = 0.45;
+  const blocking = (x, y, width) => world.lifts.find(lift => lift.axis === 'y'
+    && y > lift.baseY + 0.3 && y < lift.baseY + lift.travel - 0.05
+    && Math.abs(x - lift.baseX) < (width + lift.width) / 2 + pad);
+  for (const platform of world.platforms) {
+    if (platform.isMoving) continue;
+    const lift = blocking(platform.x, platform.y, platform.width);
+    if (!lift) continue;
+    const nextY = lift.baseY + lift.travel + 0.9;
+    const delta = nextY - platform.y;
+    platform.y = nextY;
+    for (const item of [...world.treasures, ...world.springs, ...world.switches, ...world.supplies, ...world.hazards]) {
+      if (item.platformId === platform.id && Number.isFinite(item.y)) item.y += delta;
+    }
+    for (const enemy of world.enemies) if (enemy.platformId === platform.id) { enemy.y += delta; enemy.baseY += delta; }
+  }
+  for (const edge of [...world.edges]) {
+    if (['spring', 'ride', 'board', 'gate'].includes(edge.kind)) continue;
+    let from = world.platforms[edge.from];
+    const to = world.platforms[edge.to];
+    let guard = 0;
+    while (to.y - from.y > 2.8 && guard++ < 4) {
+      const width = 4.2;
+      const stepY = from.y + 2.3;
+      let stepX = from.x + (to.x - from.x) * (2.3 / (to.y - from.y));
+      const lift = blocking(stepX, stepY, width);
+      if (lift) {
+        const left = lift.baseX - (lift.width + width) / 2 - pad;
+        const right = lift.baseX + (lift.width + width) / 2 + pad;
+        stepX = Math.abs(from.x - left) <= Math.abs(from.x - right) ? left : right;
+      }
+      const step = { id: world.platforms.length, x: stepX, y: stepY, width, isOneWay: true, isBranch: !!to.isBranch, zone: to.zone, progress: to.progress, skin: to.skin, forkRoute: to.forkRoute ? { ...to.forkRoute } : undefined };
+      world.platforms.push(step);
+      const zone = world.zones[step.zone];
+      if (zone && !zone.platformIds.includes(step.id)) zone.platformIds.push(step.id);
+      if (step.forkRoute) {
+        const route = world.forks.find(fork => fork.id === step.forkRoute.forkId)?.routes.find(item => item.id === step.forkRoute.routeId);
+        if (route && !route.platformIds.includes(step.id)) route.platformIds.push(step.id);
+      }
+      world.edges.push({ from: from.id, to: step.id, kind: 'jump' });
+      from = step;
+    }
+    if (from.id !== edge.from) edge.from = from.id;
+  }
+  world.minY = Math.min(...world.platforms.map(p => p.y)) - 14;
+  world.maxY = Math.max(...world.platforms.map(p => p.y + (p.axis === 'y' ? p.travel : 0))) + 6;
+}
+
 export function createRogueliteWorld(seed, selected) {
   const requestedId = typeof selected === 'string' ? selected : selected.id;
   const stage = STAGES.find(s => s.id === requestedId) || STAGES.find(s => s.themeId === requestedId);
@@ -135,6 +185,7 @@ export function createRogueliteWorld(seed, selected) {
   world.camps=[{id:'start',platformId:0,x:-3,y:0,zone:0}];
   world.requiredFlowers=0;
   world.minX=-7;world.maxX=cursor.x+5;world.minY=Math.min(...world.platforms.map(p=>p.y))-14;world.maxY=Math.max(...world.platforms.map(p=>p.y+(p.axis==='y'?p.travel:0)))+6;
+  openLiftShafts(world);
   world.signature=`${stage.structure}:${world.zones.map(z=>z.kind).join('/')}:${world.forks.map(f=>`${f.zone}:${f.routes[1].id}:${f.routes[1].platformIds.length}`).join('/')}`;
   // 子怪编号提前确定，存档、奖励唯一性与服务器计分保持一致。
   for(const parent of [...world.enemies])if(['candy','paint'].includes(parent.kind)){

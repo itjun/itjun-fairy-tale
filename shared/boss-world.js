@@ -1,6 +1,7 @@
 import { createRogueliteWorld } from './roguelite-world.js';
 import { STAGES } from './levels.js';
 import { bossSkills } from './boss-skills.js';
+import { bossBaseline } from './boss-health.js';
 
 // 每个世界三位小关首领和一位大关首领。招式顺序与场地共同决定打法。
 export const BOSS_THEMES = Object.freeze({
@@ -36,7 +37,7 @@ export function createBossWorld(seed, selected) {
       }
     }
     const kind=theme.kinds[chapter], definition=world.enemies.find(e=>e.kind===kind);
-    const hp=isWorldBoss?480+stage.worldIndex*100:180+stage.index*24;
+    const hp=bossBaseline(stage,isWorldBoss?'world':'small');
     const skills=bossSkills(world.themeId,chapter,isWorldBoss);
     const boss={id:world.enemies.length+1,kind,image:isWorldBoss?theme.image:world.themeId==='forest'&&chapter===0?'boss-mushroom':definition?.image,
       name:isWorldBoss?theme.leader:theme.small[chapter],isBoss:true,isWorldBoss,arenaId:world.bossArenas.length,combatVersion:2,

@@ -1,5 +1,5 @@
 // 新冒险的内容目录与旧地图版本分开，服务端和游戏共用怪物奖励定义。
-export const ADVENTURE_GENERATION_VERSION = 6;
+export const ADVENTURE_GENERATION_VERSION = 8;
 export const MONSTERS = Object.freeze({
   plane:{name:'纸飞机怪',points:25,family:'flight',behavior:'swoop',image:'monster-plane'},
   balloon:{name:'气球团',points:25,family:'flight',behavior:'balloon',image:'monster-balloon'},
@@ -52,7 +52,7 @@ export const EXPANDED_THEME_MONSTERS = Object.freeze({
 export const WEAPONS = Object.freeze({
   flame: { name:'彩笔火龙', shortName:'火龙', image:'weapon-flame', hint:'持续喷出短火焰，每 0.2 秒伤害 18，略微追随目标高度', damage:18, interval:0.2, family:'power' },
   blade: { name: '贯穿光刃', shortName: '光刃', image: 'light-wave', hint: '伤害 30，每 0.4 秒贯穿发射', damage:30, interval:0.4, family: 'power' },
-  moonblade: { name: '圆月弯刀', shortName: '弯刀', image: 'weapon-moonblade', hint: '伤害 48，每 0.18 秒连发月牙，自动追敌，可叠加数量', damage:48, interval:0.18, family: 'flight' },
+  moonblade: { name: '圆月弯刀', shortName: '弯刀', image: 'weapon-moonblade', hint: '伤害 48，每 0.4 秒一枚月牙，自动追敌，可叠加数量', damage:48, interval:0.4, family: 'flight' },
   bubble: { name: '魔法泡泡', shortName: '泡泡', image: 'magic-bubble', hint: '伤害 55，每 0.75 秒范围爆开', damage:55, interval:0.75, family: 'bubble' },
   stars: { name: '彩虹星雨', shortName: '星雨', image: 'collectible-star', hint: '每星伤害 32，每 0.65 秒发射 1 颗，可叠加数量', damage:32, interval:0.65, family: 'flight' },
   boomerang: { name: '回旋星镖', shortName: '星镖', image: 'weapon-boomerang', hint: '每程伤害 34，每 0.8 秒发射，往返可各命中一次', damage:34, interval:0.8, family: 'flight' },

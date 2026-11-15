@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { STAGES } from '../shared/levels.js';
 import { createCampaignWorld, validateCampaign } from '../shared/campaign.js';
 import { newSurvival, takeDamage } from '../src/game/characters.js';
-import { newAdventure, newJourney, queueReward, openReward, chooseReward } from '../src/game/adventure.js';
+import { newAdventure, newJourney, queueReward, openReward, chooseReward, weaponPressure } from '../src/game/adventure.js';
+import { bossTargetHp } from '../shared/boss-health.js';
 import { collectGrowth, weaponDamage } from '../src/game/growth.js';
 import { heal } from '../src/game/expedition.js';
 import { damageEnemy } from '../src/game/combat.js';
@@ -132,6 +133,32 @@ test('未强化的一把弯刀能在 35 秒内打赢全部 32 位 BOSS，保留�
   }
   assert.equal(results.length,32);
   t.diagnostic(`单弯刀战斗：${Math.min(...results.map(r=>r.seconds))}–${Math.max(...results.map(r=>r.seconds))} 秒；最少剩余 ${Math.min(...results.map(r=>r.lives))}/9 生命`);
+});
+
+test('叠厚的武器开战才加厚首领，单把弯刀保持原血量，打掉的比例随存档保留',()=>{
+  const stage=STAGES.find(s=>s.id==='meadow-3'),plain=newAdventure(7);
+  const untouched=createCampaignWorld(42,stage,6),arena=untouched.bossArenas.at(-1),boss=untouched.enemies[arena.bossId-1];
+  for(const prior of untouched.bossArenas){if(prior.id>=arena.id)break;const enemy=untouched.enemies[prior.bossId-1];enemy.hp=0;enemy.isDefeated=true;enemy.isDormant=false;}
+  stepBosses(untouched,{x:arena.left+2,y:arena.y},1/60,1,[],plain);
+  assert.ok(weaponPressure(plain)<=1);assert.equal(boss.maxHp,880);
+  const stacked=newAdventure(7);
+  stacked.growth.power=5;stacked.weapons=['blade','boomerang','stars','seed','firefly','bubble','moonblade'];stacked.weaponRanks={blade:2,moonblade:2};stacked.upgrades={double:1,fan:1};
+  stacked.loadouts[0].weapons=[...stacked.weapons];stacked.loadouts[0].weapon='blade';stacked.loadouts[0].upgrades=['double','fan'];
+  const pressure=weaponPressure(stacked);
+  for(const [role,index] of [['mid',0],['small',1],['world',2]]){
+    const world=createCampaignWorld(42,stage,6),nextArena=world.bossArenas[index],enemy=world.enemies[nextArena.bossId-1];
+    for(const prior of world.bossArenas){if(prior.id>=nextArena.id)break;const beaten=world.enemies[prior.bossId-1];beaten.hp=0;beaten.isDefeated=true;beaten.isDormant=false;}
+    const baseline=enemy.maxHp,half=Math.floor(baseline/2);enemy.hp=half;
+    stepBosses(world,{x:nextArena.left+2,y:nextArena.y},1/60,1,[],stacked);
+    const target=bossTargetHp(stage,role,pressure);
+    assert.equal(enemy.maxHp,target,role);assert.equal(enemy.hp,Math.ceil(half/baseline*target),role);assert.ok(target>baseline*8,role);
+    stepBosses(world,{x:nextArena.left+2,y:nextArena.y},1/60,2,[],stacked);assert.equal(enemy.maxHp,target,role);
+  }
+  const f=bossFixture('boss-play','forest-3'),forest=STAGES.find(s=>s.id==='forest-3'),mem=storage();
+  const live=f.state.enemies.find(e=>e.isBoss&&!e.isDefeated),savedTarget=bossTargetHp(forest,'world',weaponPressure(f.state.adventure));
+  live.maxHp=savedTarget;live.hp=savedTarget-80;
+  writeAdventure(f.run,f.state,mem);const saved=readAdventure(mem);
+  assert.ok(saved);assert.equal(saved.state.enemies.find(e=>e.id===live.id).maxHp,savedTarget);assert.equal(saved.state.enemies.find(e=>e.id===live.id).hp,savedTarget-80);
 });
 
 test('旧 BOSS 按剩余比例降低血量，死亡状态和重复存取稳定，首次覆盖前备份',()=>{

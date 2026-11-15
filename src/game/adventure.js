@@ -14,6 +14,24 @@ export function newJourney() { return { routes: {}, claimed: [], pending: null, 
 export function activeWeapons(adventure, index = 0) { return adventure.loadouts[index].weapons || [adventure.loadouts[index].weapon]; }
 export function weaponRank(adventure,id) { return adventure.weaponRanks?.[id] || (adventure.weapons.includes(id)?1:0); }
 export function weaponShotCount(weapon,powers={}) { return ((powers.weaponRank || 1)+(weapon==='stars'?(powers.fan || 0)*2:weapon==='firefly'?Number(!!powers.seek):0))*(powers.double?2:1); }
+// 相对一把基础弯刀的持续输出。小于 1 的单武器也按 1 看待，避免开局首领被减血。
+export function weaponPressure(adventure, index = 0) {
+  if (!adventure) return 1;
+  let dps = 0;
+  for (const id of activeWeapons(adventure, index)) {
+    const weapon = WEAPONS[id];
+    if (!weapon?.interval) continue;
+    const powers = upgradePower(adventure, index, id);
+    const damage = weaponDamage(id, powers.attackGrowth || 0, powers.weaponRank || 1);
+    const shots = weaponShotCount(id, powers);
+    const interval = weapon.interval / (1 + 0.18 * (powers.rapid || 0));
+    const passes = id === 'boomerang' ? 1.5 : 1;
+    dps += damage * shots * passes / interval;
+  }
+  // 厚度仍以原来「一把基础弯刀、每 0.18 秒」为 1。弯刀放慢后不再把首领血量跟着抬高。
+  const reference = 48 / 0.18;
+  return dps > 0 ? dps / reference : 1;
+}
 export function migrateAdventure(adventure) {
   adventure.growth ||= newGrowth();
   adventure.qualities ||= {}; adventure.magic ||= newMagic(); adventure.revivalWaves ||= 0; adventure.counterShield ||= 0;
@@ -53,10 +71,13 @@ export function rewardChoices(adventure, eventId, family, player = 0, survival, 
   const upgrades = Object.entries(UPGRADES).filter(([id,d])=>(adventure.upgrades[id] || 0)<(d.maxRank || 1)&&(!d.weapon||weapons.includes(d.weapon))).map(([id])=>({type:'upgrade',id}));
   const utility = [...lifePool,{type:'supply',id:'fragments'},...(survival?.hp<survival?.maxHp?[{type:'supply',id:'heal'}]:[]),...upgrades.filter(c=>['survival','resource'].includes(upgradeCategory(c.id)))];
   const result=[];
+  const itemFamily = item => item.type==='weapon' ? WEAPONS[item.id]?.family : item.type==='upgrade' ? UPGRADES[item.id]?.family : item.type==='spell' ? SPELLS[item.id]?.family : item.type==='timed' ? TIMED_ITEMS[item.id]?.family : null;
   function pick(pool,rarity) {
     const available=pool.filter(item=>!result.some(c=>c.type===item.type&&c.id===item.id));
     if(!available.length)return;
-    const next=available[Math.floor(random()*available.length)];result.push({...next,rarity});
+    const matched = rarity==='legendary' || !family ? [] : available.filter(item=>itemFamily(item)===family);
+    const bag = matched.length ? matched : available;
+    const next=bag[Math.floor(random()*bag.length)];result.push({...next,rarity});
   }
   pick(legendary,'legendary');
   if(tier==='world')pick(legendary,'legendary');

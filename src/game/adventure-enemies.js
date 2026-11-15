@@ -7,30 +7,32 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
     enemy.isWaiting = !active.includes(enemy);
     if (enemy.isWaiting || enemy.boundUntil > elapsed || enemy.frozenUntil > elapsed) { enemy.isWarning = false; continue; }
     enemy.elapsed += dt * (enemy.slowUntil > elapsed ? 0.35 : 1);
-    const cycle = (enemy.elapsed + enemy.phase) % 3.6;
+    // 没写周期时沿用 3.6 秒，旧关卡节奏不变；新关卡按角色拉开预告和出手。
+    const period = enemy.period || 3.6, scale = period / 3.6, actAt = 2.5 * scale, warnAt = 1.9 * scale, actWindow = 1.1 * scale;
+    const cycle = (enemy.elapsed + enemy.phase) % period;
     const slow = enemy.slowUntil > elapsed ? 0.35 : 1;
-    enemy.isWarning = cycle > 1.9 && cycle < 2.5;
+    enemy.isWarning = cycle > warnAt && cycle < actAt;
     let speed = enemy.speed;
     const target = options.lure && options.lure.until > elapsed && Math.abs(enemy.x-options.lure.x) < 9 ? options.lure : players.reduce((a,b) => Math.abs(a.x-enemy.x) < Math.abs(b.x-enemy.x) ? a : b);
-    const beat = Math.floor((enemy.elapsed + enemy.phase) / 3.6);
-    const isActing = cycle >= 2.5;
+    const beat = Math.floor((enemy.elapsed + enemy.phase) / period);
+    const isActing = cycle >= actAt;
     const emit = (kind, vx, vy, y = enemy.baseY + 0.8, life = 4) => projectiles.push({ x: enemy.x, y, vx, vy, gravity: 0, age: 0, kind, life, id: `${enemy.id}:${beat}:${projectiles.length}`, isActive: true });
     enemy.y = enemy.baseY;
     enemy.isHidden = false; enemy.isGuarding = false;
-    if(enemy.behavior==='swoop'){enemy.y+=isActing?3-Math.sin((cycle-2.5)/1.1*Math.PI)*3:3;speed*=isActing?3.5:.08;}
+    if(enemy.behavior==='swoop'){enemy.y+=isActing?3-Math.sin((cycle-actAt)/actWindow*Math.PI)*3:3;speed*=isActing?3.5:.08;}
     if(enemy.behavior==='balloon'){enemy.y+=2.3+Math.sin(enemy.elapsed*.8)*2.3;speed*=.25;}
     if(enemy.behavior==='iceslide'){speed*=enemy.hasShell?.08:isActing?3.6:.08;enemy.isGuarding=false;}
-    if(enemy.behavior==='twins'){enemy.isGuarding=cycle<1.7;speed=0;}
+    if(enemy.behavior==='twins'){enemy.isGuarding=cycle<1.7*scale;speed=0;}
     if(['inklob','breeze'].includes(enemy.behavior))speed=0;
     if(enemy.behavior==='breeze'&&isActing)for(const other of active)if(other!==enemy&&Math.abs(other.x-enemy.x)<9){other.direction=Math.sign(target.x-other.x)||1;other.windUntil=elapsed+.5;}
     if(enemy.windUntil>elapsed)speed*=1.35;
-    if (enemy.behavior === 'glide') { enemy.y += isActing ? Math.max(0, 3 * (1 - (cycle - 2.5) / 1.1)) : 0; speed *= isActing ? 0.6 : 0.15; }
-    if (enemy.behavior === 'inkhop') { enemy.y += isActing ? Math.sin((cycle-2.5)/1.1*Math.PI) * (beat % 2 ? 1.8 : 0.8) : 0; speed *= isActing ? 2 : 0.1; }
-    if (enemy.behavior === 'guard') { enemy.isGuarding = cycle < 2.5; speed *= isActing ? 2.4 : 0.1; }
+    if (enemy.behavior === 'glide') { enemy.y += isActing ? Math.max(0, 3 * (1 - (cycle - actAt) / actWindow)) : 0; speed *= isActing ? 0.6 : 0.15; }
+    if (enemy.behavior === 'inkhop') { enemy.y += isActing ? Math.sin((cycle-actAt)/actWindow*Math.PI) * (beat % 2 ? 1.8 : 0.8) : 0; speed *= isActing ? 2 : 0.1; }
+    if (enemy.behavior === 'guard') { enemy.isGuarding = cycle < actAt; speed *= isActing ? 2.4 : 0.1; }
     if (enemy.behavior === 'crawl') { speed *= 0.6; enemy.y += Math.sin(enemy.elapsed*4)*0.08; }
     if (enemy.behavior === 'orbit') { enemy.y += 1.8 + Math.sin(enemy.elapsed*2)*1.1; speed *= isActing ? 3 : 0.3; }
-    if (enemy.behavior === 'drop') { enemy.y += cycle < 2.5 ? 3.6 : Math.max(0, 3.6-(cycle-2.5)*9); speed *= cycle > 2.9 ? 0.7 : 0; }
-    if (enemy.behavior === 'burrow') { enemy.isHidden = cycle < 1.4; speed = 0; if (enemy.isHidden) enemy.x = beat % 2 ? enemy.minX : enemy.maxX; }
+    if (enemy.behavior === 'drop') { enemy.y += cycle < actAt ? 3.6 : Math.max(0, 3.6-(cycle-actAt)*9); speed *= cycle > 2.9 * scale ? 0.7 : 0; }
+    if (enemy.behavior === 'burrow') { enemy.isHidden = cycle < 1.4 * scale; speed = 0; if (enemy.isHidden) enemy.x = beat % 2 ? enemy.minX : enemy.maxX; }
     if (['vine','alarm','stomp','build','summon','obstacle'].includes(enemy.behavior)) speed = 0;
     const canAct = () => !options.attackGate || elapsed >= options.attackGate.next;
     const claimAction = () => { if (options.attackGate) options.attackGate.next = elapsed + 0.7; };
@@ -48,17 +50,16 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
     }
     if (options.lure && target === options.lure) enemy.direction = Math.sign(target.x-enemy.x) || 1;
     if (enemy.behavior === 'float') enemy.y += Math.sin(enemy.elapsed * 1.5 + enemy.phase) * 0.7;
-    if (enemy.behavior === 'dart') { speed *= cycle < 2.5 ? 0.1 : 3; enemy.y += Math.sin(enemy.elapsed * 2) * 0.9; }
+    if (enemy.behavior === 'dart') { speed *= cycle < actAt ? 0.1 : 3; enemy.y += Math.sin(enemy.elapsed * 2) * 0.9; }
     if (['hop', 'leap', 'bounce'].includes(enemy.behavior)) {
       const height = enemy.behavior === 'bounce' ? 2.6 : enemy.behavior === 'leap' ? 1.5 : 0.7;
-      enemy.y += cycle >= 2.5 ? Math.sin((cycle - 2.5) / 1.1 * Math.PI) * height : 0;
-      speed *= cycle < 2.5 ? 0.2 : 1.8;
+      enemy.y += cycle >= actAt ? Math.sin((cycle - actAt) / actWindow * Math.PI) * height : 0;
+      speed *= cycle < actAt ? 0.2 : 1.8;
     }
-    if (['roll', 'charge', 'scuttle'].includes(enemy.behavior)) speed *= cycle < 2.5 ? 0.12 : enemy.behavior === 'charge' ? 4 : 2.7;
+    if (['roll', 'charge', 'scuttle'].includes(enemy.behavior)) speed *= cycle < actAt ? 0.12 : enemy.behavior === 'charge' ? 4 : 2.7;
     if (['bubble', 'fan', 'lob','inklob','twins'].includes(enemy.behavior)) {
       speed = 0;
-      const beat = Math.floor((enemy.elapsed + enemy.phase) / 3.6);
-      if (cycle > 2.5 && enemy.lastShotBeat !== beat && canAct()) {
+      if (cycle >= actAt && enemy.lastShotBeat !== beat && canAct()) {
         enemy.lastShotBeat = beat; claimAction();
         enemy.direction = Math.sign(target.x - enemy.x) || 1;
         const slopes = enemy.behavior === 'fan' ? [-0.35, 0, 0.35] : [['lob','inklob'].includes(enemy.behavior) ? 1.1 : 0];
