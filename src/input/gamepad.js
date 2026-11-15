@@ -1,4 +1,4 @@
-import { GamepadGate, readXboxPad, nearestControl } from './gamepad-state.js';
+import { GamepadGate, confirmMenu, readXboxPad, nearestControl } from './gamepad-state.js';
 
 const listeners = new Set();
 let state = { mode: 'keyboard', context: 'menu', connected: false, name: '', notice: '', vibration: true, deadzone: 0.22 };
@@ -77,9 +77,9 @@ function scroll(scope, delta) {
 
 export function startGamepad() {
   const gate = new GamepadGate(), abort = new AbortController();
-  let frame, identity = '', context = null, contextKey = '', lastTime = 0, focused = null, isFocused = document.hasFocus();
+  let frame, identity = '', context = null, contextKey = '', lastTime = 0, focused = null, isFocused = document.hasFocus(), stickUntil = 0;
   function release() { gameplay?.release(); document.activeElement?.dispatchEvent(new CustomEvent('garden:practice-input', { detail: null })); gate.reset(); }
-  function keyboard() { publish({ mode: 'keyboard' }); }
+  function keyboard() { if (performance.now() < stickUntil) return; publish({ mode: 'keyboard' }); }
   window.addEventListener('keydown', keyboard, { signal: abort.signal });
   window.addEventListener('pointerdown', keyboard, { signal: abort.signal });
   window.addEventListener('blur', () => { isFocused = false; release(); gameplay?.pause(); activePad?.vibrationActuator?.reset?.()?.catch?.(() => {}); }, { signal: abort.signal });
@@ -114,7 +114,7 @@ export function startGamepad() {
     }
     const step = gate.step(input, time);
     if (!step.isReady) return;
-    if (step.pressed.size || input.scroll) publish({ mode: 'gamepad', notice: '' });
+    if (step.navigation || step.pressed.size || input.scroll) { stickUntil = performance.now() + 500; publish({ mode: 'gamepad', notice: '' }); }
     if (isPlaying) {
       if (step.pressed.has('pause') || step.pressed.has('back')) { release(); gameplay.pause(); return; }
       if (step.pressed.has('interact')) { gameplay.interact(); return; }
@@ -144,9 +144,13 @@ export function startGamepad() {
     if (step.pressed.has('back')) { back(scope); return; }
     if (step.pressed.has('pause')) { controls(scope).find(node => node.hasAttribute('data-gamepad-resume'))?.click(); return; }
     if (step.pressed.has('confirm')) {
-      // 首次 A 只定位；不会把跳跃键带进奖励、死亡或破坏性确认。
+      // 光标不在选项上时，第一次 A 只定位。选关卡片已经有色块时，按一次就进入。
       const target = document.activeElement;
-      if (!focused || focused !== target || !controls(scope).includes(target)) { focus(controls(scope)[0]); focused = document.activeElement; return; }
+      const items = controls(scope);
+      if (!items.includes(target)) { focus(items[0]); focused = document.activeElement; return; }
+      const action = confirmMenu(focused === target, !!target.closest('.level-choices'));
+      focused = target;
+      if (action === 'arm') return;
       if (target.hasAttribute('data-gamepad-canvas')) target.dispatchEvent(new CustomEvent('garden:canvas-confirm'));
       else if (!['SELECT', 'INPUT'].includes(target.tagName)) target.click();
     }
