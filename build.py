@@ -15,6 +15,25 @@ ROOT = Path(__file__).resolve().parent
 NAME = '花园王国'
 
 
+def version_parts(text):
+    numbers = []
+    for part in text.strip().lstrip('v').split('.'):
+        digits = ''
+        for char in part:
+            if char.isdigit(): digits += char
+            else: break
+        if digits: numbers.append(int(digits))
+    return numbers
+
+
+def version_at_least(actual, required):
+    left, right = version_parts(actual), version_parts(required)
+    width = max(len(left), len(right), 1)
+    left.extend([0] * (width - len(left)))
+    right.extend([0] * (width - len(right)))
+    return left >= right
+
+
 def run(args, **kwargs):
     print('>', ' '.join(map(str, args)), flush=True)
     return subprocess.run([str(arg) for arg in args], cwd=ROOT, check=True, **kwargs)
@@ -60,7 +79,7 @@ def stop_running():
             except ProcessLookupError: pass
     else:
         for pid in pids:
-            run(['powershell.exe', '-NoProfile', '-Command', f'(Get-Process -Id {pid} -ErrorAction SilentlyContinue).CloseMainWindow() | Out-Null'])
+            run(['powershell.exe', '-NoProfile', '-Command', f'try {{ $p = Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($null -ne $p) {{ $null = $p.CloseMainWindow() }} }} catch {{}}; exit 0'])
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline and set(pids) & set(processes()): time.sleep(0.3)
     for pid in set(pids) & set(processes()):
@@ -110,7 +129,7 @@ def main():
     npm = shutil.which('npm.cmd' if sys.platform == 'win32' else 'npm')
     required = (ROOT / '.nvmrc').read_text().strip()
     actual = subprocess.check_output(['node', '-p', 'process.versions.node'], text=True).strip()
-    if actual != required: raise RuntimeError(f'请使用项目指定的 Node {required}，当前是 {actual}')
+    if not version_at_least(actual, required): raise RuntimeError(f'请使用不低于 {required} 的 Node，当前是 {actual}')
     arch = 'arm64' if platform.machine().lower() in ('arm64','aarch64') else 'x64'
     stop_running()
     run([npm, 'ci'])

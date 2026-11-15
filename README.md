@@ -17,7 +17,7 @@ Electron 桌面版启动即全屏，安装后无需 Node 或浏览器，游戏�
 
 ## 开发与打包
 
-开发环境固定 Node **26.13.0 LTS**（见 `.nvmrc`）。Electron **45.2.3 stable** 自带 Node **24.22.2 LTS**，无需终端用户安装 Node。Electron 没有 LTS 分支，按官方最近三个稳定主版本的支持政策更新；React **19.3.1**、Vite **8.3.5** 等采用当前稳定版并锁入 lockfile。
+开发环境以 `.nvmrc` 中的 Node **26.13.0** 为最低版本，更高版本可以构建。Electron **45.2.3 stable** 自带 Node **24.22.2 LTS**，无需终端用户安装 Node。Electron 没有 LTS 分支，按官方最近三个稳定主版本的支持政策更新；React **19.3.1**、Vite **8.3.5** 等采用当前稳定版并锁入 lockfile。
 
 ```sh
 npm ci
