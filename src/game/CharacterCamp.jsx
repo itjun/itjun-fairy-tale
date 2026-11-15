@@ -40,7 +40,7 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
       const dt = previous ? Math.min((time-previous)/1000,0.035) : 0; previous = time; elapsed += dt;
       survival.shieldRemaining = Math.max(0,survival.shieldRemaining-dt);
       if (isTrying && character === 'little' && elapsed >= nextDemoJump) { jump = true; nextDemoJump = player.isGrounded ? elapsed+0.48 : elapsed+2; }
-      stepPlayer(player,{ direction:pad.direction || Number(keys.has('KeyD')||keys.has('ArrowRight'))-Number(keys.has('KeyA')||keys.has('ArrowLeft')), jump, isDoubleJump:character==='little' },[floor],dt,{minX:3,maxX:22,minY:-10}); jump=false;
+      stepPlayer(player,{ direction:pad.direction || Number(keys.has('KeyD')||keys.has('ArrowRight'))-Number(keys.has('KeyA')||keys.has('ArrowLeft')), jump },[floor],dt,{minX:3,maxX:22,minY:-10}); jump=false;
       if (keys.has('KeyJ') || pad.actions.has('attack') || isTrying) {
         const shots = fireLoadout(player,elapsed,{left:0,right:28},adventure);
         if (shots.length) {

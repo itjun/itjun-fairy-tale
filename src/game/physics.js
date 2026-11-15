@@ -49,8 +49,9 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   if (player.buffer > 0 && player.coyote > 0) {
     player.vy = RULES.jump; player.buffer = 0; player.coyote = 0; player.isGrounded = false; isJumped = true;
   }
-  if (!isJumped && input.jump && input.isDoubleJump && !player.isGrounded && !player.isAirJumpUsed && player.dropTime <= 0) {
-    player.vy = RULES.jump; player.buffer = 0; player.coyote = 0; player.isAirJumpUsed = true; isJumped = true;
+  if (!isJumped && input.jump && !player.isGrounded && !player.isAirJumpUsed && player.dropTime <= 0) {
+    player.vy = player.character === 'little' ? RULES.jump * 1.16 : RULES.jump;
+    player.buffer = 0; player.coyote = 0; player.isAirJumpUsed = true; isJumped = true;
   }
   const support = player.isGrounded && player.ground && (player.ground.slope || player.ground.isSeesaw) && Math.abs(player.y-platformY(player.ground,player.x))<.05 ? player.ground : null;
   const previousY = player.y, previousX = player.x;

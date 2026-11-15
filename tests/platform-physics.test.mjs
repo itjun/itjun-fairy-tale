@@ -39,8 +39,9 @@ test('离台宽容时间与提前按跳可用，空中不能无限连跳', () =>
   const platform = firstPlatform(), player = createPlayer(platform);
   player.x = 7; player.isGrounded = false; player.coyote = 0.08;
   assert.equal(stepPlayer(player, { direction: 1, jump: true }, [platform], dt).isJumped, true);
+  assert.equal(stepPlayer(player, { direction: 1, jump: true }, [platform], dt).isJumped, true);
   assert.equal(stepPlayer(player, { direction: 1, jump: true }, [platform], dt).isJumped, false);
-  rescue(player); player.y = 0.05; player.vy = -2; player.isGrounded = false; player.coyote = 0;
+  rescue(player); player.y = 0.05; player.vy = -2; player.isGrounded = false; player.coyote = 0; player.isAirJumpUsed = true;
   stepPlayer(player, { direction: 0, jump: true }, [platform], dt);
   let isBufferedJump = false;
   for (let i = 0; i < 10; i++) isBufferedJump ||= stepPlayer(player, { direction: 0, jump: false }, [platform], dt).isJumped;

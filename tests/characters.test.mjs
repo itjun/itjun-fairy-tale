@@ -34,13 +34,13 @@ test('妈妈姐姐按真实发射累计，每四次触发一次；花朵只在�
  assert.equal(bloomAtHit(wave,[],enemies,10),null);assert.ok(bloomAtHit(wave,[{enemy:enemies[0]}],enemies,10));assert.equal(enemies[1].slowUntil,12);assert.equal(enemies[2].slowUntil,undefined);assert.equal(bloomAtHit(wave,[{enemy:enemies[0]}],enemies,11),null);
  const floralCharge={isUsed:false};assert.ok(bloomAtHit({floralCharge},[{enemy:enemies[1]}],enemies,13));assert.equal(bloomAtHit({floralCharge},[{enemy:enemies[0]}],enemies,14),null);
 });
-test('妹妹空中只能再跳一次，落地才恢复，下跳不刷新；其他角色保持基础跳跃',()=>{
+test('四位角色空中只能再跳一次，落地才恢复，下跳不刷新',()=>{
  const floor={id:0,x:0,y:0,width:30,isOneWay:true};
- for(const isDoubleJump of [false,true]){const p=createPlayer(floor);stepPlayer(p,{direction:0,jump:true,isDoubleJump},[floor],1/120);for(let i=0;i<24;i++)stepPlayer(p,{direction:0,isDoubleJump},[floor],1/120);
- const second=stepPlayer(p,{direction:0,jump:true,isDoubleJump},[floor],1/120);assert.equal(second.isJumped,isDoubleJump);
- assert.equal(stepPlayer(p,{direction:0,jump:true,isDoubleJump},[floor],1/120).isJumped,false);
- for(let i=0;i<400;i++)stepPlayer(p,{direction:0,isDoubleJump},[floor],1/120);
- assert.equal(p.isGrounded,true);assert.equal(p.isAirJumpUsed,false);p.isAirJumpUsed=true;stepPlayer(p,{direction:0,drop:true,isDoubleJump},[floor],1/120);assert.equal(p.isAirJumpUsed,true);}
+ for(const character of ['dad','mom','sister','little']){const p=createPlayer(floor);p.character=character;stepPlayer(p,{direction:0,jump:true},[floor],1/120);for(let i=0;i<24;i++)stepPlayer(p,{direction:0},[floor],1/120);
+ const second=stepPlayer(p,{direction:0,jump:true},[floor],1/120);assert.equal(second.isJumped,true,character);
+ assert.equal(stepPlayer(p,{direction:0,jump:true},[floor],1/120).isJumped,false,character);
+ for(let i=0;i<400;i++)stepPlayer(p,{direction:0},[floor],1/120);
+ assert.equal(p.isGrounded,true,character);assert.equal(p.isAirJumpUsed,false,character);p.isAirJumpUsed=true;stepPlayer(p,{direction:0,drop:true},[floor],1/120);assert.equal(p.isAirJumpUsed,true,character);}
 });
 test('旧双人存档迁移为单人，原记录备份和完整背包保留，旧成绩人数不篡改',()=>{
  const original=adventureFixture('duo'),mem=storage();writeAdventure(original.run,original.state,mem);const raw=mem.getItem('garden-active-adventure-v1');const migrated=readAdventure(mem);
