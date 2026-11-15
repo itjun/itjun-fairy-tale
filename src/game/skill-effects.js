@@ -21,6 +21,28 @@ export class SkillEffects {
     const mesh = new THREE.Mesh(this.geometry, this.materials[kind]);
     mesh.scale.set(width, height, 1); group.add(mesh); return mesh;
   }
+  attachShot(wave) {
+    const group = this.group(); this.shots.set(wave, group);
+    if (wave.kind === 'pulse' && wave.source==='flame') {
+      this.add(group,'dragon',2.8,2.3);
+      this.add(group,'flame',3.2,1.2).position.x=2;
+    } else if (wave.kind === 'blade') {
+      this.add(group, 'blade', 3.8, 1.5);
+      this.add(group, 'blade', 2.6, 0.95).position.x = -1.6;
+      this.add(group, 'blade', 1.5, 0.55).position.x = -2.9;
+    } else if(wave.kind==='flame'){
+      this.add(group,'flame',3.5,1.25);
+    } else if (wave.kind==='moonblade') {
+      this.add(group,'moonblade',1.6,1.6);
+      for(let i=0;i<2;i++)this.add(group,'stars',.24-i*.07,.24-i*.07).position.set(-.65-i*.4,0,0);
+    } else {
+      this.add(group, wave.kind, wave.kind === 'bubble' ? 2.1 : 1.1, wave.kind === 'bubble' ? 2.1 : 1.1);
+      for (let i = 0; i < 3; i++) {
+        const mesh = this.add(group, 'stars', 0.45 - i * 0.1, 0.45 - i * 0.1);
+        mesh.position.set(-0.8 - i * 0.55, -(wave.slope || 0) * (0.8 + i * 0.55), 0);
+      }
+    }
+  }
   burst(x, y, at, isReward = false, isCompact = false) {
     if (this.bursts.length >= 24) this.scene.remove(this.bursts.shift().group);
     const group = this.group(); group.position.set(x, y, 1.4);
@@ -55,42 +77,28 @@ export class SkillEffects {
         mesh.position.set(Math.cos(angle) * 1.4, Math.sin(angle) * 1.4, 0.1);
       });
     }
-    // 高叠加只简化绘制，全部弹道仍由战斗层结算；按武器均分可见预算。
-    const byKind = new Map();
-    for (const wave of waves) if (wave.isActive && (wave.kind !== 'pulse' || wave.source==='flame' && wave.delay>.8) && Math.abs(wave.x-cameraX)<=halfWidth+5) {
-      if (!byKind.has(wave.kind)) byKind.set(wave.kind,[]);
-      byKind.get(wave.kind).push(wave);
-    }
-    const visible = new Set(), budget = Math.max(1,Math.floor(120 / (byKind.size || 1)));
-    for (const shots of byKind.values()) {
-      const stride = Math.max(1,Math.ceil(shots.length/budget));
-      for (let i=0;i<shots.length;i+=stride) visible.add(shots[i]);
-    }
-    for (const [wave, group] of this.shots) if (!visible.has(wave)) { this.scene.remove(group); this.shots.delete(wave); }
-    for (const wave of visible) {
-      let group = this.shots.get(wave);
-      if (!group) {
-        group = this.group(); this.shots.set(wave, group);
-        if (wave.kind === 'pulse' && wave.source==='flame') {
-          this.add(group,'dragon',2.8,2.3);
-          this.add(group,'flame',3.2,1.2).position.x=2;
-        } else if (wave.kind === 'blade') {
-          this.add(group, 'blade', 3.8, 1.5);
-          this.add(group, 'blade', 2.6, 0.95).position.x = -1.6;
-          this.add(group, 'blade', 1.5, 0.55).position.x = -2.9;
-        } else if(wave.kind==='flame'){
-          this.add(group,'flame',3.5,1.25);
-        } else if (wave.kind==='moonblade') {
-          this.add(group,'moonblade',1.6,1.6);
-          for(let i=0;i<2;i++)this.add(group,'stars',.24-i*.07,.24-i*.07).position.set(-.65-i*.4,0,0);
-        } else {
-          this.add(group, wave.kind, wave.kind === 'bubble' ? 2.1 : 1.1, wave.kind === 'bubble' ? 2.1 : 1.1);
-          for (let i = 0; i < 3; i++) {
-            const mesh = this.add(group, 'stars', 0.45 - i * 0.1, 0.45 - i * 0.1);
-            mesh.position.set(-0.8 - i * 0.55, -wave.slope * (0.8 + i * 0.55), 0);
-          }
-        }
+    // 高叠加只简化绘制，全部弹道仍由战斗层结算。已经画出来的继续用，避免每帧拆掉重建。
+    const budget = 120, reach = halfWidth + 5, wanted = [];
+    for (const wave of waves) if (wave.isActive && (wave.kind !== 'pulse' || wave.source==='flame' && wave.delay>.8) && Math.abs(wave.x-cameraX)<=reach) wanted.push(wave);
+    const wantedSet = new Set(wanted);
+    for (const [wave, group] of this.shots) if (!wantedSet.has(wave)) { this.scene.remove(group); this.shots.delete(wave); }
+    let created = 0;
+    const admit = wave => {
+      if (this.shots.has(wave) || created >= 8) return;
+      if (this.shots.size >= budget) {
+        let farthest, far = -1;
+        for (const shown of this.shots.keys()) { const distance = Math.abs(shown.x-cameraX); if (distance > far) { far = distance; farthest = shown; } }
+        if (!farthest || Math.abs(wave.x-cameraX) + 1 >= far) return;
+        this.scene.remove(this.shots.get(farthest)); this.shots.delete(farthest);
       }
+      this.attachShot(wave); created++;
+    };
+    if (this.shots.size < budget) {
+      const missing = wanted.filter(wave => !this.shots.has(wave));
+      missing.sort((a,b) => Math.abs(a.x-cameraX) - Math.abs(b.x-cameraX));
+      for (const wave of missing) admit(wave);
+    } else for (const wave of wanted) if (!this.shots.has(wave) && Math.abs(wave.x-cameraX) < halfWidth * 0.45) admit(wave);
+    for (const [wave, group] of this.shots) {
       group.position.set(wave.x, wave.y, 1.1); group.scale.x = wave.direction;
       if (wave.kind === 'stars' && !this.isReducedMotion) group.children[0].rotation.z = elapsed * 6;
       if (wave.kind === 'moonblade') {

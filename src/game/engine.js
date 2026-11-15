@@ -45,13 +45,14 @@ export class GardenEngine {
     this.isPaused = true; this.keys = new Set(); this.touch = new Set(); this.gamepad = new Set(); this.gamepadDirection = 0; this.jumps = [false, false];
     this.collected = 0; this.distance = 0; this.checkpoint = 0; this.elapsed = 0;
     this.players = [createPlayer(this.world.start)];
+    this.players[0].character = this.survival.character;
     if(adventure)for(const effect of this.adventure.magic.active){effect.x=this.players[0].x;effect.y=this.players[0].y+1;effect.hitIds=[];}
     this.checkpointId = this.world.start.id;
     this.platformViews = new Map(); this.treasureViews = new Map(); this.enemyViews = new Map(); this.enemyMarkers = new Map();
     this.textures = []; this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#faf4e6');
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.setAttribute('aria-label', '花园王国三维跳台场景');
     host.appendChild(this.renderer.domElement);
@@ -389,7 +390,7 @@ export class GardenEngine {
     }
     else stepEnemies(enemies, STEP);
     const previousBoss=currentBoss(this.world),previousStage=previousBoss?.attackStage;
-    stepBosses(this.world,this.players[0],STEP,this.elapsed,this.enemyShots);
+    stepBosses(this.world,this.players[0],STEP,this.elapsed,this.enemyShots,this.adventure);
     const nextBoss=currentBoss(this.world);if(nextBoss?.attackStage==='warning'&&previousStage!=='warning')this.callbacks.onSound('boss-warning');
     const spawned = [];
     for (const wave of this.waves) {
@@ -412,7 +413,7 @@ export class GardenEngine {
       const speedMultiplier = (player.inkUntil > this.elapsed ? 0.65 : 1) * (1 + (!player.isGrounded ? (powers.air || 0) * 0.05 : 0) + (player.hasteUntil > this.elapsed ? 0.12 : 0));
       if (powers.feather && !player.isGrounded && player.vy < -3 && (this.keys.has('Space') || this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.hasControl('jump'))) player.vy = -3;
       player.fallPeak = Math.max(player.fallPeak ?? player.y, player.y);
-      const result = stepPlayer(player, { direction: (this.keys.has('KeyA') || this.keys.has('KeyD') || this.keys.has('ArrowLeft') || this.keys.has('ArrowRight') || this.touch.has('left') || this.touch.has('right')) ? Number(right) - Number(left) : (this.gamepadDirection || 0), speedMultiplier, isDoubleJump: this.survival.character === 'little', jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, STEP, { ...this.world, isFiniteLife: true, minY: Math.max(this.world.minY,player.safe.y-14) });
+      const result = stepPlayer(player, { direction: (this.keys.has('KeyA') || this.keys.has('KeyD') || this.keys.has('ArrowLeft') || this.keys.has('ArrowRight') || this.touch.has('left') || this.touch.has('right')) ? Number(right) - Number(left) : (this.gamepadDirection || 0), speedMultiplier, jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, STEP, { ...this.world, isFiniteLife: true, minY: Math.max(this.world.minY,player.safe.y-14) });
       this.jumps[index] = false;
       constrainBossArena(this.world,player);
       if (player.isGrounded) {
@@ -475,7 +476,6 @@ export class GardenEngine {
             if (this.survival.character === 'sister') shots.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, bounds, 'stars', powers));
           }
           this.waves.push(...shots); for(const id of new Set(shots.map(shot=>shot.kind)))this.callbacks.onSound(`${id}:fire`);
-          this.callbacks.onLifeChange?.(this.snapshot());
         }
       }
       if (this.world.version >= 4) {
@@ -499,7 +499,7 @@ export class GardenEngine {
       for (const enemy of enemies.filter(e => !e.isDormant)) {
         const contact = touchEnemy(player, enemy, previousY, this.elapsed);
         if (contact === 'stomp' || contact === 'hit') { this.recordHit({enemy,isDefeated:contact==='stomp',damage:enemy.lastDamage,blocked:enemy.lastBlocked});this.callbacks.onSound('hit'); }
-        if (contact === 'bump') { player.protection += (powers.shield || 0); this.hurt(false, enemy.isBoss?20:enemy.behavior==='charge'?15:10); if (this.survival.phase !== 'alive') return; }
+        if (contact === 'bump') { player.protection += (powers.shield || 0); this.hurt(false, enemy.isBoss?20:enemy.touchDamage || (enemy.behavior==='charge'?15:10)); if (this.survival.phase !== 'alive') return; }
       }
       if (this.adventure && powers.cleanse && !resourcesFor(this.adventure).cleanseCooldown) {
         const nearbyShots = this.enemyShots.filter(shot => shot.isActive && Math.hypot(shot.x-player.x, shot.y-player.y-0.8) < 4).slice(0,3);
@@ -534,7 +534,7 @@ export class GardenEngine {
         if(this.adventure){
           const chosen=this.world.forks.map(f=>f.routes.find(r=>r.id===this.journey.routes[f.id])).filter(Boolean);
           const tier=this.world.version>=5 ? (this.world.enemies.some(e=>e.isWorldBoss)?'world':'small') : undefined;
-          queueReward(this.journey,`finish:${this.levelKey}`,chosen.at(-1)?.family || 'power',tier==='world'?'大关 BOSS 挑战成功':'小关通关啦',tier);
+          queueReward(this.journey,`finish:${this.levelKey}`,chosen.at(-1)?.family || 'power',this.world.version>=8?'这一关挑战成功':tier==='world'?'大关 BOSS 挑战成功':'小关通关啦',tier);
           if(tier==='world'){grow(this.adventure,this.survival,'heart');grow(this.adventure,this.survival,'power');}
           openReward(this.adventure,this.journey,this.survival);
           const powers = upgradePower(this.adventure);
@@ -578,7 +578,7 @@ export class GardenEngine {
     }
     const points=enemy.points+(enemy.drop?COLLECTIBLES[enemy.drop].points:0);
     this.pickups.push({id:`enemy-${enemy.id}`,kind:enemy.drop,points,x:enemy.x,y:enemy.y+2,at:this.elapsed});
-    this.callbacks.onSound(enemy.isBoss?'boss-defeat':'flower'); this.publish(enemy.isBoss ? `${enemy.name}挑战成功！${enemy.isMidBoss?'继续向前，药包已准备好！':enemy.isWorldBoss?'去出口领取大关奖励。':areBossesDefeated(this.world)?'继续向前，收下通关奖励！':'继续向前，挑战大关 BOSS！'}` : `打败小怪，+${points} 分！${this.recoveryNotice || ''}`); this.recoveryNotice = '';
+    this.callbacks.onSound(enemy.isBoss?'boss-defeat':'flower'); this.publish(enemy.isBoss ? `${enemy.name}挑战成功！${enemy.isMidBoss?'继续向前，药包已准备好！':enemy.isWorldBoss?(this.world.version>=8?'去出口领奖励。':'去出口领取大关奖励。'):areBossesDefeated(this.world)?'继续向前，收下通关奖励！':'继续向前，挑战大关 BOSS！'}` : `打败小怪，+${points} 分！${this.recoveryNotice || ''}`); this.recoveryNotice = '';
   }
   selectReward(index, expectedId, expectedPlayer) {
     if (this.survival?.phase && this.survival.phase !== 'alive' || !this.adventure || !this.isPaused || this.journey.pending?.id !== expectedId || this.journey.pending?.player !== expectedPlayer) return false;
@@ -718,9 +718,10 @@ export class GardenEngine {
         if(enemy.isDefeated) mesh.material=this.burstMaterial;
         mesh.material.opacity=enemy.hitUntil>this.elapsed?(enemy.isBoss?.9:.5):1;
         if (!enemy.isDefeated) mesh.material.color.set(enemy.boundUntil > this.elapsed ? '#e3b7ff' : enemy.slowUntil > this.elapsed ? '#80d6ff' : enemy.isWarning ? '#ffe47a' : '#ffffff');
-        this.enemyMarkers.get(enemy.id).forEach((marker,i)=>{marker.visible=mesh.visible&&!enemy.isDefeated&&!enemy.isBoss&&(enemy.hp>1 || enemy.isWarning);marker.position.set(enemy.x+(i?0.25:-0.25),enemy.y+enemy.height+0.4,0.6);});
+        const showBar = enemy.showBar ?? (enemy.hp > 1);
+        this.enemyMarkers.get(enemy.id).forEach((marker,i)=>{marker.visible=mesh.visible&&!enemy.isDefeated&&!enemy.isBoss&&(showBar || enemy.isWarning);marker.position.set(enemy.x+(i?0.25:-0.25),enemy.y+enemy.height+0.4,0.6);});
         const aspect = mesh.material.map.image.width / mesh.material.map.image.height;
-        mesh.scale.set(enemy.height * aspect * enemy.direction, enemy.isDefeated ? 2 : enemy.height * (enemy.hp>1&&!enemy.isBoss?1.15:1), 1);
+        mesh.scale.set(enemy.height * aspect * enemy.direction, enemy.isDefeated ? 2 : enemy.height * (!enemy.isBoss && showBar ? 1.15 : 1), 1);
         if(enemy.isBoss&&!enemy.isDefeated&&!this.isReducedMotion) {
           const cast=enemy.attackStage==='attack',warning=enemy.attackStage==='warning';
           mesh.rotation.z=warning?Math.sin(enemy.attackTime*16)*.035:cast?-enemy.direction*.1:Math.sin(enemy.elapsed*6)*.025;

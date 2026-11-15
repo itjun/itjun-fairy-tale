@@ -49,14 +49,24 @@ function contactTime(x, y, dx, dy, enemy, radius) {
   return entry;
 }
 
+const contactScratch = [];
 export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   if (!wave.isActive) return [];
   const source = { x: wave.x, damage: wave.damage };
   const distance = Math.min(wave.remaining, wave.speed * dt);
   const dx = (wave.kind==='moonblade'?wave.headingX:wave.direction) * distance, dy = (wave.kind==='moonblade'?wave.headingY:wave.slope) * distance;
-  const contacts = enemies.filter(e => !e.isDefeated && !e.isHidden && !wave.hitIds.has(e.id)).map(enemy => ({
-    enemy, time: contactTime(wave.x, wave.y, dx, dy, enemy, wave.kind === 'bubble' ? 0.65 : (wave.radius ?? 0.25)),
-  })).filter(hit => hit.time !== null).sort((a, b) => a.time - b.time);
+  const radius = wave.kind === 'bubble' ? 0.65 : (wave.radius ?? 0.25);
+  const minX = Math.min(wave.x, wave.x + dx) - radius, maxX = Math.max(wave.x, wave.x + dx) + radius;
+  const minY = Math.min(wave.y, wave.y + dy) - radius, maxY = Math.max(wave.y, wave.y + dy) + radius;
+  contactScratch.length = 0;
+  for (const enemy of enemies) {
+    if (enemy.isDefeated || enemy.isHidden || enemy.isDormant || wave.hitIds.has(enemy.id)) continue;
+    if (enemy.x + enemy.width / 2 < minX || enemy.x - enemy.width / 2 > maxX || enemy.y + enemy.height < minY || enemy.y > maxY) continue;
+    const time = contactTime(wave.x, wave.y, dx, dy, enemy, radius);
+    if (time !== null) contactScratch.push({ enemy, time });
+  }
+  if (contactScratch.length > 1) contactScratch.sort((a, b) => a.time - b.time);
+  const contacts = contactScratch;
   const fraction = ['bubble','stars'].includes(wave.kind) && contacts.length ? contacts[0].time : 1;
   wave.x += dx * fraction; wave.y += dy * fraction; wave.remaining -= distance; wave.age += dt;
   if (wave.remaining <= 0) wave.isActive = false;
@@ -67,7 +77,7 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
     wave.burst = { x: wave.x, y: wave.y, radius: wave.burstRadius ?? 3.8 };
     // 大型首领边缘已被直接击中，即使中心在爆圈之外也保留这次命中。
     const directIds = new Set(targets.map(e=>e.id));
-    targets = enemies.filter(e => !e.isDefeated && (directIds.has(e.id) || Math.hypot(e.x - wave.x, e.y + e.height / 2 - wave.y) <= (wave.burstRadius ?? 3.8)));
+    targets = enemies.filter(e => !e.isDefeated && !e.isHidden && !e.isDormant && (directIds.has(e.id) || Math.hypot(e.x - wave.x, e.y + e.height / 2 - wave.y) <= (wave.burstRadius ?? 3.8)));
   }
   return targets.filter(enemy => !wave.hitIds.has(enemy.id)).map(enemy => {
     wave.hitIds.add(enemy.id);

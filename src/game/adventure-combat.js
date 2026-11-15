@@ -55,7 +55,7 @@ export function areaAttack(x, y, radius, enemies, elapsed, powers = {}) {
 export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
   if (!wave.isActive) return { hits: [], spawned: [] };
   const powers = wave.powers || {}, spawned = [];
-  const active = enemies.filter(e => !e.isDormant && !e.isHidden);
+  const active = enemies;
   if (wave.kind === 'pulse') {
     wave.age += dt;
     if (wave.age < wave.delay) return { hits: [], spawned };
@@ -65,8 +65,16 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
   }
   if (wave.kind === 'seed') { wave.velocityY -= 17 * dt; wave.slope = wave.velocityY / wave.speed; }
   if (wave.kind === 'moonblade') {
-    const targets=active.filter(e=>!e.isDefeated&&!wave.hitIds.has(e.id)&&Math.hypot(e.x-wave.x,e.y+e.height/2-wave.y)<=22);
-    const target=targets.find(e=>e.id===wave.targetId)||targets.sort((a,b)=>Math.hypot(a.x-wave.x,a.y+a.height/2-wave.y)-Math.hypot(b.x-wave.x,b.y+b.height/2-wave.y))[(wave.targetOffset || 0)%targets.length];
+    const targets=[];
+    let target=null;
+    for (const enemy of active) {
+      if (enemy.isDormant || enemy.isHidden || enemy.isDefeated || wave.hitIds.has(enemy.id)) continue;
+      const dx=enemy.x-wave.x,dy=enemy.y+enemy.height/2-wave.y;
+      if (dx*dx+dy*dy>484) continue;
+      if (enemy.id===wave.targetId) { target=enemy; break; }
+      targets.push(enemy);
+    }
+    target ||= targets.sort((a,b)=>Math.hypot(a.x-wave.x,a.y+a.height/2-wave.y)-Math.hypot(b.x-wave.x,b.y+b.height/2-wave.y))[(wave.targetOffset || 0)%targets.length];
     wave.targetId=target?.id ?? null;
     if(target) {
       const dx=target.x-wave.x,dy=target.y+target.height/2-wave.y,distance=Math.hypot(dx,dy);
@@ -80,7 +88,12 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
     }
   }
   if (['firefly','stars','flame'].includes(wave.kind)) {
-    const target = active.filter(e => !e.isDefeated && (e.x - wave.x) * wave.direction > -0.5 && Math.abs(e.x - wave.x) < 18).sort((a, b) => Math.hypot(a.x - wave.x, a.y - wave.y) - Math.hypot(b.x - wave.x, b.y - wave.y))[0];
+    let target, nearest = Infinity;
+    for (const enemy of active) {
+      if (enemy.isDormant || enemy.isHidden || enemy.isDefeated || (enemy.x - wave.x) * wave.direction <= -0.5 || Math.abs(enemy.x - wave.x) >= 18) continue;
+      const distance = Math.hypot(enemy.x - wave.x, enemy.y - wave.y);
+      if (distance < nearest) { nearest = distance; target = enemy; }
+    }
     if (target) wave.slope = Math.max(wave.kind==='firefly'?-1:-.55, Math.min(wave.kind==='firefly'?1:.55, (target.y + target.height / 2 - wave.y) / Math.max(1, Math.abs(target.x - wave.x))));
   }
   const previousY = wave.y;
@@ -111,7 +124,7 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
     }
     if (powers.frost) hit.enemy.slowUntil = elapsed + 1.5 + powers.frost;
     if (powers.chain && !wave.isChained) {
-      const targets = active.filter(e => !e.isDefeated && !wave.hitIds.has(e.id) && Math.hypot(e.x - hit.enemy.x, e.y - hit.enemy.y) < 4 + powers.chain).slice(0, powers.chain);
+      const targets = active.filter(e => !e.isDormant && !e.isHidden && !e.isDefeated && !wave.hitIds.has(e.id) && Math.hypot(e.x - hit.enemy.x, e.y - hit.enemy.y) < 4 + powers.chain).slice(0, powers.chain);
       for (const enemy of targets) { wave.hitIds.add(enemy.id); const isDefeated=damageEnemy(enemy, elapsed, {x:wave.x,damage:Math.round(wave.damage*0.5)}); hits.push({ enemy, isDefeated, damage:enemy.lastDamage, blocked:enemy.lastBlocked }); }
     }
     if (powers.split && !wave.isSplit) for (const slope of [-0.25, 0.25]) spawned.push({ ...wave, kind: 'stars', damage:Math.max(1,Math.round(wave.damage*0.4)), x: hit.enemy.x, y: hit.enemy.y + 1, slope, remaining: 8, age: 0, isActive: true, isSplit: true, powers: {}, hitIds: new Set([hit.enemy.id]) });
