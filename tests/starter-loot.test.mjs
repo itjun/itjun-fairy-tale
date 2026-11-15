@@ -40,7 +40,7 @@ test('小怪低频掉落由种子固定，保底不超过八只、每小关最�
   for(const d of a.loot.drops){const p=lootPosition(a.world,d);assert.ok(Math.abs(p.x-a.world.platforms[d.platformId].x)<a.world.platforms[d.platformId].width/2);assert.equal(nearbyLoot(a.loot,a.world,{x:p.x,y:p.y-1})?.enemyId,d.enemyId);}
 });
 
-test('补给弹窗必须选择后确认，回血与加长血条分别生效，不能重复领取或满血浪费',()=>{
+test('点选补给立即领取，回血与加长血条分别生效，不能重复领取或满血浪费',()=>{
   const {loot}=dropped(),a=starterAdventure(1,recommendedStarter('sister')),s=newSurvival(),id=loot.drops[0].enemyId;
   s.hp=50;assert.equal(chooseLifeLoot(loot,a,s,id,'heal'),false);loot.pendingId=id;
   assert.ok(chooseLifeLoot(loot,a,s,id,'heal'));assert.equal(s.hp,75);assert.equal(s.maxHp,100);assert.equal(chooseLifeLoot(loot,a,s,id,'heart'),false);
