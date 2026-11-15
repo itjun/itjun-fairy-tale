@@ -1,5 +1,31 @@
 html[data-input-mode="gamepad"] :focus { outline: 4px dashed #58753a !important; outline-offset: 5px; }
 html[data-input-mode="gamepad"] [tabindex="-1"]:focus { outline: none !important; }
+/* 手柄是主要操作。光标停住的选项整块填色，纸纹边框不再只剩一条虚线。已选传奇、史诗仍保持金、紫。 */
+html[data-input-mode="gamepad"] #root :is(button, a, select, input):focus:not([data-gamepad-canvas]):not([aria-pressed="true"][data-rarity="legendary"]):not([aria-pressed="true"][data-rarity="epic"]) {
+  outline: none !important;
+  border-image: none !important;
+  background: #b6e84a !important;
+  border-style: solid !important;
+  border-color: #3d6b1e !important;
+  color: #1c340f !important;
+  box-shadow: none !important;
+}
+html[data-input-mode="gamepad"] #root :is(button, a):focus:not([aria-pressed="true"][data-rarity="legendary"]):not([aria-pressed="true"][data-rarity="epic"]) :is(span, strong, small, em) {
+  color: #1c340f;
+}
+html[data-input-mode="gamepad"] #root .reward-choice[aria-pressed="true"]:is([data-rarity="legendary"], [data-rarity="epic"]):focus {
+  outline: none !important;
+}
+/* 选关格子会裁掉外扩虚线，光标必须落在卡片里面。 */
+#root .level-choices button:focus {
+  outline: none !important;
+  border-image: none !important;
+  background: #b6e84a !important;
+  border-style: solid !important;
+  border-color: #3d6b1e !important;
+  color: #1c340f !important;
+}
+#root .level-choices button:focus :is(span, strong, small) { color: #1c340f; }
 .gamepad-notice { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 2000; max-width: 85vw; padding: 9px 18px; background: #fff8e9; color: #4e583b; border: 2px solid #9d9b71; border-radius: 9px; pointer-events: none; font-size: 18px; }
 .gamepad-guide { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1800; padding: 7px 16px; background: #fff8e9ee; color: #4e583b; text-align: center; font-size: 16px; pointer-events: none; }
 body:has([data-game-status="playing"]) .gamepad-guide { display: none; }
