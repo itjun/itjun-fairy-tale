@@ -67,7 +67,7 @@ test('每场首领出招前先预告至少 2 秒，站在场地外不会挨打',
     assert.equal(shots.length,0,act.id);assert.ok(b.isDormant);
     p.x=arena.left+2;let firstWarning,firstShot;
     for(let n=0;n<900;n++){const t=n/120;stepBosses(w,p,1/120,t,shots);if(b.isWarning&&firstWarning===undefined)firstWarning=t;if(shots.length&&firstShot===undefined)firstShot=t;}
-    assert.ok(firstWarning>=.99&&firstWarning<1.1,act.id);assert.ok(firstShot-firstWarning>=1.99,act.id);
+    assert.ok(firstWarning>=.19&&firstWarning<.3,act.id);assert.ok(firstShot-firstWarning>=1.99,act.id);
   }
 });
 
@@ -98,14 +98,18 @@ test('首领的血量、招式、预告落点和成长随存档保留，改坏�
   const invalid=structuredClone(saved);invalid.state.enemies.find(e=>e.id===b.id).attackStage='skip';writeAdventure(invalid.run,invalid.state,mem);assert.equal(readAdventure(mem),null);
 });
 
-test('只带一把没强化的弯刀，站着不躲也能在 14 秒内打赢八位首领，一条命都不掉',t=>{
+test('轻松难度只带一把没强化的弯刀，主动跳跃躲招能在 20 秒内打赢八位首领',t=>{
   const results=[];
   for(const act of WORLD_ACTS) {
     const g=headless('boss-moon',act.id),boss=bossOf(g.world),start=g.elapsed;
-    g.adventure.difficulty='normal';g.applyRoomRules();g.survival=newSurvival('little');g.players[0].protection=0;g.keys.add('KeyJ');
-    run(g,30,()=>boss.isDefeated||g.survival.phase!=='alive');
+    g.adventure.difficulty='easy';g.applyRoomRules();g.survival=newSurvival('little');g.players[0].protection=0;g.keys.add('KeyJ');
+    run(g,25,()=>{
+      if (boss.isWarning && boss.attackTime > 2 && g.players[0].isGrounded) g.keys.add('Space');
+      else g.keys.delete('Space');
+      return boss.isDefeated||g.survival.phase!=='alive';
+    });
     const result={stage:act.id,boss:boss.name,seconds:Number((g.elapsed-start).toFixed(2)),lives:g.survival.lives,hp:boss.hp};results.push(result);
-    assert.ok(boss.isDefeated,JSON.stringify(result));assert.ok(result.seconds<=14,JSON.stringify(result));assert.equal(g.survival.lives,3,JSON.stringify(result));
+    assert.ok(boss.isDefeated,JSON.stringify(result));assert.ok(result.seconds<=20,JSON.stringify(result));assert.equal(g.survival.lives,3,JSON.stringify(result));
     assert.ok(g.defeatedIds.includes(boss.id));assert.equal(g.adventure.growth.power,0);assert.deepEqual(g.adventure.loadouts[0].weapons,['moonblade']);
     assert.ok(g.damageNumbers.filter(item=>item.enemyId===boss.id).length<=3,'伤害数字不挤在同一处');
   }
@@ -119,6 +123,8 @@ test('同一小段时间里首领最多掉一成二的血，普通小怪仍是�
   assert.equal(boss.isDefeated, false);
   assert.equal(dealt, Math.round(1200 * 0.12));
   damageEnemy(boss, 1.5, { damage: 400, x: 0 });
+  assert.equal(boss.lastDamage, 0);
+  damageEnemy(boss, 2.5, { damage: 400, x: 0 });
   assert.equal(boss.lastDamage, Math.round(1200 * 0.12));
   assert.ok(boss.hp > boss.maxHp * 0.7);
   const minion = { hp: 10, combatVersion: 2, isDefeated: false, attackStage: 'rest' };

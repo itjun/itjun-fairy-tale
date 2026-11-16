@@ -8,8 +8,8 @@ export const BOSS_WARNINGS = {
   bounce:'跳跳球要来了，换个位置！', lob:'要抛过来了，离开标记位置！',
   return:'叶刃会飞回来，留意来回两次！', ring:'音浪要来了，换个位置！', wave:'浪花要来了，跳起来躲开！',
 };
-export const WEAK_SECONDS = 1.5;
-// 第 9 版的首领分两段：半血前只用第一招，半血后两招轮着来。
+export const WEAK_SECONDS = 1;
+// 首领分两段：半血前只用第一招，半血后两招轮着来。
 function bossSkill(boss) {
   const skills = boss.hasPhases && !boss.isEnraged ? boss.skills.slice(0, 1) : boss.skills;
   return skills[boss.attackIndex % skills.length];
@@ -77,7 +77,8 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
     }
     if (stage) applyBossToughness(boss, stage, pressure);
     boss.elapsed+=dt;
-    if (boss.isWorldBoss && !boss.isEnraged && boss.hp <= boss.maxHp/2) { boss.isEnraged=true;boss.attackStage='rest';boss.attackTime=0; }
+    // 已经预告的招式先放完，换阶段不取消蓄力，也不重新开始休息。
+    if (boss.isWorldBoss && !boss.isEnraged && boss.hp <= boss.maxHp/2 && boss.attackStage === 'rest') boss.isEnraged=true;
     if (boss.boundUntil>elapsed) continue;
     const slow=boss.slowUntil>elapsed?.8:1;
     boss.attackTime+=dt*slow;
@@ -89,7 +90,7 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
       // 蓄力时停下，空档主动接近；近身后退开，留出躲避和反击空间。
       const direction=Math.abs(gap)>7?boss.direction:Math.abs(gap)<4?-boss.direction:0;
       boss.x=Math.max(boss.minX,Math.min(boss.maxX,boss.x+direction*(boss.isEnraged?3.3:2.6)*slow*dt));
-      const rest=boss.attackIndex===0?1:boss.isEnraged?2.5:3;
+      const rest=boss.isEnraged?.15:.2;
       if(boss.attackTime>=rest) {
         boss.attackStage='warning';boss.attackTime=0;boss.isWarning=true;
         boss.warningX=player.x;
@@ -105,7 +106,7 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
       releaseBossSkill(boss,arena,skill,shots);
     } else if (boss.attackStage==='attack') {
       if(skill.kind==='charge')boss.x=Math.max(boss.minX,Math.min(boss.maxX,boss.x+boss.direction*6*dt));
-      if(boss.attackTime>=1.2){boss.attackStage=boss.hasPhases?'weak':'rest';boss.attackTime=0;boss.attackIndex++;}
+      if(boss.attackTime>=.7){boss.attackStage=boss.hasPhases?'weak':'rest';boss.attackTime=0;boss.attackIndex++;}
     } else if (boss.attackStage==='weak' && boss.attackTime>=WEAK_SECONDS) {
       boss.attackStage='rest';boss.attackTime=0;
     }
@@ -121,6 +122,9 @@ export function bossStatus(world, elapsed) {
     warningX:boss.warningX,warningY:boss.warningY ?? boss.baseY+.8,arena};
 }
 export function isValidBossState(saved, original, elapsed) {
+  if (saved.hurtUntil !== undefined || saved.hurtTaken !== undefined) {
+    if (!Number.isFinite(saved.hurtUntil) || saved.hurtUntil < 0 || saved.hurtUntil > elapsed + 1.51 || !Number.isInteger(saved.hurtTaken) || saved.hurtTaken < 0 || saved.hurtTaken > Math.round(saved.maxHp * 0.12)) return false;
+  }
   return typeof saved.isDormant==='boolean' && typeof saved.isShielded==='boolean' && (saved.isEnraged===undefined || typeof saved.isEnraged==='boolean')
     && ['rest','warning','attack',...(original.hasPhases?['weak']:[])].includes(saved.attackStage) && Number.isInteger(saved.attackIndex) && saved.attackIndex>=0 && saved.attackIndex<100000
     && Number.isFinite(saved.attackTime) && saved.attackTime>=0 && saved.attackTime<=3.1

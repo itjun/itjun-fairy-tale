@@ -1,7 +1,7 @@
 import { damageEnemy } from './combat.js';
 import { RULES } from './physics.js';
 
-const SAVE_FIELDS=['windUntil','frozenUntil','freezeImmuneUntil','hasShell','id','x','y','hp','maxHp','direction','elapsed','isDefeated','defeatedAt','isDormant','slowUntil','lastShotBeat','lastActionBeat','isSummoned','boundUntil','guardHits','isHidden','isGuarding','isShielded','shieldUntil','isEnraged','attackIndex','attackTime','attackStage','warningX','warningY'];
+const SAVE_FIELDS=['windUntil','frozenUntil','freezeImmuneUntil','hasShell','id','x','y','hp','maxHp','direction','elapsed','isDefeated','defeatedAt','isDormant','slowUntil','lastShotBeat','lastActionBeat','isSummoned','boundUntil','guardHits','isHidden','isGuarding','isShielded','shieldUntil','isEnraged','attackIndex','attackTime','attackStage','warningX','warningY','hurtUntil','hurtTaken'];
 export function saveEnemy(enemy) { return Object.fromEntries(SAVE_FIELDS.filter(key=>enemy[key]!==undefined).map(key=>[key,enemy[key]])); }
 export function restoreEnemy(enemy, saved) { for(const key of SAVE_FIELDS) if(Object.hasOwn(saved,key))enemy[key]=saved[key]; }
 

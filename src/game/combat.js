@@ -8,10 +8,10 @@ export function damageEnemy(enemy, elapsed = enemy.elapsed, source) {
   if (enemy.isGuarding && source && Math.sign(source.x-enemy.x) === enemy.direction) { enemy.guardHits = (enemy.guardHits || 0) + 1; if (enemy.guardHits % 2) { enemy.hitUntil = elapsed + 0.16; enemy.lastBlocked = damage; return false; } }
   const reduced = enemy.isShielded ? Math.max(1, Math.round(damage * 0.7)) : damage;
   let actual = reduced;
-  // 叠了很多武器时，同一小段时间里首领最多掉一成二的血，一发打不倒。单把武器一发用不满这个上限。
+  // 每 1.5 秒最多掉一成二的血，叠满武器也能看见几轮招式。基础血量不额外加厚。
   if (enemy.isBoss && enemy.maxHp) {
     const cap = Math.max(1, Math.round(enemy.maxHp * 0.12));
-    if (!(elapsed < enemy.hurtUntil)) { enemy.hurtUntil = elapsed + 0.45; enemy.hurtTaken = 0; }
+    if (!(elapsed < enemy.hurtUntil)) { enemy.hurtUntil = elapsed + 1.5; enemy.hurtTaken = 0; }
     actual = Math.min(actual, Math.max(0, cap - enemy.hurtTaken));
     enemy.hurtTaken += actual;
   }

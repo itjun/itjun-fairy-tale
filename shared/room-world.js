@@ -370,6 +370,11 @@ export function createRoomWorld(seed, selected) {
       world.doors.push({ id: world.doors.length, roomId: room.id, targetRoomId: target.id, platformId: platform.id, offsetX: platform === exit ? 3.8 : 0, kind: target.kind, reward: target.reward });
     });
   }
+  const bossRoom = world.rooms.at(-1), floor = world.platforms[world.bossArenas[0].floorId];
+  // 保留原来的三块，再补齐中间、右侧和第三层，左右都能连续跳上去躲招。
+  for (const [x, level] of [[0, 1], [5.5, 2], [-10, 3], [0, 3], [10, 3]]) {
+    appendRoomPlatform(world, bossRoom, floor.x + x, floor.y + LAYER * level, 6, floor.skin);
+  }
   world.start = world.platforms[world.rooms[0].startId];
   world.finish = world.platforms[world.rooms.at(-1).exitId];
   world.requiredFlowers = 0;
