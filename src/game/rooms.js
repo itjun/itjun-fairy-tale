@@ -69,7 +69,7 @@ function stepPuzzle(world, room, puzzle, player, dt, events) {
 
 export function dropPosition(world, room) {
   const exit = world.platforms[room.exitId];
-  return { x: exit.x - 3.8, y: exit.y + 1.1 };
+  return { x: exit.x + 1.5, y: exit.y + 1.4 };
 }
 
 // 每个固定步长调用一次。返回这一步发生的事，发奖励、播声音都由引擎按事件去做。
@@ -91,7 +91,7 @@ export function stepRoom(world, state, player, dt, isExtraWave = false) {
     else if (room.kind === 'boss') isCleared = world.enemies[room.bossId - 1].isDefeated;
     else if (room.kind === 'puzzle') isCleared = stepPuzzle(world, room, state.puzzle, player, dt, events);
     else if (room.kind === 'shop') isCleared = true;
-    else isCleared = player.isGrounded && player.ground?.id === room.exitId;
+    else isCleared = player.isGrounded && room.exitPlatformIds.includes(player.ground?.id);
     if (isCleared) {
       state.cleared.push(room.id);
       state.stars[room.id] = 1 + Number(!state.isHurt) + Number(!state.isFallen);

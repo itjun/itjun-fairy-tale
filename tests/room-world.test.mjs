@@ -26,7 +26,7 @@ test('第 10 版一章五层：开场房、三次两扇门、首领房', () => {
         const doors = world.doors.filter(door => door.roomId === room.id);
         assert.deepEqual(doors.map(door => door.targetRoomId), targets.map(target => target.id));
         for (const door of doors) {
-          assert.notEqual(door.platformId, room.exitId, '门不放在刚踩到就会通关的出口上');
+          assert.ok(doorPosition(world, door).x > world.platforms[room.exitId].x + 2, '门在通关旗前方，刚到旗子不会立刻被传走');
           assert.notEqual(door.platformId, room.startId);
           assert.equal(door.kind, world.rooms[door.targetRoomId].kind);
           assert.equal(door.reward, world.rooms[door.targetRoomId].reward);

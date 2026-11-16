@@ -111,7 +111,7 @@ test('掉在门边的爱心、碎片和贴纸各有各的用处', () => {
     land(game, world, world.doors.find(door => door.targetRoomId === room.id));
     game.survival.hp = 40;
     const exit = world.platforms[room.exitId];
-    stand(game, exit, exit.x + 4); step(game);
+    stand(game, exit, exit.x); step(game);
     assert.equal(game.journey.pending, null, '这种门不弹三选一');
     stand(game, exit, dropPosition(world, room).x); step(game);
     check(found);
