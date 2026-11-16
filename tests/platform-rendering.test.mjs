@@ -3,57 +3,97 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
-import { createCampaignWorld } from '../shared/campaign.js';
-import { GardenEngine } from '../src/game/engine.js';
+import { WORLD_ACTS } from '../shared/levels.js';
+import { createRoomWorld } from '../shared/room-world.js';
+import { GardenEngine, PLATFORM_CROPS, TERRAIN_CROPS, THIN_ART } from '../src/game/engine.js';
+import { LAYER } from '../shared/room-terrain.js';
 
 async function material(name) {
-  const {width,height}=await sharp(fileURLToPath(new URL(`../public/assets/${name}.png`,import.meta.url))).metadata();
-  const map=new THREE.Texture({width,height});
-  return new THREE.MeshBasicMaterial({map,transparent:true,alphaTest:.08});
+  const { width, height } = await sharp(fileURLToPath(new URL(`../public/assets/${name}.png`, import.meta.url))).metadata();
+  return new THREE.MeshBasicMaterial({ map: new THREE.Texture({ width, height }), transparent: true, alphaTest: .08 });
 }
-async function renderPlatforms(world,platforms) {
-  const awning=await material('platform-awning'),rock=await material('terrain-rock');
-  const game=Object.assign(Object.create(GardenEngine.prototype),{
-    world:{version:5,platforms,hazards:[],supplies:[],treasures:[],enemies:[],springs:[],switches:[],decorations:[],finish:world.finish},
-    level:{id:'family'},platforms,scene:new THREE.Scene(),platformViews:new Map(),
-    planeGeometry:new THREE.PlaneGeometry(1,1),awningMaterial:awning,terrainMaterials:{rock},flagMaterial:awning,
-  });
-  game.buildWorld();game.scene.updateMatrixWorld(true);
-  return {game,platforms,meshes:platforms.map(p=>game.platformViews.get(p.id).children[0])};
+// 素材只读尺寸，裁剪方式和引擎里一样，这样量出来的贴图高度就是游戏里的高度。
+async function loadMaterials() {
+  const platformMaterials = Object.fromEntries(await Promise.all(['raft', 'ice', 'gear', 'conveyor'].map(async kind => [kind, await material(`platform-${kind}`)])));
+  for (const [kind, bounds] of Object.entries(PLATFORM_CROPS)) { const texture = platformMaterials[kind].map; texture.offset.y = 1 - bounds[1]; texture.repeat.y = bounds[1] - bounds[0]; }
+  const terrainMaterials = Object.fromEntries(await Promise.all(['bank', 'cookie', 'rock', 'blocks'].map(async kind => [kind, await material(`terrain-${kind}`)])));
+  terrainMaterials.cloud = await material('platform-cloud');
+  for (const [kind, bounds] of Object.entries(TERRAIN_CROPS)) {
+    const texture = terrainMaterials[kind].map, w = texture.image.width, h = texture.image.height;
+    texture.offset.set(bounds[0] / w, 1 - bounds[3] / h); texture.repeat.set((bounds[2] - bounds[0]) / w, (bounds[3] - bounds[1]) / h);
+  }
+  const flag = await material('checkpoint-flag');
+  return { platformMaterials, terrainMaterials, awningMaterial: await material('platform-awning'), liftMaterial: await material('lift-leaf'), bridgeMaterial: await material('bridge-rope'),
+    flagMaterial: flag, newTowerMaterial: flag, grassMaterial: new THREE.MeshBasicMaterial(), collectibleMaterials: { balloon: await material('collectible-balloon') } };
 }
-async function renderStart() {
-  const world=createCampaignWorld(42,'family-3',5);
-  return renderPlatforms(world,[world.start,world.platforms[world.forks[0].routes[1].platformIds[0]]]);
+const materials = await loadMaterials();
+// 只搭平台，别的东西都留空。
+function render(world) {
+  const game = Object.assign(Object.create(GardenEngine.prototype), { ...materials,
+    world: { ...world, hazards: [], supplies: [], treasures: [], enemies: [], springs: [], switches: [], decorations: [], zones: [], bossArenas: [] },
+    level: { id: world.themeId }, platforms: world.platforms, scene: new THREE.Scene(), platformViews: new Map(),
+    planeGeometry: new THREE.PlaneGeometry(1, 1), boxGeometry: new THREE.BoxGeometry(1, 1, 1) });
+  game.buildWorld(); game.scene.updateMatrixWorld(true);
+  return game;
 }
+const overlapX = (a, b) => Math.min(a.x + a.width / 2, b.x + b.width / 2) - Math.max(a.x - a.width / 2, b.x - b.width / 2);
 
-test('钟楼主路与高处支路有稳定前后层级，不用相同深度争抢同一像素',async()=>{
-  // 种子 1 的主路与高路在同一高度汇合，缩短贴图也不能消除这处重叠。
-  const world=createCampaignWorld(1,'family-3',5);
-  const {meshes}=await renderPlatforms(world,[world.platforms[3],world.platforms[12]]);
-  const [top,lower]=meshes.map(mesh=>new THREE.Box3().setFromObject(mesh));
-  const isOverlapping=top.min.x<lower.max.x&&top.max.x>lower.min.x&&top.min.y<lower.max.y&&top.max.y>lower.min.y;
-  assert.ok(isOverlapping,'测试必须覆盖实际互相重叠的贴图');
-  assert.ok(Math.abs(top.min.z-lower.min.z)>.0001||meshes.every(mesh=>!mesh.material.depthWrite),
-    `重叠贴图深度相同：${top.min.z} / ${lower.min.z}，移动镜头时会争抢像素`);
+test('上下两层的平台贴图不盖住对方的落脚面：上层的图离下层台面留得出小怪的高度，下层的图顶不到上层台面', () => {
+  // 拼出来的贴图最厚 THIN_ART；冰面和传送带是固定厚度的一整条，厚 1.1。
+  const room = LAYER - THIN_ART, fixedRoom = LAYER - 1.15;
+  assert.ok(room >= 1.5);
+  let pairs = 0;
+  for (const act of WORLD_ACTS) for (const seed of [1, 42, 137, 999]) {
+    const world = createRoomWorld(seed, act), game = render(world);
+    const boxes = new Map(world.platforms.map(platform => [platform.id, new THREE.Box3().setFromObject(game.platformViews.get(platform.id))]));
+    for (const a of world.platforms) for (const b of world.platforms) {
+      // 会动的平台位置一直在变，这里只量不动的。
+      if (a.id === b.id || a.roomId !== b.roomId || a.isMoving || b.isMoving || Math.abs(a.y - b.y) < 0.01 || overlapX(a, b) < 0.5) continue;
+      pairs++;
+      const box = boxes.get(a.id), where = `${act.id} ${seed} 平台 ${a.id}（高 ${a.y}）和 ${b.id}（高 ${b.y}）`;
+      if (a.y > b.y) assert.ok(box.min.y >= b.y + (a.isIce || a.conveyor ? fixedRoom : room) - 1e-6, `${where}：上层的图垂到 ${box.min.y.toFixed(2)}`);
+      else assert.ok(box.max.y <= b.y, `${where}：下层的图顶到 ${box.max.y.toFixed(2)}`);
+    }
+  }
+  assert.ok(pairs > 500, `只量到 ${pairs} 对上下叠着的平台`);
 });
 
-test('宽平台只露出一部分时仍绘制，不因中心离开镜头就突然消失',async t=>{
-  const world=createCampaignWorld(42,'family-3',5),floor=world.platforms[world.bossArenas[0].floorId];
-  const {game}=await renderPlatforms(world,[floor]);
-  const cameraX=floor.x-25,character=new THREE.Mesh(game.planeGeometry,game.awningMaterial);
-  Object.assign(game,{isReady:true,isPaused:true,lastTime:0,lastPublish:0,elapsed:0,cameraX,cameraY:4,
-    camera:new THREE.OrthographicCamera(-12,12,9,-9,.1,150),players:[{x:cameraX-3,y:0,facing:1}],survival:{character:'dad'},
-    journey:{},combatLoot:{drops:[]},backdrops:[],bossSwitchViews:new Map(),skillEffects:{updateMagic(){},update(){}},waves:[],enemyShots:[],enemyShotViews:new Map(),
-    playerViews:[character],characterMaterials:{dad:{standing:game.awningMaterial}},talentView:character,treasureViews:new Map(),renderer:{render(){}}});
-  const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=()=>0;
-  t.after(()=>{if(original===undefined)delete globalThis.requestAnimationFrame;else globalThis.requestAnimationFrame=original;});
+test('贴图叠在一起的平台各有各的深度，镜头移动时不争抢同一像素', () => {
+  const isOverlapping = (a, b) => a.min.x < b.max.x && a.max.x > b.min.x && a.min.y < b.max.y && a.max.y > b.min.y;
+  const boxOf = (game, platform) => new THREE.Box3().setFromObject(game.platformViews.get(platform.id));
+  // 地图里碰上贴图相叠的，深度都不一样。
+  for (const act of WORLD_ACTS) {
+    const world = createRoomWorld(42, act), game = render(world);
+    const views = world.platforms.map(platform => ({ platform, box: boxOf(game, platform) }));
+    for (const a of views) for (const b of views) {
+      if (a.platform.id >= b.platform.id || a.platform.roomId !== b.platform.roomId || !isOverlapping(a.box, b.box)) continue;
+      assert.ok(Math.abs(a.box.max.z - b.box.max.z) > .0001, `${act.id} 平台 ${a.platform.id} 和 ${b.platform.id} 深度相同：${a.box.max.z}`);
+    }
+  }
+  // 地图里不一定有相叠的，再摆两块一定叠上的来量。
+  const world = createRoomWorld(42, WORLD_ACTS[1]);
+  const upper = { id: 0, roomId: 0, x: 0, y: 0.5, width: 8, skin: 'roof' }, lower = { id: 1, roomId: 0, x: 3, y: 0, width: 12, skin: 'rock' };
+  const game = render({ ...world, platforms: [upper, lower], start: upper, finish: lower });
+  const [top, bottom] = [upper, lower].map(platform => boxOf(game, platform));
+  assert.ok(isOverlapping(top, bottom), '这两块的贴图要真的叠在一起');
+  assert.ok(Math.abs(top.max.z - bottom.max.z) > .0001, `叠着的贴图深度相同：${top.max.z} / ${bottom.max.z}`);
+  assert.ok(bottom.max.z > top.max.z, '下层的落脚面在前面，不会被上层的图挡住');
+});
+
+test('宽平台只露出一部分时仍绘制，不因中心离开镜头就突然消失', t => {
+  const world = createRoomWorld(42, WORLD_ACTS[1]), floor = world.platforms[world.bossArenas[0].floorId], game = render(world);
+  const cameraX = floor.x - 25, character = new THREE.Mesh(game.planeGeometry, game.awningMaterial);
+  Object.assign(game, { isReady: true, isPaused: true, lastTime: 0, lastPublish: 0, elapsed: 0, cameraX, cameraY: floor.y + 4,
+    cameraTarget: () => ({ x: cameraX, y: floor.y + 4 }), camera: new THREE.OrthographicCamera(-12, 12, 9, -9, .1, 150),
+    players: [{ x: cameraX - 3, y: floor.y, facing: 1 }], survival: { character: 'dad' }, adventure: { loadouts: [{ weapon: 'moonblade' }] },
+    journey: {}, combatLoot: { drops: [] }, backdrops: [], hazardViews: new Map(), switchViews: new Map(), enemyViews: new Map(), enemyMarkers: new Map(),
+    skillEffects: { updateMagic() {}, update() {} }, roomViews: { update() {} }, waves: [], enemyShots: [], enemyShotViews: new Map(), claimedSupplies: [],
+    playerViews: [character], characterMaterials: { dad: { standing: game.awningMaterial } }, talentView: character, treasureViews: new Map(), renderer: { render() {} },
+    callbacks: { onUpdate() {} }, snapshot() { return {}; } });
+  const original = globalThis.requestAnimationFrame; globalThis.requestAnimationFrame = () => 0;
+  t.after(() => { if (original === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = original; });
   game.animate(16);
-  assert.ok(floor.x-floor.width/2<game.cameraX+game.camera.right,'平台边缘位于画面内');
-  assert.ok(game.platformViews.get(floor.id).visible,'平台仍在画面内，不能突然隐藏');
-});
-
-test('宽地面不会把整张图片等比撑高并盖住地下支路的落脚面',async()=>{
-  const {game,platforms}=await renderStart();
-  const upper=new THREE.Box3().setFromObject(game.platformViews.get(platforms[0].id));
-  assert.ok(upper.min.y>platforms[1].y+.25,`起点图片延伸到 ${upper.min.y}，支路台面位于 ${platforms[1].y}`);
+  assert.ok(Math.abs(floor.x - game.cameraX) > game.camera.right, '平台中心在画面外');
+  assert.ok(floor.x - floor.width / 2 < game.cameraX + game.camera.right, '平台边缘在画面内');
+  assert.ok(game.platformViews.get(floor.id).visible, '平台还有一截在画面里，不能突然隐藏');
 });

@@ -35,6 +35,14 @@ export const BOSS_SKILL_NAMES = Object.freeze({
   bounce: '弹来弹去', lob: '抛物投掷', return: '飞出去再回来', ring: '环形音浪', wave: '贴地浪花',
 });
 
+// 精英的四种特点。头顶的牌子写名字，孩子一眼知道这只怪哪里不一样。
+export const ELITE_TRAITS = Object.freeze({
+  big: { name: '大个子', hint: '血更厚，个头更大', hp: 1.5, size: 1.6, speed: 1, period: 1 },
+  shield: { name: '带盾', hint: '盾会挡一下，过一会儿又长出来', hp: 1, size: 1.3, speed: 1, period: 1 },
+  split: { name: '会分身', hint: '打倒后分成两只小的', hp: 1, size: 1.3, speed: 1, period: 1 },
+  fast: { name: '跑得快', hint: '动作更快', hp: 0.85, size: 1.3, speed: 1.8, period: 0.65 },
+});
+
 export function roleForBehavior(behavior) { return BEHAVIOR_ROLE[behavior] || 'scout'; }
 
 export function monsterVitality(kind, stage, isElite = false) {

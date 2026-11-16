@@ -15,28 +15,26 @@ export function isValidMagic(m) {
     && m.active.length<=4 && new Set(m.active.map(e=>e.id)).size===m.active.length
     && m.active.every(e=>m.ranks[e.id]&&finite(e.age,6)&&finite(e.nextTick,7)&&finite(e.duration,6)&&[e.x,e.y].every(Number.isFinite)&&typeof e.isShield==='boolean'&&Array.isArray(e.hitIds)&&e.hitIds.length<=20&&e.hitIds.every(Number.isSafeInteger));
 }
-export function equipSpell(adventure,id) {
-  const m=adventure.magic;
-  if(!m?.ranks[id] || m.active.some(e=>e.id===id))return false;
-  m.equipped=m.equipped.includes(id)?m.equipped.filter(key=>key!==id):[...m.equipped,id];adventure.revision++;return true;
-}
 function hit(enemy,elapsed,damage,x,source) {
   const isDefeated=damageEnemy(enemy,elapsed,{x,damage});
   return {enemy,isDefeated,damage:enemy.lastDamage,blocked:enemy.lastBlocked,source};
 }
+export const CHARGE_PER_HIT = 1.5;
 // 只由固定游玩步长调用；充能、持续效果、命中记录一起保存，暂停不推进。
-export function stepMagic(adventure,survival,player,enemies,shots,dt,elapsed,isFiring,bounds) {
+// 第 9 版传入 manual：武器打中才攒能量（hits），按 Y 放（isCast）；打开“满了自动放”时继续攻击也会放（isAuto）。
+export function stepMagic(adventure,survival,player,enemies,shots,dt,elapsed,isFiring,bounds,manual) {
   if(dt<=0)return {hits:[],events:[]};
   const m=adventure.magic ||= newMagic(),hits=[],events=[];
   m.gap=Math.max(0,m.gap-dt);m.counterCooldown=Math.max(0,m.counterCooldown-dt);
   const visible=enemies.filter(e=>!e.isDefeated&&!e.isDormant&&!e.isHidden&&e.x>=bounds.left&&e.x<=bounds.right&&Math.abs(e.y-player.y)<14);
   for(const id of m.equipped) {
-    if(!isFiring||!visible.length||m.active.some(e=>e.id===id)||m.ready.includes(id))continue;
-    m.charges[id]=Math.min(SPELLS[id].charge,(m.charges[id] || 0)+dt);
+    if(m.active.some(e=>e.id===id)||m.ready.includes(id)||(manual?!manual.hits:!isFiring||!visible.length))continue;
+    m.charges[id]=Math.min(SPELLS[id].charge,(m.charges[id] || 0)+(manual?manual.hits*CHARGE_PER_HIT:dt));
     if(m.charges[id]===SPELLS[id].charge)m.ready.push(id);
   }
-  if(isFiring && visible.length && !m.gap) {
-    const id=m.ready.find(key=>m.equipped.includes(key)&&(key!=='fire'||visible.some(e=>Math.hypot(e.x-player.x,e.y-player.y)<6.5)));
+  const isCasting=manual?manual.isCast||manual.isAuto&&isFiring&&visible.length>0:isFiring&&visible.length>0;
+  if(isCasting && !m.gap) {
+    const id=m.ready.find(key=>m.equipped.includes(key)&&(manual?.isCast||key!=='fire'||visible.some(e=>Math.hypot(e.x-player.x,e.y-player.y)<6.5)));
     if(id){
       m.ready=m.ready.filter(key=>key!==id);m.charges[id]=0;m.gap=2.5;
       m.active.push({id,age:0,nextTick:0,duration:SPELLS[id].duration+(id==='fire'?m.ranks[id]-1:0),x:player.x,y:player.y+1,isShield:id==='fire',hitIds:[]});

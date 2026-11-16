@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, protocol,
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { mkdir, access } from 'node:fs/promises';
+import { mkdir, access, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { openStore, validateRun } from '../server/store.mjs';
 import { UpdateManager } from './updates.mjs';
@@ -13,7 +13,7 @@ app.setName('花园王国');
 // Explicit test profile keeps verification out of the family's real saves.
 if (process.env.GARDEN_DESKTOP_PROFILE) app.setPath('userData', resolve(process.env.GARDEN_DESKTOP_PROFILE));
 protocol.registerSchemesAsPrivileged([{ scheme: 'garden', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
-let win, store, databasePath, closeRequest, updater, installing = false, mayExit = false;
+let win, store, databasePath, backupDir, closeRequest, updater, installing = false, mayExit = false;
 let tray, trayMenu, isRestarting = false;
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
@@ -34,12 +34,19 @@ async function finishExit() {
   }
   mayExit = true; app.quit();
 }
-async function closeFailed() {
+function closeFailed() {
   if (!closeRequest || closeRequest.phase !== 'saving') return;
   clearTimeout(closeRequest?.timer);
   closeRequest.phase = 'confirming';
   isRestarting = false;
   if (installing) { installing = false; updater.cancelInstall(); }
+  // 确认页画在应用里，手柄也能选。页面 3 秒内没接住，才退回系统窗口。
+  closeRequest.timer = setTimeout(() => { void confirmCloseNatively(); }, 3000);
+  win.webContents.send('garden:close-failed', closeRequest.token);
+}
+async function confirmCloseNatively() {
+  if (closeRequest?.phase !== 'confirming') return;
+  closeRequest.phase = 'native';
   const { response } = await dialog.showMessageBox(win, { type: 'warning', title: '积分还没有保存好', message: '要留下来重试保存吗？', detail: '留在游戏中可以重试。直接退出后，尚未写入的积分会在下次打开时尝试补存。', buttons: ['留在游戏', '仍然退出'], defaultId: 0, cancelId: 0 });
   if (response === 1) finishExit();
   else closeRequest = null;
@@ -47,7 +54,7 @@ async function closeFailed() {
 function requestClose() {
   if (mayExit || closeRequest) return;
   const token = randomUUID();
-  closeRequest = { token, phase: 'saving', timer: setTimeout(() => { void closeFailed(); }, 10000) };
+  closeRequest = { token, phase: 'saving', timer: setTimeout(closeFailed, 10000) };
   win.webContents.send('garden:prepare-close', token);
 }
 function requestRestart() {
@@ -87,18 +94,56 @@ async function backupScores() {
   try { await backup(source, filePath); } finally { source.close(); }
   await dialog.showMessageBox(win, { message: '成绩本已备份。', detail: filePath });
 }
+function readRuns(path) {
+  const source = new DatabaseSync(path, { readOnly: true });
+  try {
+    const rows = source.prepare('SELECT * FROM runs').all().map(row => ({ ...row, collectedIds: JSON.parse(row.collectedIds || '[]'), defeatedIds: JSON.parse(row.defeatedIds || '[]'), scoringVersion: row.scoringVersion || 1 }));
+    for (const row of rows) validateRun(row, true);
+    return rows;
+  } finally { source.close(); }
+}
 async function importScores() {
   const { canceled, filePaths } = await dialog.showOpenDialog(win, { title: '导入旧版或备份的成绩本', properties: ['openFile'], filters: [{ name: 'SQLite 成绩本', extensions: ['sqlite', 'db'] }] });
   if (canceled) return;
   if (resolve(filePaths[0]) === databasePath) throw new Error('这已经是正在使用的成绩本。');
-  const source = new DatabaseSync(filePaths[0], { readOnly: true });
-  let rows;
-  try {
-    rows = source.prepare('SELECT * FROM runs').all().map(row => ({ ...row, collectedIds: JSON.parse(row.collectedIds || '[]'), defeatedIds: JSON.parse(row.defeatedIds || '[]'), scoringVersion: row.scoringVersion || 1 }));
-    rows.forEach(validateRun);
-  } finally { source.close(); }
+  const rows = readRuns(filePaths[0]);
   store.importRuns(rows);
   await dialog.showMessageBox(win, { message: `已合并 ${rows.length} 条记录。`, detail: '原成绩本未修改，重复记录不会重复计分。重新打开“我的成绩本”即可查看。' });
+}
+// 应用里的备份：写到固定的备份文件夹，不弹系统文件窗口，手柄也能用。
+const BACKUP_ID = /^\d{8}-\d{6}$/;
+async function listBackups() {
+  let names;
+  try { names = await readdir(backupDir); }
+  catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+  const ids = [...new Set(names.map(name => name.slice(0, 15)).filter(id => BACKUP_ID.test(id)))].sort().reverse();
+  return ids.map(id => ({ id, hasScores: names.includes(`${id}.sqlite`), hasGarden: names.includes(`${id}.json`) }));
+}
+async function createBackup(garden) {
+  if (typeof garden !== 'string' || garden.length > 524288) throw new Error('花园进度太大，没法备份。');
+  await mkdir(backupDir, { recursive: true });
+  const now = new Date(), pad = value => String(value).padStart(2, '0');
+  const id = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const source = new DatabaseSync(databasePath, { readOnly: true });
+  try { await backup(source, join(backupDir, `${id}.sqlite`)); } finally { source.close(); }
+  await writeFile(join(backupDir, `${id}.json`), garden);
+  // 只留最新的 20 份，备份文件夹不会越攒越大。
+  for (const old of (await listBackups()).slice(20)) for (const type of ['sqlite', 'json']) await rm(join(backupDir, `${old.id}.${type}`), { force: true });
+  return listBackups();
+}
+async function restoreBackup(id) {
+  if (typeof id !== 'string' || !BACKUP_ID.test(id)) throw new Error('找不到这份备份。');
+  let runs = 0, garden = null;
+  const names = (await listBackups()).find(item => item.id === id);
+  if (!names) throw new Error('找不到这份备份。');
+  if (names.hasScores) { const rows = readRuns(join(backupDir, `${id}.sqlite`)); store.importRuns(rows); runs = rows.length; }
+  if (names.hasGarden) garden = await readFile(join(backupDir, `${id}.json`), 'utf8');
+  return { runs, garden };
+}
+// 页面按结果显示文字，出错时只带回一句能看懂的话。
+async function backupTask(task) {
+  try { return { result: await task() }; }
+  catch (error) { console.error('备份操作未完成', error); return { error: error.message }; }
 }
 function menuTask(task) { return () => { task().catch(error => dialog.showErrorBox('成绩本操作未完成', error.message)); }; }
 async function createWindow() {
@@ -132,6 +177,7 @@ if (hasLock) {
     const dataDir = join(app.getPath('userData'), 'saves');
     await mkdir(dataDir, { recursive: true });
     databasePath = join(dataDir, 'garden.sqlite');
+    backupDir = join(app.getPath('userData'), 'backups');
     // Development can migrate the existing project database once, without touching it.
     if (!app.isPackaged && !process.env.GARDEN_DESKTOP_PROFILE) {
       try {
@@ -153,10 +199,21 @@ if (hasLock) {
     ipcMain.handle('garden:check-update', event => trusted(event) ? updater.check() : null);
     ipcMain.on('garden:update-safe', (event, safe) => { if (trusted(event)) updater.setSafe(safe === true); });
     ipcMain.handle('garden:quit', event => { if (trusted(event)) requestClose(); });
+    ipcMain.handle('garden:fullscreen', event => { if (trusted(event)) toggleFullscreen(); });
+    ipcMain.handle('garden:restart', event => { if (trusted(event)) requestRestart(); });
+    ipcMain.handle('garden:backup-list', event => trusted(event) ? backupTask(listBackups) : null);
+    ipcMain.handle('garden:backup-create', (event, garden) => trusted(event) ? backupTask(() => createBackup(garden)) : null);
+    ipcMain.handle('garden:backup-restore', (event, id) => trusted(event) ? backupTask(() => restoreBackup(id)) : null);
+    ipcMain.on('garden:close-decision', (event, result) => {
+      if (!trusted(event) || closeRequest?.phase !== 'confirming' || result?.token !== closeRequest.token) return;
+      clearTimeout(closeRequest.timer);
+      if (result.isShown === true) return;
+      if (result.isExit === true) finishExit(); else closeRequest = null;
+    });
     ipcMain.on('garden:close-ready', (event, result) => {
       if (!trusted(event) || closeRequest?.phase !== 'saving' || result?.token !== closeRequest.token) return;
       clearTimeout(closeRequest.timer);
-      if (result.isSaved === true) finishExit(); else void closeFailed();
+      if (result.isSaved === true) finishExit(); else closeFailed();
     });
     updater = new UpdateManager({ app, notify: state => { if (win && !win.isDestroyed()) win.webContents.send('garden:update-state', state); }, requestInstall: () => { if (closeRequest || mayExit) { updater.cancelInstall(); return; } installing = true; requestClose(); } });
     Menu.setApplicationMenu(Menu.buildFromTemplate([

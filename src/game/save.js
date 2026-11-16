@@ -1,89 +1,71 @@
 import { isValidProjectiles } from './projectile-state.js';
-import { newSurvival, isValidSurvival, migrateSurvival } from './characters.js';
-import { createCampaignWorld, GENERATION_VERSION } from '../../shared/campaign.js';
-import { createSkillRewards, isValidSkillState } from './skills.js';
-import { isValidAdventure, isValidJourney, migrateAdventure, migratePendingReward, weaponPressure } from './adventure.js';
-import { bossRole, bossTargetHp } from '../../shared/boss-health.js';
-import { WEAPONS } from '../../shared/adventure-catalog.js';
+import { isValidSurvival, migrateSurvival } from './characters.js';
+import { createRoomWorld } from '../../shared/room-world.js';
+import { isValidAdventure, isValidJourney, migrateAdventure, migratePendingReward } from './adventure.js';
+import { bossBaseline, bossTargetHp } from '../../shared/boss-health.js';
+import { ADVENTURE_GENERATION_VERSION, WEAPONS } from '../../shared/adventure-catalog.js';
 import { isValidBossState } from './bosses.js';
 import { isValidCombatLoot } from './combat-loot.js';
 import { findStage } from '../../shared/levels.js';
+import { isValidRoomState } from './rooms.js';
 const KEY = ['garden','active','adventure','v1'].join('-');
-export function writeAdventure(run,state,storage=localStorage) {
-  const original = storage.getItem(KEY);
-  if (original && !JSON.parse(original).state?.survival && !storage.getItem(`${KEY}-before-single-player`)) storage.setItem(`${KEY}-before-single-player`, original);
-  if (original && JSON.parse(original).state?.survival?.version === 1 && !storage.getItem(`${KEY}-before-life-only`)) storage.setItem(`${KEY}-before-life-only`, original);
-  if (original && JSON.parse(original).state?.survival?.version < 3 && !storage.getItem(`${KEY}-before-boss-growth`)) storage.setItem(`${KEY}-before-boss-growth`, original);
-  if (original && JSON.parse(original).state?.enemies?.some(e=>e.attackStage&&e.maxHp===undefined) && !storage.getItem(`${KEY}-before-easier-combat`)) storage.setItem(`${KEY}-before-easier-combat`, original);
-  if (original && JSON.parse(original).state?.survival?.version < 4 && !storage.getItem(`${KEY}-before-hp-lives`)) storage.setItem(`${KEY}-before-hp-lives`, original);
-  storage.setItem(KEY,JSON.stringify({run,state}));
-}
+// 以前换规则时留下的旧存档备份，现在跟旧地图一起清掉。
+const OLD_BACKUPS = ['single-player', 'life-only', 'boss-growth', 'easier-combat', 'hp-lives'];
+export function writeAdventure(run,state,storage=localStorage) { storage.setItem(KEY,JSON.stringify({run,state})); }
 export function clearAdventure(storage=localStorage) { storage.removeItem(KEY); }
+// 只认当前这一版地图。别的版本的续关存档和旧备份直接删掉，成绩本里的历史不受影响。
+function removeOldSaves(storage) {
+  for (const name of OLD_BACKUPS) storage.removeItem(`${KEY}-before-${name}`);
+  let saved;
+  try { saved = JSON.parse(storage.getItem(KEY)); } catch { saved = undefined; }
+  if (saved !== null && (saved?.run?.generationVersion !== ADVENTURE_GENERATION_VERSION || saved.state?.version !== ADVENTURE_GENERATION_VERSION)) storage.removeItem(KEY);
+}
 export function readAdventure(storage=localStorage) {
   try {
+    removeOldSaves(storage);
     const saved=JSON.parse(storage.getItem(KEY));
     if(!saved) return null;
     const {run,state}=saved;
-    if(run.scoringVersion!==3 || ![1,2,3,4,5,6,7,8].includes(run.generationVersion) || !['playing','paused','completed','ended'].includes(run.status) || ![1,2].includes(run.players) || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.version!==run.generationVersion || state.seed!==run.seed || state.levelId!==run.levelId) return null;
-    const count = state.survival ? 1 : run.players;
-    if (state.survival && (!isValidSurvival(state.survival) || state.isCompleted && state.survival.phase !== 'alive' || run.status === 'ended' && state.survival.phase !== 'over')) return null;
-    if (!state.survival && run.status === 'ended') return null;
-    const world=createCampaignWorld(run.seed,run.levelId,run.generationVersion);
-    if (state.version >= 2 && (!isValidAdventure(state.adventure, count) || !isValidJourney(state.journey, world, count))) return null;
-    if (!isValidSkillState(state.skillState, createSkillRewards(world), state.elapsed)) return null;
-    if(!Array.isArray(state.players)||state.players.length!==count||state.players.some(p=>!world.platforms[p.safeId]||world.platforms[p.safeId].isMoving))return null;
+    if(run.scoringVersion!==3 || !['playing','paused','completed','ended'].includes(run.status) || run.players!==1 || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.seed!==run.seed || state.levelId!==run.levelId) return null;
+    const stage=findStage(run.levelId);
+    if (!isValidSurvival(state.survival) || state.isCompleted && state.survival.phase !== 'alive' || run.status === 'ended' && state.survival.phase !== 'over') return null;
+    const world=createRoomWorld(run.seed,stage);
+    if (!isValidAdventure(state.adventure, 1) || !isValidJourney(state.journey, 1)) return null;
+    if(!Array.isArray(state.players)||state.players.length!==1||state.players.some(p=>!world.platforms[p.safeId]||world.platforms[p.safeId].isMoving))return null;
     if (state.players.some(p => p.safeX !== undefined && (!Number.isFinite(p.safeX) || Math.abs(p.safeX-world.platforms[p.safeId].x) > world.platforms[p.safeId].width/2))) return null;
     if (state.revival !== undefined) {
       const platform = state.revival && world.platforms[state.revival.platformId];
-      if (!platform || !Number.isInteger(state.revival.platformId) || !Number.isFinite(state.revival.offsetX) || Math.abs(state.revival.offsetX) > Math.max(0,platform.width/2-0.35) || !['fallen','over'].includes(state.survival?.phase)) return null;
+      if (!platform || !Number.isInteger(state.revival.platformId) || !Number.isFinite(state.revival.offsetX) || Math.abs(state.revival.offsetX) > Math.max(0,platform.width/2-0.35) || !['fallen','over'].includes(state.survival.phase)) return null;
     }
     const isIds=(ids,limit,start=1)=>Array.isArray(ids)&&ids.every(id=>Number.isInteger(id)&&id>=start&&id<=limit)&&new Set(ids).size===ids.length;
     if(!isIds(state.collectedIds,world.treasures.length)||!isIds(state.defeatedIds,world.enemies.length)||!isIds(state.visited,world.zones.length)||!isIds(state.switches,world.switches.length-1,0))return null;
     if(!Array.isArray(state.enemies)||state.enemies.length!==world.enemies.length||state.enemies.some((e,i)=>e.id!==i+1||![e.x,e.y,e.hp,e.elapsed,e.direction].every(Number.isFinite)))return null;
-    if(state.version>=5) {
-      const stage=findStage(world.stageId);
-      for(const enemy of state.enemies) {
-        const current=world.enemies[enemy.id-1];
-        if(!current.isBoss)continue;
-        const oldMax=current.isWorldBoss?660+stage.worldIndex*650:240+stage.index*90;
-        const target=bossTargetHp(stage,bossRole(current),weaponPressure(state.adventure),state.version);
-        const savedMax=enemy.maxHp ?? oldMax;
-        if(![oldMax,current.maxHp,target].includes(savedMax)||enemy.hp<0||enemy.hp>savedMax)return null;
-        // 旧血量按剩余比例换到单武器血量；已经按当前武器加厚的战斗保持原进度。
-        if(savedMax!==current.maxHp&&savedMax!==target)enemy.hp=Math.ceil(enemy.hp/savedMax*current.maxHp);
-        enemy.maxHp=savedMax===target?target:current.maxHp;
-      }
+    // 首领开战时按当时的武器加厚过，存下来的血量上限只能在单武器血量和最多加厚之间。
+    const thickest=bossTargetHp(stage,100);
+    for(const enemy of state.enemies) {
+      if(!world.enemies[enemy.id-1].isBoss)continue;
+      enemy.maxHp ??= bossBaseline(stage);
+      if(!Number.isInteger(enemy.maxHp)||enemy.maxHp<bossBaseline(stage)||enemy.maxHp>thickest||enemy.hp>enemy.maxHp)return null;
     }
-    if (state.version >= 2 && state.enemies.some((e,i) => e.hp < 0 || e.hp > (world.enemies[i].isBoss ? Math.max(world.enemies[i].hp, e.maxHp || 0) : world.enemies[i].hp) || e.elapsed < 0 || ![-1,1].includes(e.direction) || typeof e.isDefeated !== 'boolean' || e.isDefeated !== state.defeatedIds.includes(e.id))) return null;
-    if (state.version >= 3) {
-      const isOptionalNumber = (value, max) => value === undefined || Number.isFinite(value) && value >= 0 && value <= max;
-      if (state.enemies.some(e => !isOptionalNumber(e.windUntil,state.elapsed+.6) || !isOptionalNumber(e.boundUntil, state.elapsed+2) || !isOptionalNumber(e.guardHits, 100000) || !isOptionalNumber(e.frozenUntil,state.elapsed+1.1) || !isOptionalNumber(e.freezeImmuneUntil,state.elapsed+4.1) || ['isHidden','isGuarding','isSummoned','isDormant','hasShell'].some(k => e[k] !== undefined && typeof e[k] !== 'boolean'))) return null;
-      if (state.players.some(p => !isOptionalNumber(p.protection, 10) || !isOptionalNumber(p.shotRemaining, 2) || !isOptionalNumber(p.inkRemaining, 1))) return null;
-      if (state.lure && (![state.lure.x,state.lure.y,state.lure.until].every(Number.isFinite) || state.lure.until > state.elapsed+3)) return null;
-    }
+    if (state.enemies.some((e,i) => e.hp < 0 || e.hp > (world.enemies[i].isBoss ? e.maxHp : world.enemies[i].hp) || e.elapsed < 0 || ![-1,1].includes(e.direction) || typeof e.isDefeated !== 'boolean' || e.isDefeated !== state.defeatedIds.includes(e.id))) return null;
+    const isOptionalNumber = (value, max) => value === undefined || Number.isFinite(value) && value >= 0 && value <= max;
+    if (state.enemies.some(e => !isOptionalNumber(e.windUntil,state.elapsed+.6) || !isOptionalNumber(e.boundUntil, state.elapsed+2) || !isOptionalNumber(e.guardHits, 100000) || !isOptionalNumber(e.frozenUntil,state.elapsed+1.1) || !isOptionalNumber(e.freezeImmuneUntil,state.elapsed+4.1) || ['isHidden','isGuarding','isSummoned','isDormant','hasShell'].some(k => e[k] !== undefined && typeof e[k] !== 'boolean'))) return null;
+    if (state.players.some(p => !isOptionalNumber(p.protection, 10) || !isOptionalNumber(p.shotRemaining, 2) || !isOptionalNumber(p.inkRemaining, 1))) return null;
+    if (state.lure && (![state.lure.x,state.lure.y,state.lure.until].every(Number.isFinite) || state.lure.until > state.elapsed+3)) return null;
     if (state.checkpointId !== undefined && (!world.platforms[state.checkpointId] || world.platforms[state.checkpointId].isMoving)) return null;
-    if (state.version >= 4) {
-      if (!Array.isArray(state.supplies) || new Set(state.supplies).size !== state.supplies.length || state.supplies.some(id => !world.supplies.some(s => s.id === id))) return null;
-      if (!Array.isArray(state.mechanisms) || new Set(state.mechanisms.map(p=>p.id)).size !== state.mechanisms.length || state.mechanisms.some(p => !world.platforms[p.id] || p.collapseAt !== undefined && (!world.platforms[p.id].isCrumbling || !Number.isFinite(p.collapseAt) || p.collapseAt < state.elapsed-4 || p.collapseAt > state.elapsed+2.3) || p.slope !== undefined && (!world.platforms[p.id].isSeesaw || !Number.isFinite(p.slope) || Math.abs(p.slope) > .23))) return null;
-    }
-    if (state.version >= 5) {
-      if(state.enemies.some((e,i)=>world.enemies[i].isBoss&&!isValidBossState(e,world.enemies[i],state.elapsed)))return null;
-      if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
-    }
+    if (!Array.isArray(state.supplies) || new Set(state.supplies).size !== state.supplies.length || state.supplies.some(id => !world.supplies.some(s => s.id === id))) return null;
+    if (!Array.isArray(state.mechanisms) || new Set(state.mechanisms.map(p=>p.id)).size !== state.mechanisms.length || state.mechanisms.some(p => !world.platforms[p.id] || p.collapseAt !== undefined && (!world.platforms[p.id].isCrumbling || !Number.isFinite(p.collapseAt) || p.collapseAt < state.elapsed-4 || p.collapseAt > state.elapsed+2.3) || p.slope !== undefined && (!world.platforms[p.id].isSeesaw || !Number.isFinite(p.slope) || Math.abs(p.slope) > .23))) return null;
+    if(state.enemies.some((e,i)=>world.enemies[i].isBoss&&!isValidBossState(e,world.enemies[i],state.elapsed)))return null;
+    if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
+    // 房间进度要和地图对得上，人也得站在当前这间房里。
+    if (!isValidRoomState(state.rooms, world) || state.players.some(p => world.platforms[p.safeId].roomId !== state.rooms.roomId)) return null;
     if(!isValidProjectiles(state.projectiles,world))return null;
     if (!isValidCombatLoot(state.combatLoot,world,state.defeatedIds)) return null;
-    if (state.combatLoot?.pendingId!=null && (state.survival?.phase!=='alive'||state.isCompleted||state.journey?.pending)) return null;
+    if (state.combatLoot?.pendingId!=null && (state.survival.phase!=='alive'||state.isCompleted||state.journey.pending)) return null;
     if(state.players.some(p=>p.weaponCycles&&Object.entries(p.weaponCycles).some(([id,n])=>!WEAPONS[id]||!Number.isInteger(n)||n<0||n>=60)))return null;
     if (state.players.some(p => p.weaponShots && Object.entries(p.weaponShots).some(([id,value])=>!WEAPONS[id] || !Number.isFinite(value) || value<0 || value>2))) return null;
-    if (!state.survival) {
-      // 保留原双人记录的计分人数；玩法只迁移第一位，背包仍完整保留。
-      state.survival = newSurvival('sister'); state.players = state.players.slice(0,1);
-      state.checkpointId = state.players[0].safeId;
-      if (state.adventure) { state.adventure.loadouts = state.adventure.loadouts.slice(0,1); if (state.journey.pending) state.journey.pending.player = 0; }
-    }
     state.survival = migrateSurvival(state.survival);
-    if (state.adventure?.version === 1) state.journey.queued = [];
-    if (state.adventure) {migrateAdventure(state.adventure);migratePendingReward(state.adventure,state.journey);}
+    migrateAdventure(state.adventure);migratePendingReward(state.adventure,state.journey);
     return saved;
   } catch { return null; }
 }

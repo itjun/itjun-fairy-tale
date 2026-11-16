@@ -4,11 +4,10 @@ import { newSurvival, takeDamage, reviveSurvival, recordAttack, bloomAtHit, isVa
 import { createPlayer, stepPlayer, rescue, revivalPoint } from '../src/game/physics.js';
 import { fireAdventureWeapon } from '../src/game/adventure-combat.js';
 import { readAdventure, writeAdventure } from '../src/game/save.js';
-import { adventureFixture } from './helpers/adventure-fixtures.mjs';
-import { GardenEngine } from '../src/game/engine.js';
-import { createCampaignWorld } from '../shared/campaign.js';
+import { roomFixture } from './helpers/adventure-fixtures.mjs';
+import { headless } from './helpers/headless-engine.mjs';
 
-function storage(){ const map=new Map();return {getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v)}; }
+function storage(){ const map=new Map();return {getItem:k=>map.get(k) ?? null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)}; }
 test('三条命包含当前血条；受伤扣血，归零扣一命，继续不再扣命，零命禁止复活',()=>{
  const s=newSurvival('mom');assert.equal(s.hp,100);assert.equal(s.lives,3);
  assert.equal(takeDamage(s),'hurt');assert.equal(s.hp,90);assert.equal(s.lives,3);
@@ -42,35 +41,37 @@ test('四位角色空中只能再跳一次，落地才恢复，下跳不刷新',
  for(let i=0;i<400;i++)stepPlayer(p,{direction:0},[floor],1/120);
  assert.equal(p.isGrounded,true,character);assert.equal(p.isAirJumpUsed,false,character);p.isAirJumpUsed=true;stepPlayer(p,{direction:0,drop:true},[floor],1/120);assert.equal(p.isAirJumpUsed,true,character);}
 });
-test('旧双人存档迁移为单人，原记录备份和完整背包保留，旧成绩人数不篡改',()=>{
- const original=adventureFixture('duo'),mem=storage();writeAdventure(original.run,original.state,mem);const raw=mem.getItem('garden-active-adventure-v1');const migrated=readAdventure(mem);
- assert.equal(migrated.run.players,2);assert.equal(migrated.state.players.length,1);assert.equal(migrated.state.adventure.loadouts.length,1);assert.equal(migrated.state.journey.pending.player,0);assert.deepEqual(migrated.state.adventure.weapons,original.state.adventure.weapons);
- writeAdventure(migrated.run,migrated.state,mem);assert.equal(mem.getItem('garden-active-adventure-v1-before-single-player'),raw);assert.deepEqual(readAdventure(mem),migrated);
-});
 test('死亡、零命和累计存档恢复原样，非法状态不能进入游戏',()=>{
- for(const mode of ['workbench','fallen','over']){const f=adventureFixture(mode),mem=storage();writeAdventure(f.run,f.state,mem);assert.deepEqual(readAdventure(mem),f);}
- const nine=adventureFixture('workbench'),nineStorage=storage();nine.state.survival.lives=9;writeAdventure(nine.run,nine.state,nineStorage);assert.equal(readAdventure(nineStorage).state.survival.lives,9);nine.state.survival.lives=1000;writeAdventure(nine.run,nine.state,nineStorage);assert.equal(readAdventure(nineStorage),null);
- const f=adventureFixture('over'),mem=storage();f.state.survival.hp=3;writeAdventure(f.run,f.state,mem);assert.equal(readAdventure(mem),null);
+ for(const mode of ['door','fallen','over']){const {run,state}=roomFixture(mode),mem=storage();writeAdventure(run,state,mem);assert.deepEqual(readAdventure(mem),JSON.parse(JSON.stringify({run,state})));}
+ const nine=roomFixture(),nineStorage=storage();nine.state.survival.lives=9;writeAdventure(nine.run,nine.state,nineStorage);assert.equal(readAdventure(nineStorage).state.survival.lives,9);nine.state.survival.lives=1000;writeAdventure(nine.run,nine.state,nineStorage);assert.equal(readAdventure(nineStorage),null);
+ const f=roomFixture('over'),mem=storage();f.state.survival.hp=3;writeAdventure(f.run,f.state,mem);assert.equal(readAdventure(mem),null);
 });
-function headless(){
- const f=adventureFixture('workbench'),g=Object.create(GardenEngine.prototype),world=createCampaignWorld(42,'forest',2);
- Object.assign(g,{world,platforms:world.platforms,players:[createPlayer(world.start)],survival:newSurvival('mom'),adventure:f.state.adventure,journey:f.state.journey,isPaused:false,elapsed:1,keys:new Set(),touch:new Set(),jumps:[false],waves:[],enemyShots:[],visited:new Set(),furthestPlatform:0,checkpoint:0,checkpointId:0,distance:0,collected:0,collectedIds:[],defeatedIds:[],pickups:[],skillRewards:[],camera:{right:20},cameraX:0,skillEffects:{burst(){}},treasureViews:new Map(world.treasures.map(t=>[t.id,{isCollected:true}])),callbacks:{onSound(){},onUpdate(){},onLifeChange(){}},snapshot(){return {survival:structuredClone(this.survival)};},publish(){}});
+// 开场房清完的森林关，标准难度（轻松档掉坑不扣血），人放回起点。
+function game(){
+ const g=headless('door','forest-world');g.adventure.difficulty='normal';g.applyRoomRules();g.survival=newSurvival('mom');
+ rescue(g.players[0],g.world.start);g.players[0].recoveries=0;g.players[0].protection=0;
  return g;
 }
+const quiet=g=>g.platforms.find(p=>p.roomId===0&&p.id!==g.world.start.id&&!p.isMoving&&!p.isCrumbling&&!p.isSeesaw&&!p.slope&&!p.isCheckpoint&&p.isEnabled!==false&&p.width>=4);
 test('引擎同帧掉坑和怪物接触只扣一命，死亡停住；零命不能解除暂停',()=>{
- const g=headless(),p=g.players[0];g.survival.hp=20;p.y=-100;p.isGrounded=false;p.safe=g.world.start;g.world.enemies[0].x=p.x;g.world.enemies[0].y=p.y;
+ const g=game(),p=g.players[0];g.survival.hp=20;p.y=-100;p.isGrounded=false;p.safe=g.world.start;g.world.enemies[0].x=p.x;g.world.enemies[0].y=p.y;
  let saves=0;g.callbacks.onLifeChange=()=>saves++;g.tick();assert.equal(g.survival.lives,2);assert.equal(g.survival.phase,'fallen');assert.equal(g.isPaused,true);assert.equal(saves,1);
  g.tick();assert.equal(g.survival.lives,2);assert.equal(g.revive(),true);assert.equal(p.x,g.world.start.x);assert.equal(g.survival.hp,100);
  while(g.survival.lives > 0){g.hurt(true);g.revive();}g.pause(false);assert.equal(g.isPaused,true);assert.equal(g.revive(),false);
 });
-test('远离检查点死亡在原处复活，扣命一次且保留奖励与构筑',()=>{
- const g=headless(),p=g.players[0],platform=g.platforms.find(p=>!p.isMoving && !p.isCheckpoint && p.isEnabled!==false && p.x>50);
+test('轻松档掉坑不扣血，只送回刚才站稳的地方',()=>{
+ const g=game(),p=g.players[0];g.adventure.difficulty='easy';g.applyRoomRules();
+ p.y=-100;p.isGrounded=false;g.tick();
+ assert.equal(g.survival.hp,100);assert.equal(g.survival.lives,3);assert.equal(p.x,g.world.start.x);assert.equal(p.y,g.world.start.y);assert.equal(g.roomState.isFallen,true);
+});
+test('离起点很远的地方死亡在原处复活，扣命一次且保留奖励与构筑',()=>{
+ const g=game(),p=g.players[0],platform=quiet(g);
  rescue(p,platform,platform.x+0.5);
- g.collectedIds=[1];g.defeatedIds=[2];g.visited=new Set([1]);
- const adventure=structuredClone(g.adventure),journey=structuredClone(g.journey),x=p.x;
+ g.collectedIds=[1];g.visited=new Set([1]);
+ const adventure=structuredClone(g.adventure),journey=structuredClone(g.journey),defeated=[...g.defeatedIds],x=p.x;
  g.survival.hp=20;g.hurt(true);assert.equal(g.survival.lives,2);assert.equal(g.survival.phase,'fallen');
  assert.equal(g.revive(),true);assert.equal(p.x,x);assert.equal(p.y,platform.y);assert.equal(p.isGrounded,true);assert.equal(p.protection,3);assert.equal(g.survival.hp,100);assert.equal(g.survival.lives,2);
- assert.notEqual(p.x,g.platforms[g.checkpointId].x);assert.deepEqual(g.adventure,adventure);assert.deepEqual(g.journey,journey);assert.deepEqual(g.collectedIds,[1]);assert.deepEqual(g.defeatedIds,[2]);assert.deepEqual([...g.visited],[1]);assert.equal(g.revive(),false);
+ assert.notEqual(p.x,g.world.start.x);assert.deepEqual(g.adventure,adventure);assert.deepEqual(g.journey,journey);assert.deepEqual(g.collectedIds,[1]);assert.deepEqual(g.defeatedIds,defeated);assert.deepEqual([...g.visited],[1]);assert.equal(g.revive(),false);
 });
 test('掉坑回到最后站稳的边缘，空中死亡落到脚下，移动台死亡可原地继续',()=>{
  const floor={id:1,x:100,y:0,width:20},p=createPlayer(floor);p.x=108;
@@ -81,16 +82,16 @@ test('掉坑回到最后站稳的边缘，空中死亡落到脚下，移动台�
  const lift={id:2,x:120,y:5,width:6,isMoving:true};p.x=121;p.y=5;p.isGrounded=true;p.ground=lift;
  const point=revivalPoint(p,[floor,lift],false);assert.deepEqual(point,{platformId:2,offsetX:1});rescue(p,lift,lift.x+point.offsetX);assert.equal(p.x,121);assert.equal(p.safe.id,1);assert.equal(p.safeX,108);
 });
-test('死亡后保存重开仍在附近继续，旧存档用最近安全平台而非旧检查点',()=>{
- const g=headless(),p=g.players[0],f=adventureFixture('fallen'),platform=g.platforms.find(p=>!p.isMoving && p.isEnabled!==false && p.x>60);
- g.seed=42;g.level={id:'forest'};g.skillState={kind:'blade',until:0,collectedIds:[]};rescue(p,platform,platform.x+0.6);g.survival.hp=20;g.hurt(true);
+test('死亡后保存重开仍在原处继续，复活点对不上地图的存档不收',()=>{
+ const g=game(),p=g.players[0],f=roomFixture('door','forest-world'),platform=quiet(g);
+ rescue(p,platform,platform.x+0.6);g.survival.hp=20;g.hurt(true);
  const state=g.exportState(),mem=storage();writeAdventure(f.run,state,mem);const saved=readAdventure(mem);assert.ok(saved);assert.deepEqual(saved.state.revival,state.revival);
- const restored=headless();restored.seed=42;restored.level={id:'forest'};restored.restoreState(saved.state);assert.equal(restored.revive(),true);assert.equal(restored.players[0].x,platform.x+0.6);assert.equal(restored.survival.lives,2);
- delete saved.state.revival;delete saved.state.players[0].safeX;writeAdventure(f.run,saved.state,mem);const legacy=readAdventure(mem);restored.restoreState(legacy.state);restored.revive();assert.equal(restored.players[0].x,platform.x);
+ const restored=game();restored.restoreState(saved.state);assert.equal(restored.revive(),true);assert.equal(restored.players[0].x,platform.x+0.6);assert.equal(restored.survival.lives,2);
  for(const revival of [{platformId:999999,offsetX:0},{platformId:platform.id,offsetX:9999}]){writeAdventure(f.run,{...state,revival},mem);assert.equal(readAdventure(mem),null);}
 });
 test('引擎接触伤害保护避免同帧连扣，暂停不推进护盾冷却',()=>{
- const g=headless(),p=g.players[0];g.world.enemies=g.world.enemies.slice(0,2).map(e=>({...e,x:p.x,y:p.y,baseY:p.y,minX:p.x,maxX:p.x,speed:0,behavior:'walk',isDormant:false,isDefeated:false}));
+ const g=game(),p=g.players[0];
+ for(const e of g.world.enemies.slice(0,2))Object.assign(e,{x:p.x,y:p.y,baseY:p.y,minX:p.x,maxX:p.x,speed:0,behavior:'walk',touchDamage:undefined,hp:1,isDormant:false,isDefeated:false});
  g.tick();assert.equal(g.survival.hp,90);assert.equal(g.survival.lives,3);g.tick();assert.equal(g.survival.hp,90);
  g.survival.character='dad';g.survival.shieldRemaining=10;g.pause(true);const before=structuredClone(g.survival);assert.deepEqual(g.snapshot().survival,before);
 });

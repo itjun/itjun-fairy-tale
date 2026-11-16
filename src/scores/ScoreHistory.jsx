@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Chart, LineController, LineElement, PointElement, LinearScale, Tooltip, Legend, Filler } from 'chart.js';
-import { ArrowLeft, Trophy, Flower, CalendarBlank, ArrowsClockwise } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, Trophy, Flower, CalendarBlank, ArrowsClockwise } from '@phosphor-icons/react';
 import { LEVELS as WORLDS, STAGES, WORLD_ACTS } from '../../shared/levels.js';
 import { flushScores, pendingCount } from './client.js';
 import './scores.css';
@@ -12,19 +12,42 @@ const timeText = value => new Date(value).toLocaleString('zh-CN', { month: '2-di
 const LEVELS = [...WORLDS, ...STAGES.map(stage=>({...stage,name:`${stage.name} / ${stage.chapterName}`})), ...WORLD_ACTS.map(stage=>({...stage,name:`${stage.name} / ${stage.chapterName}`}))];
 const names = Object.fromEntries(LEVELS.map(level => [level.id, level.name]));
 function statusText(run) { if (run.status === 'completed') return '已通关'; if (run.status === 'ended') return '已结束'; return Date.now() - Date.parse(run.updatedAt) > 60000 ? '中途离开' : run.status === 'paused' ? '休息中' : '游玩中'; }
+function chartSeries(data, view) {
+  const isDaily = view === 'daily' || data.isDailyOnly;
+  const values = isDaily ? data.days : data.points;
+  return LEVELS.map(level => ({ label: level.name, borderColor: level.color, backgroundColor: level.color, pointRadius: values.length > 100 ? 2 : 4, pointHoverRadius: 7, borderWidth: 2, tension: 0.15,
+    data: values.filter(point => point.levelId === level.id).map(point => ({ x: isDaily ? new Date(point.date + 'T12:00:00').getTime() : Date.parse(point.startedAt), y: isDaily ? point.average : point.score, sessions: point.sessions, status: point.status })).sort((a, b) => a.x - b.x) })).filter(dataset => dataset.data.length);
+}
 function ScoreChart({ data, view }) {
-  const canvas = useRef(null);
+  const canvas = useRef(null), chartRef = useRef(null);
+  const isDaily = view === 'daily' || data.isDailyOnly;
+  // 手柄摸不到曲线上的点，用 LB、RB 按时间一个一个看。
+  const [selected, setSelected] = useState(-1);
+  const datasets = chartSeries(data, view);
+  const steps = datasets.flatMap((dataset, datasetIndex) => dataset.data.map((point, index) => ({ datasetIndex, index, point, label: dataset.label }))).sort((a, b) => a.point.x - b.point.x);
+  const current = steps[selected];
   useEffect(() => {
-    const isDaily = view === 'daily' || data.isDailyOnly;
-    const values = isDaily ? data.days : data.points;
-    const datasets = LEVELS.map(level => ({ label: level.name, borderColor: level.color, backgroundColor: level.color, pointRadius: values.length > 100 ? 2 : 4, pointHoverRadius: 7, borderWidth: 2, tension: 0.15,
-      data: values.filter(point => point.levelId === level.id).map(point => ({ x: isDaily ? new Date(point.date + 'T12:00:00').getTime() : Date.parse(point.startedAt), y: isDaily ? point.average : point.score, sessions: point.sessions, status: point.status })).sort((a, b) => a.x - b.x) })).filter(dataset => dataset.data.length);
-    const chart = new Chart(canvas.current, { type: 'line', data: { datasets }, options: { responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
+    setSelected(-1);
+    const chart = new Chart(canvas.current, { type: 'line', data: { datasets: chartSeries(data, view) }, options: { responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
       interaction: { mode: 'nearest', intersect: false }, plugins: { legend: { position: 'bottom', labels: { color: '#6b7059', boxWidth: 16, padding: 22 } }, tooltip: { callbacks: { title: items => isDaily ? new Date(items[0].raw.x).toLocaleDateString('zh-CN') : timeText(items[0].raw.x), label: item => `${item.dataset.label}：${item.raw.y} 分${isDaily ? `（${item.raw.sessions} 次平均）` : ''}` } } },
       scales: { x: { type: 'linear', title: { display: true, text: '游玩时间', color: '#8b806b' }, ticks: { maxTicksLimit: 6, color: '#8b806b', callback: value => new Date(value).toLocaleString('zh-CN', isDaily ? { month: 'numeric', day: 'numeric' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) }, grid: { display: false } }, y: { beginAtZero: true, suggestedMax: 50, title: { display: true, text: isDaily ? '平均积分' : '本次积分', color: '#8b806b' }, ticks: { precision: 0, color: '#8b806b' }, grid: { color: '#ebe6d9' } } } } });
-    return () => chart.destroy();
+    chartRef.current = chart;
+    return () => { chartRef.current = null; chart.destroy(); };
   }, [data, view]);
-  return <div className="score-chart"><canvas ref={canvas} role="img" aria-label="按游玩时间排列的积分曲线，不同颜色代表不同关卡；每次积分可在下方记录表查看" /></div>;
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const active = current ? [{ datasetIndex: current.datasetIndex, index: current.index }] : [];
+    chart.setActiveElements(active); chart.tooltip.setActiveElements(active, { x: 0, y: 0 }); chart.update();
+  }, [selected]);
+  return <div className="score-chart-area">
+    <div className="score-chart"><canvas ref={canvas} role="img" aria-label="按游玩时间排列的积分曲线，不同颜色代表不同关卡；每次积分可在下方记录表查看" /></div>
+    <div className="score-stepper" data-gamepad-tabs="看上一个点、下一个点">
+      <button aria-label="上一个点" disabled={!steps.length} onClick={() => setSelected(value => value <= 0 ? steps.length - 1 : value - 1)}><ArrowLeft size={20} /></button>
+      <span role="status">{current ? `${isDaily ? new Date(current.point.x).toLocaleDateString('zh-CN') : timeText(current.point.x)}　${current.label}　${current.point.y} 分${isDaily ? `（${current.point.sessions} 次平均）` : ''}　第 ${selected + 1} / ${steps.length} 个点` : `一共 ${steps.length} 个点，一个一个看`}</span>
+      <button aria-label="下一个点" disabled={!steps.length} onClick={() => setSelected(value => (value + 1) % steps.length)}><ArrowRight size={20} /></button>
+    </div>
+  </div>;
 }
 export function ScoreHistory({ onClose }) {
   const [preset, setPreset] = useState('7');
@@ -57,11 +80,12 @@ export function ScoreHistory({ onClose }) {
     }
     load(); return () => { isActive = false; controller.abort(); };
   }, [dates.from, dates.to, level, offset, refresh]);
+  // 日期只留四个快捷范围，手柄不用去拨日期框。
   function choosePreset(value) { setPreset(value); setDates(presetDates(value)); setOffset(0); }
   return <div className="score-screen"><div className="score-shell">
     <header className="score-header"><button className="quiet-button" data-gamepad-back onClick={onClose}><ArrowLeft size={21} />返回</button><span>花园王国 / 我的成绩本</span><button className="quiet-button" disabled={isLoading} onClick={() => setRefresh(v => v + 1)}><ArrowsClockwise size={20} />刷新</button></header>
     <div className="score-heading"><div><small>每一次探索，都留下小小足迹</small><h1>我的探险成绩本</h1><p>看看收集了多少快乐，也看看每一次的进步。</p></div><Trophy size={60} weight="duotone" /></div>
-    <section className="score-filters" aria-label="成绩筛选"><div className="score-presets">{[['today','今天'],['7','近 7 天'],['30','近 30 天'],['all','全部']].map(([id,label]) => <button key={id} aria-pressed={preset===id} onClick={() => choosePreset(id)}>{label}</button>)}</div><div className="score-date-range"><label>开始日期<input type="date" value={dates.from} onChange={e => { setDates(d => ({...d,from:e.target.value})); setPreset('custom'); setOffset(0); }} /></label><label>结束日期<input type="date" value={dates.to} onChange={e => { setDates(d => ({...d,to:e.target.value})); setPreset('custom'); setOffset(0); }} /></label><label>关卡<select value={level} onChange={e => { setLevel(e.target.value); setOffset(0); }}><option value="">全部关卡</option>{LEVELS.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div></section>
+    <section className="score-filters" aria-label="成绩筛选"><div className="score-presets">{[['today','今天'],['7','近 7 天'],['30','近 30 天'],['all','全部']].map(([id,label]) => <button key={id} aria-pressed={preset===id} onClick={() => choosePreset(id)}>{label}</button>)}</div><div className="score-date-range"><label>关卡<select value={level} onChange={e => { setLevel(e.target.value); setOffset(0); }}><option value="">全部关卡</option>{LEVELS.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div></section>
     {syncNote && <p className="score-warning" role="status">{syncNote} 待补存 {pendingCount()} 次。</p>}
     {error ? <div className="score-empty" role="alert"><h2>成绩还在路上</h2><p>{error}</p><button className="primary-button" onClick={()=>setRefresh(v=>v+1)}>再试一次</button></div> : isLoading ? <div className="score-empty" role="status">正在翻开成绩本…</div> : data && <>
       <section className="score-summary" aria-label="积分汇总">{[['累计积分',data.summary.total,'分'],['游玩次数',data.summary.sessions,'次'],['最高积分',data.summary.best,'分'],['平均积分',data.summary.average,'分']].map(([label,value,unit])=><div key={label}><span>{label}</span><strong>{value}<small>{unit}</small></strong></div>)}</section>

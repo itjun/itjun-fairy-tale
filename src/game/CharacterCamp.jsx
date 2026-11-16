@@ -79,7 +79,7 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
   },[character,build,isTrying,onProgress,mixer]);
   return <canvas ref={canvas} data-gamepad-canvas data-gamepad-practice tabIndex={0} onPointerDown={event => event.currentTarget.focus()} width="1060" height="530" aria-label={`${CHARACTERS[character].name}技能试用场景`}/>;
 }
-export function CharacterCamp({ character, build, isSound, onBuild, onSelect, onBack, onStart }) {
+export function CharacterCamp({ character, build, locked = [], isSound, onBuild, onSelect, onBack, onStart }) {
   const gamepadState = useGamepad();
   const root=useRef(null), [isTrying,setIsTrying]=useState(false), [progress,setProgress]=useState({attacks:0}),[isPicking,setIsPicking]=useState(false);
   const isPickerPreviouslyOpen=useRef(false),audio=useRef(null);audio.current ||= new CombatAudio();
@@ -104,6 +104,6 @@ export function CharacterCamp({ character, build, isSound, onBuild, onSelect, on
         <button className="paper-action character-depart" onClick={onStart}><img src="./assets/checkpoint-flag.png" alt=""/>用{person.name}出发<ArrowRight/></button>
       </div>
     </div>
-    {isPicking&&<StarterPicker build={build} onClose={()=>setIsPicking(false)} onConfirm={next=>{onBuild(next);setIsPicking(false);}}/>}
+    {isPicking&&<StarterPicker build={build} locked={locked} onClose={()=>setIsPicking(false)} onConfirm={next=>{onBuild(next);setIsPicking(false);}}/>}
   </section>;
 }

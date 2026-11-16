@@ -27,7 +27,7 @@ body, #root, #root .platform-game, #root .score-screen {
   border-radius: 0;
   box-shadow: none;
 }
-#root :is(.primary-button,.quiet-button,.text-button,.icon-button,.sound-button,.world-help,.map-hotspot,.decorate-toggle,.family-choices button,.color-choices button,.flavor,.flower-pot button,.achievement-list button,.sticker-tools button,.gallery-controls button,.adventure-header button,.adventure-bottom button,.touch-controls button,.player-mode button,.score-presets button,.score-pagination button) {
+#root :is(.primary-button,.quiet-button,.text-button,.icon-button,.sound-button,.world-help,.map-hotspot,.decorate-toggle,.family-choices button,.color-choices button,.flavor,.flower-pot button,.achievement-list button,.sticker-tools button,.gallery-controls button,.adventure-bottom button,.touch-controls button,.score-presets button,.score-pagination button) {
   border: 2px solid transparent;
   border-image: var(--paper-button) 128 fill / 12px / 0 stretch;
   border-radius: 0;
@@ -46,7 +46,7 @@ body, #root, #root .platform-game, #root .score-screen {
 }
 #root :is(.quiet-button,.text-button) { font-size: 16px; }
 #root .color-choices button { color: var(--choice); }
-#root :is(.player-mode button[aria-pressed=true],.score-presets button[aria-pressed=true],.flavor[aria-pressed=true],.sticker-tools button[aria-pressed=true]) {
+#root :is(.score-presets button[aria-pressed=true],.flavor[aria-pressed=true],.sticker-tools button[aria-pressed=true]) {
   border-image-source: var(--green-button);
   color: #263d24;
 }
@@ -54,7 +54,7 @@ body, #root, #root .platform-game, #root .score-screen {
   border-image-source: var(--pink-button);
   color: #713752;
 }
-#root :is(.adventure-title,.adventure-score,.adventure-message,.adventure-bottom>span,.level-progress,.place-label,.collection) {
+#root :is(.adventure-message,.adventure-bottom>span,.place-label,.collection) {
   border: 2px solid transparent;
   border-image: var(--paper-panel) 96 fill / 13px / 0 stretch;
   border-radius: 0;
@@ -95,7 +95,6 @@ body, #root, #root .platform-game, #root .score-screen {
 }
 #root .score-screen :is(td,th) { font-family: var(--hand-font); font-size: 15px; }
 #root .score-summary strong { font-family: var(--hand-font); }
-#root .adventure-score { font-size: 16px; }
 #root .adventure-message { font-size: 17px; }
 @media(max-width:850px) {
   #root .level-menu .adventure-menu-actions { gap: 8px; }
@@ -105,7 +104,6 @@ body, #root, #root .platform-game, #root .score-screen {
   #root .adventure-menu:not(.level-menu) { padding: 24px 20px; }
   #root .adventure-menu:not(.level-menu) h2 { font-size: 27px; }
   #root .adventure-menu:not(.level-menu) p { font-size: 16px; }
-  #root .adventure-score { font-size: 13px; }
   #root .adventure-message { font-size: 15px; }
 }
 /* Desktop actions reuse the same paper buttons as the game. */

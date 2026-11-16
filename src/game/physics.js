@@ -1,15 +1,6 @@
 export { randomGenerator } from '../../shared/random.js';
 export const RULES = Object.freeze({ speed: 6, gravity: 23, jump: 12.6, radius: 0.28, coyote: 0.14, buffer: 0.16 });
 export function platformY(platform, x) { return platform.y + (platform.slope || 0) * Math.max(-platform.width / 2, Math.min(platform.width / 2, x - platform.x)); }
-export function firstPlatform() { return { id: 0, x: 0, y: 0, width: 12, isCheckpoint: true }; }
-export function nextPlatform(previous, random, level) {
-  const id = previous.id + 1;
-  const isCheckpoint = id % 6 === 0;
-  const width = isCheckpoint ? 7 : 3.8 + random() * 1.6;
-  const gap = (level?.gapMin ?? 0.9) + random() * (level?.gapRange ?? 0.7);
-  const y = Math.max(-0.5, Math.min(2.5, previous.y + (random() - 0.4) * (level?.rise ?? 1.2)));
-  return { id, width, x: previous.x + previous.width / 2 + gap + width / 2, y, isCheckpoint };
-}
 export function createPlayer(platform, offset = 0) {
   return { x: platform.x + offset, y: platformY(platform,platform.x+offset), vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, safeX: platform.x + offset, facing: 1, recoveries: 0, protection: 0, knockTime: 0, dropTime: 0, springTime: 0 };
 }
@@ -64,7 +55,9 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   if (player.vy <= 0) {
     for (const platform of platforms) {
       if (platform.isEnabled === false || player.dropTime > 0 && platform.id === player.ignoredPlatform) continue;
-      if (previousY >= platformY(platform,previousX) - 0.01 && player.y <= platformY(platform,player.x) && Math.abs(player.x - platform.x) < platform.width / 2 + RULES.radius && (!landing || platformY(platform,player.x) > platformY(landing,player.x))) landing = platform;
+      // 升降台这一帧往上走了多少，就把它上一帧的台面往下算多少，不然人会从正在上升的台面穿过去。
+      const lifted = Math.max(0, Math.min(0.1, platform.deltaY || 0));
+      if (previousY >= platformY(platform,previousX) - lifted - 0.01 && player.y <= platformY(platform,player.x) && Math.abs(player.x - platform.x) < platform.width / 2 + RULES.radius && (!landing || platformY(platform,player.x) > platformY(landing,player.x))) landing = platform;
     }
   }
   player.ground = landing;
@@ -76,15 +69,4 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   const isRescued = player.y < (bounds.minY ?? -7);
   if (isRescued && !bounds.isFiniteLife) rescue(player);
   return { isJumped, isRescued };
-}
-export function regroup(players, maxDistance = 13) {
-  if (players.length < 2 || Math.abs(players[0].x - players[1].x) <= maxDistance && Math.abs(players[0].y - players[1].y) <= 10) return false;
-  const leader = (players[0].safe.progress ?? players[0].x) > (players[1].safe.progress ?? players[1].x) ? players[0] : players[1];
-  const follower = leader === players[0] ? players[1] : players[0];
-  rescue(follower, leader.safe);
-  return true;
-}
-export function prunePlatforms(platforms, players) {
-  const minSafe = Math.min(...players.map(player => player.safe.x));
-  return platforms.filter(platform => platform.x + platform.width / 2 > minSafe - 22);
 }

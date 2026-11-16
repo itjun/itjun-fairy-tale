@@ -5,17 +5,6 @@ const SAVE_FIELDS=['windUntil','frozenUntil','freezeImmuneUntil','hasShell','id'
 export function saveEnemy(enemy) { return Object.fromEntries(SAVE_FIELDS.filter(key=>enemy[key]!==undefined).map(key=>[key,enemy[key]])); }
 export function restoreEnemy(enemy, saved) { for(const key of SAVE_FIELDS) if(Object.hasOwn(saved,key))enemy[key]=saved[key]; }
 
-export function stepEnemies(enemies, dt) {
-  for (const enemy of enemies) {
-    enemy.elapsed += dt;
-    if (enemy.isDefeated) continue;
-    enemy.x += enemy.direction * enemy.speed * dt;
-    if (enemy.x >= enemy.maxX) { enemy.x = enemy.maxX; enemy.direction = -1; }
-    if (enemy.x <= enemy.minX) { enemy.x = enemy.minX; enemy.direction = 1; }
-    if (enemy.kind === 'puff') enemy.y = enemy.baseY + Math.sin(enemy.elapsed * 1.5 + enemy.phase) * 0.35;
-  }
-}
-
 export function touchEnemy(player, enemy, previousY, elapsed = enemy.elapsed) {
   if (enemy.isDefeated || enemy.isHidden || player.protection > 0) return null;
   if (Math.abs(player.x - enemy.x) > enemy.width / 2 + RULES.radius) return null;

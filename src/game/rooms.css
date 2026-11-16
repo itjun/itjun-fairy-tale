@@ -1,0 +1,111 @@
+/* 第 9 版游玩界面：左上命和血，中间这一章的房间，右上碎片，右下三个键。 */
+.room-hud { position:absolute; inset:0; pointer-events:none; color:#535546; }
+.room-hud>aside { position:absolute; }
+.room-hud-life,.room-hud-path,.room-hud-keys>span,.room-hud-prompt,.room-hud-side>span,.album-toast { border:2px solid transparent; border-image:var(--paper-button) 128 fill / 14px / 0 stretch; }
+.room-hud-life { left:24px; top:20px; display:flex; align-items:center; gap:12px; width:300px; max-width:30vw; padding:10px 18px; }
+.room-hud-life>img { width:44px; height:58px; object-fit:contain; }
+.room-hud-life>div { flex:1; min-width:0; }
+.room-hud-lives { display:flex; align-items:center; gap:3px; height:30px; }
+.room-hud-lives img { width:22px; height:29px; object-fit:contain; }
+.room-hud-lives b { font-weight:400; font-size:20px; color:#65519a; }
+.room-hud-life progress { display:block; width:100%; height:16px; appearance:none; -webkit-appearance:none; border:2px solid #2f2a25; border-radius:9px 11px 8px 10px; background:#fffdf6; overflow:hidden; }
+.room-hud-life progress::-webkit-progress-bar { background:#fffdf6; }
+.room-hud-life progress::-webkit-progress-value { background:#e8747c; }
+.room-hud-life small { display:flex; justify-content:space-between; gap:8px; margin-top:3px; font-size:15px; }
+.room-hud-life em { font-style:normal; color:#8c4a67; }
+
+.room-hud-path { left:50%; top:16px; transform:translateX(-50%); padding:8px 20px 6px; text-align:center; }
+.room-hud-path ol { display:flex; align-items:flex-start; justify-content:center; gap:14px; margin:0; padding:0; list-style:none; }
+.room-hud-path li { display:flex; flex-direction:column; align-items:center; gap:2px; color:#9d9b71; }
+.room-hud-path li b { display:grid; place-items:center; width:40px; height:40px; border:2.5px solid #9d9b71; border-radius:52% 48% 50% 50% / 48% 52% 48% 52%; background:#fffdf6; font-weight:400; font-size:21px; }
+.room-hud-path li[data-kind=unknown] b { border-style:dashed; }
+.room-hud-path li[aria-current] { color:#5c1f38; }
+.room-hud-path li[aria-current] b { width:48px; height:48px; border-color:#a83e66; background:#f6b6cb; font-size:25px; }
+.room-hud-path li[data-kind=boss] b { border-color:#8f2948; }
+.room-hud-path li span { display:flex; color:#d39a1e; }
+.room-hud-path p { display:flex; justify-content:center; gap:14px; margin:4px 0 0; font-size:19px; white-space:nowrap; }
+.room-hud-path strong { font-weight:400; color:#a83e66; }
+
+.room-hud-side { right:24px; top:20px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.room-hud-side>span { display:flex; align-items:center; gap:6px; padding:6px 14px; font-size:19px; }
+.room-hud-side img { width:24px; height:24px; object-fit:contain; }
+.room-hud-side b { font-weight:400; font-size:23px; color:#486738; }
+.room-hud-side small { max-width:240px; font-size:14px; text-align:right; }
+#root .room-hud-side button { pointer-events:auto; display:grid; place-items:center; min-width:56px; min-height:52px; padding:8px 12px; background:transparent; border:2px solid transparent; border-image:var(--paper-button) 128 fill / 12px / 0 stretch; color:#64674c; }
+#root .room-hud-side .room-hud-combo { color:#a83e66; font-size:23px; animation:score-bounce .35s ease-out; }
+
+.room-hud-keys { right:24px; bottom:24px; display:flex; align-items:flex-end; gap:12px; }
+.room-hud-keys>span { display:flex; align-items:center; gap:8px; min-height:44px; padding:8px 14px; font-size:21px; }
+.room-hud-keys img { width:32px; height:32px; object-fit:contain; }
+.room-hud-keys i { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.room-hud-keys progress { width:44px; height:8px; accent-color:#aa75bf; }
+.room-hud-keys em { font-style:normal; color:#8a5a00; }
+.room-hud-keys kbd,.room-hud-prompt kbd { display:inline-grid; place-items:center; min-width:30px; height:30px; padding:0 8px; box-sizing:border-box; border:2.5px solid #2f2a25; border-radius:11px 13px 12px 10px; background:#fffdf6; font-size:16px; }
+.room-hud-keys .is-ready { background:#fbe9a4; animation:spell-ready 1s ease-in-out infinite alternate; }
+.room-hud-keys .is-ready .pad-key { box-shadow:0 0 0 4px #f6d35b88; }
+@keyframes spell-ready { from { transform:scale(1); } to { transform:scale(1.07); } }
+
+.room-hud-prompt { position:absolute; left:50%; bottom:128px; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:12px 24px; font-size:26px; color:#5c1f38; white-space:nowrap; }
+.room-fade { position:absolute; inset:0; background:#faf4e6; animation:room-fade .45s ease-out forwards; }
+@keyframes room-fade { from { opacity:1; } to { opacity:0; } }
+.album-toast { position:absolute; left:50%; top:132px; transform:translateX(-50%); z-index:5; display:flex; align-items:center; gap:10px; padding:12px 24px; font-size:23px; color:#5c1f38; pointer-events:none; white-space:nowrap; animation:skill-arrive 4s ease-out both; }
+.album-toast img { width:34px; height:34px; object-fit:contain; }
+
+.platform-game[data-rooms=true] { --damage-min-top:20%; }
+.platform-game[data-rooms=true] .boss-health { top:128px; left:50%; width:min(46%,620px); transform:translateX(-50%); }
+.platform-game[data-rooms=true] .boss-health small.is-weak { color:#a83e66; font-size:18px; }
+.platform-game[data-rooms=true] .adventure-message { bottom:84px; }
+.platform-game[data-rooms=true][data-game-status=reward] :is(.room-hud-keys,.room-hud-path,.room-hud-prompt) { display:none; }
+/* 房间奖励多了两行说明，面板加高、图缩小，“选这个”才不会被底栏挡住。 */
+@media(min-height:701px) and (max-height:900px) {
+  .platform-game[data-rooms=true] .reward-panel { height:82%; max-height:82%; }
+  .platform-game[data-rooms=true] .reward-choice>img { height:84px; }
+}
+#root .room-touch button { font-size:22px; }
+#root .room-touch button.is-ready { background:#fbe9a4; }
+
+/* 出发前选难度。 */
+.difficulty-row { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px 16px; margin:8px 0; font-size:18px; }
+.difficulty-row .option-chips { margin-left:0; }
+#root .difficulty-row .option-chips button { min-height:46px; font-size:20px; }
+.difficulty-row small { flex-basis:100%; font-size:15px; color:#78664f; }
+
+/* 本领一览：整页平铺，只看不改。 */
+.run-overview { color:#514f45; }
+.run-overview .home-page-header,.run-overview .home-page-content { max-width:1180px; }
+.run-overview .home-page-header { display:flex; align-items:center; justify-content:space-between; flex-direction:row-reverse; padding-bottom:16px; }
+.run-overview .home-page-header h1 { margin:0; font-size:36px; }
+.run-overview .home-page-content { padding-top:8px; }
+.run-overview h2 { margin:22px 0 8px; font-size:26px; font-weight:400; color:#a83e66; }
+.run-overview .option-note { margin:6px 0; font-size:18px; }
+.run-overview ul,.run-overview ol { margin:0; padding:0; list-style:none; }
+.overview-cards { display:flex; flex-wrap:wrap; gap:14px; }
+.overview-cards li { display:grid; grid-template-columns:48px auto; column-gap:12px; align-items:center; padding:10px 18px; border:2.5px solid var(--rarity-color,#9d9b71); border-radius:14px 16px 13px 15px; background:#fffdf6; }
+.overview-cards img { grid-row:span 2; width:48px; height:48px; object-fit:contain; }
+.overview-cards strong { font-weight:400; font-size:22px; }
+.overview-cards small { font-size:15px; color:#777761; }
+.overview-sets { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+.overview-sets>div { padding:12px 14px; border:2px dashed #c9c4ae; border-radius:14px 16px 13px 15px; }
+.overview-sets>div:not([data-level="0"]) { border:2.5px solid #7a9a62; background:#eef2e1; }
+.overview-sets h3 { margin:0 0 8px; font-size:22px; font-weight:400; }
+.overview-sets h3 b { font-weight:400; color:#a83e66; }
+.overview-sets h3 small { display:block; font-size:15px; color:#5f7a4c; }
+.overview-sets li { display:flex; align-items:center; gap:6px; min-height:34px; font-size:18px; }
+.overview-sets li img { width:28px; height:28px; object-fit:contain; }
+.overview-sets li.is-empty { color:#a9a58f; }
+.overview-path { display:flex; flex-wrap:wrap; gap:10px 26px; }
+.overview-path li { display:flex; align-items:center; gap:8px; font-size:20px; color:#777761; }
+.overview-path li b { display:grid; place-items:center; width:38px; height:38px; border:2.5px solid #9d9b71; border-radius:52% 48% 50% 50% / 48% 52% 48% 52%; background:#fffdf6; font-weight:400; }
+.overview-path li[aria-current] { color:#5c1f38; }
+.overview-path li[aria-current] b { border-color:#a83e66; background:#f6b6cb; }
+.overview-path small { color:#b07d12; font-size:15px; }
+
+@media(max-width:1000px) {
+  .room-hud-life { width:220px; padding:8px 12px; } .room-hud-life>img { display:none; }
+  .room-hud-path { padding:6px 12px 4px; } .room-hud-path ol { gap:8px; } .room-hud-path li b { width:32px; height:32px; font-size:17px; } .room-hud-path li[aria-current] b { width:38px; height:38px; font-size:20px; } .room-hud-path p { font-size:15px; gap:8px; }
+  .room-hud-side>span { font-size:15px; padding:4px 10px; } .room-hud-side b { font-size:18px; }
+  .overview-sets { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:1099px),(pointer:coarse) { .room-hud-keys { display:none; } .room-hud-prompt { bottom:190px; font-size:20px; } }
+@media(max-width:700px) { .room-hud-path { top:86px; } .room-hud-path p span { display:none; } .platform-game[data-rooms=true] .boss-health { top:190px; width:80%; } }
+@media(prefers-reduced-motion:reduce) { .room-fade,.album-toast,.room-hud-keys .is-ready,#root .room-hud-side .room-hud-combo { animation:none; } .room-fade { display:none; } }

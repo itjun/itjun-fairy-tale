@@ -1,5 +1,5 @@
-// 新冒险的内容目录与旧地图版本分开，服务端和游戏共用怪物奖励定义。
-export const ADVENTURE_GENERATION_VERSION = 8;
+// 服务端和游戏共用怪物奖励定义。地图只留这一版：第 10 版，选门闯房间加上有高低的房型。
+export const ADVENTURE_GENERATION_VERSION = 10;
 export const MONSTERS = Object.freeze({
   plane:{name:'纸飞机怪',points:25,family:'flight',behavior:'swoop',image:'monster-plane'},
   balloon:{name:'气球团',points:25,family:'flight',behavior:'balloon',image:'monster-balloon'},
@@ -32,22 +32,16 @@ export const MONSTERS = Object.freeze({
   paint: { name: '彩笔桶', points: 30, family: 'bubble', behavior: 'summon', image: 'monster-paint' },
   candy: { name: '糖果团', points: 20, family: 'bubble', behavior: 'split', image: 'enemy-candy' },
 });
-export const THEME_MONSTERS = Object.freeze({
-  rainbow: ['jelly', 'leaf', 'mushroom', 'puff'], family: ['leaf', 'toy', 'puff', 'squirrel'],
-  sweet: ['jelly', 'candy', 'mushroom', 'toy'], beach: ['crab', 'fish', 'puff', 'jelly'],
-  meadow: ['leaf', 'squirrel', 'firefly', 'mushroom'], snow: ['snowball', 'snowflower', 'puff', 'toy'],
-  forest: ['mushroom', 'squirrel', 'firefly', 'leaf'], cartoon: ['toy', 'candy', 'fish', 'firefly'],
-});
-// 版本 2 沿用上方候选池，版本 3 才使用扩展池，避免旧存档重抽。
+// 每个世界自己的怪物池。每行最后三种原先只在旧地图里出场，现在并进来，三十种怪都能遇到。
 export const EXPANDED_THEME_MONSTERS = Object.freeze({
-  rainbow: ['jelly', 'leaf', 'mushroom', 'puff', 'flowerpot', 'umbrella', 'ink', 'wool'],
-  family: ['leaf', 'toy', 'puff', 'squirrel', 'bell', 'leafshield', 'pillow', 'paint'],
-  sweet: ['jelly', 'candy', 'mushroom', 'toy', 'pillow', 'ink', 'paint', 'umbrella'],
-  beach: ['crab', 'fish', 'puff', 'jelly', 'sandcastle', 'umbrella', 'burrow', 'wool'],
-  meadow: ['leaf', 'squirrel', 'firefly', 'mushroom', 'flowerpot', 'leafshield', 'wool', 'burrow'],
-  snow: ['snowball', 'snowflower', 'puff', 'toy', 'icicle', 'pillow', 'umbrella', 'bell'],
-  forest: ['mushroom', 'squirrel', 'firefly', 'leaf', 'moth', 'leafshield', 'flowerpot', 'burrow'],
-  cartoon: ['toy', 'candy', 'fish', 'firefly', 'paint', 'bell', 'ink', 'moth'],
+  rainbow: ['jelly', 'leaf', 'mushroom', 'puff', 'flowerpot', 'umbrella', 'ink', 'wool', 'plane', 'balloon', 'dandelion'],
+  family: ['leaf', 'toy', 'puff', 'squirrel', 'bell', 'leafshield', 'pillow', 'paint', 'twins', 'plane', 'balloon'],
+  sweet: ['jelly', 'candy', 'mushroom', 'toy', 'pillow', 'ink', 'paint', 'umbrella', 'balloon', 'twins', 'octopus'],
+  beach: ['crab', 'fish', 'puff', 'jelly', 'sandcastle', 'umbrella', 'burrow', 'wool', 'octopus', 'plane', 'balloon'],
+  meadow: ['leaf', 'squirrel', 'firefly', 'mushroom', 'flowerpot', 'leafshield', 'wool', 'burrow', 'dandelion', 'plane', 'twins'],
+  snow: ['snowball', 'snowflower', 'puff', 'toy', 'icicle', 'pillow', 'umbrella', 'bell', 'penguin', 'balloon', 'plane'],
+  forest: ['mushroom', 'squirrel', 'firefly', 'leaf', 'moth', 'leafshield', 'flowerpot', 'burrow', 'dandelion', 'octopus', 'balloon'],
+  cartoon: ['toy', 'candy', 'fish', 'firefly', 'paint', 'bell', 'ink', 'moth', 'twins', 'plane', 'octopus'],
 });
 export const WEAPONS = Object.freeze({
   flame: { name:'彩笔火龙', shortName:'火龙', image:'weapon-flame', hint:'持续喷出短火焰，每 0.2 秒伤害 18，略微追随目标高度', damage:18, interval:0.2, family:'power' },

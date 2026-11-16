@@ -2,6 +2,9 @@ export const RARITIES = Object.freeze({
   common: {name:'普通',color:'#8e8986',rank:0}, rare: {name:'稀有',color:'#3b87bf',rank:1},
   epic: {name:'史诗',color:'#9363b4',rank:2}, legendary: {name:'传奇',color:'#c47a1c',rank:3},
 });
+// 第 9 版按门出卡的奖励档位。品质高一档多送几片碎片，传奇另有各自的传奇效果。
+export const ROOM_TIERS = Object.freeze(['door-weapon', 'door-upgrade', 'door-spell', 'elite', 'boss']);
+export const RARITY_FRAGMENTS = Object.freeze({ common: 0, rare: 1, epic: 3, legendary: 5 });
 export const SPELLS = Object.freeze({
   fire: {name:'暖阳火环',image:'flame-stream',family:'power',charge:18,duration:4,damage:32,hint:'战斗充能 18 秒，火环跟随 4 秒，挡一次伤害'},
   snow: {name:'雪花风暴',image:'collectible-snowflake',family:'frost',charge:22,duration:3,damage:44,hint:'战斗充能 22 秒，两道雪幕冻结小怪、减缓首领'},

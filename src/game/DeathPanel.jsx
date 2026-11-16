@@ -29,7 +29,7 @@ export function DeathPanel({ survival, heldKeys, onContinue, onRestart }) {
     <img className="death-bottle" src="./assets/life-potion.png" alt=""/>
     <h2 id="death-title">这条血用完了</h2>
     <p>{survival.lives ? `还剩 ${survival.lives} 条命，可以在附近满血继续。` : '命数用完了，重新出发吧。'}</p>
-    <p>继续保留地图、武器和成长。<br/>重来会从第一小关出发，重置本次成长。</p>
+    <p>继续保留地图、武器和成长。<br/>重来会从第一个世界出发，重置本次成长。</p>
     {isWaiting && <small role="status">先松开按键，再选一次。</small>}
     <div className="adventure-menu-actions"><button className="primary-button" disabled={isWaiting || isBusy || !survival.lives} onClick={() => choose(false)}>继续{!survival.lives ? '（没有剩余命数）' : ''}</button><button className="text-button" disabled={isWaiting || isBusy} onClick={() => choose(true)}>重来</button></div>
   </section></div>;

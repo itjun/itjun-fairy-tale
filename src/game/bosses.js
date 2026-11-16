@@ -1,5 +1,5 @@
 import { findStage } from '../../shared/levels.js';
-import { bossBaseline, bossRole, bossTargetHp } from '../../shared/boss-health.js';
+import { bossBaseline, bossTargetHp } from '../../shared/boss-health.js';
 import { weaponPressure } from './adventure.js';
 
 export const BOSS_WARNINGS = {
@@ -8,6 +8,12 @@ export const BOSS_WARNINGS = {
   bounce:'跳跳球要来了，换个位置！', lob:'要抛过来了，离开标记位置！',
   return:'叶刃会飞回来，留意来回两次！', ring:'音浪要来了，换个位置！', wave:'浪花要来了，跳起来躲开！',
 };
+export const WEAK_SECONDS = 1.5;
+// 第 9 版的首领分两段：半血前只用第一招，半血后两招轮着来。
+function bossSkill(boss) {
+  const skills = boss.hasPhases && !boss.isEnraged ? boss.skills.slice(0, 1) : boss.skills;
+  return skills[boss.attackIndex % skills.length];
+}
 export function currentBoss(world) { return world.enemies.find(e=>e.isBoss && !e.isDefeated && !e.isDormant); }
 export function areBossesDefeated(world) { return (world.bossArenas || []).every(a=>world.enemies[a.bossId-1].isDefeated); }
 export function constrainBossArena(world, player) {
@@ -49,10 +55,10 @@ function releaseBossSkill(boss, arena, skill, shots) {
   // 远处或高台上的玩家也要躲开冲锋时甩出的主题弹道。
   if(skill.kind==='charge') aim(0,{size:1.4});
 }
-export function applyBossToughness(boss, stage, pressure, version = 6) {
+export function applyBossToughness(boss, stage, pressure) {
   if (!boss?.isBoss || boss.isDefeated || boss.isDormant) return;
-  const baseline = bossBaseline(stage, bossRole(boss), version);
-  const target = bossTargetHp(stage, bossRole(boss), pressure, version);
+  const baseline = bossBaseline(stage);
+  const target = bossTargetHp(stage, pressure);
   if (boss.maxHp !== baseline || target === baseline) return;
   const ratio = baseline > 0 ? Math.min(1, boss.hp / boss.maxHp) : 1;
   boss.maxHp = target;
@@ -67,20 +73,16 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
     if (boss.isDormant) {
       const previous=world.bossArenas[arena.id-1];
       if (previous && !world.enemies[previous.bossId-1].isDefeated || player.x < arena.left || player.x > arena.right || Math.abs(player.y-arena.y)>9) continue;
-      boss.isDormant=false;boss.isShielded=arena.layout==='mechanism';boss.attackTime=0;
+      boss.isDormant=false;boss.attackTime=0;
     }
-    if (stage) applyBossToughness(boss, stage, pressure, world.version || 6);
+    if (stage) applyBossToughness(boss, stage, pressure);
     boss.elapsed+=dt;
     if (boss.isWorldBoss && !boss.isEnraged && boss.hp <= boss.maxHp/2) { boss.isEnraged=true;boss.attackStage='rest';boss.attackTime=0; }
-    if (arena.layout==='mechanism') {
-      boss.isShielded=elapsed >= boss.shieldUntil;
-      if (boss.isShielded && player.isGrounded && player.ground?.id===arena.floorId && Math.abs(player.x-arena.switchX)<1.4) { boss.shieldUntil=elapsed+12;boss.isShielded=false; }
-    }
     if (boss.boundUntil>elapsed) continue;
     const slow=boss.slowUntil>elapsed?.8:1;
     boss.attackTime+=dt*slow;
     boss.isWarning=boss.attackStage==='warning';
-    const skill=boss.skills[boss.attackIndex%boss.skills.length];
+    const skill=bossSkill(boss);
     if(boss.attackStage==='rest') {
       const gap=player.x-boss.x;
       boss.direction=Math.sign(gap)||boss.direction;
@@ -98,27 +100,29 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
         }
         boss.warningY=Math.max(arena.y+.8,Math.min(arena.y+9,targetY));
       }
-    } else if (boss.attackStage==='warning' && boss.attackTime>=2) {
+    } else if (boss.attackStage==='warning' && boss.attackTime>=2+(world.warningBonus || 0)) {
       boss.attackStage='attack';boss.attackTime=0;boss.isWarning=false;
       releaseBossSkill(boss,arena,skill,shots);
     } else if (boss.attackStage==='attack') {
       if(skill.kind==='charge')boss.x=Math.max(boss.minX,Math.min(boss.maxX,boss.x+boss.direction*6*dt));
-      if(boss.attackTime>=1.2){boss.attackStage='rest';boss.attackTime=0;boss.attackIndex++;}
+      if(boss.attackTime>=1.2){boss.attackStage=boss.hasPhases?'weak':'rest';boss.attackTime=0;boss.attackIndex++;}
+    } else if (boss.attackStage==='weak' && boss.attackTime>=WEAK_SECONDS) {
+      boss.attackStage='rest';boss.attackTime=0;
     }
   }
 }
 export function bossStatus(world, elapsed) {
   const boss=currentBoss(world);
   if (!boss) return null;
-  const arena=world.bossArenas[boss.arenaId],skill=boss.skills[boss.attackIndex%boss.skills.length];
-  return {id:boss.id,name:boss.name,hp:boss.hp,maxHp:boss.maxHp,isWorldBoss:boss.isWorldBoss,isMidBoss:!!boss.isMidBoss,isShielded:boss.isShielded,isEnraged:!!boss.isEnraged,
+  const arena=world.bossArenas[boss.arenaId],skill=bossSkill(boss);
+  return {id:boss.id,name:boss.name,hp:boss.hp,maxHp:boss.maxHp,isWorldBoss:boss.isWorldBoss,isShielded:boss.isShielded,isEnraged:!!boss.isEnraged,
     shieldSeconds:Math.max(0,Math.ceil(boss.shieldUntil-elapsed)),warning:boss.isWarning?`${skill.name}：${BOSS_WARNINGS[skill.kind]}`:'',
-    casting:boss.attackStage==='attack'?`正在施放：${skill.name}`:'',
+    casting:boss.attackStage==='attack'?`正在施放：${skill.name}`:'',isWeak:boss.attackStage==='weak',hasPhases:!!boss.hasPhases,
     warningX:boss.warningX,warningY:boss.warningY ?? boss.baseY+.8,arena};
 }
 export function isValidBossState(saved, original, elapsed) {
   return typeof saved.isDormant==='boolean' && typeof saved.isShielded==='boolean' && (saved.isEnraged===undefined || typeof saved.isEnraged==='boolean')
-    && ['rest','warning','attack'].includes(saved.attackStage) && Number.isInteger(saved.attackIndex) && saved.attackIndex>=0 && saved.attackIndex<100000
+    && ['rest','warning','attack',...(original.hasPhases?['weak']:[])].includes(saved.attackStage) && Number.isInteger(saved.attackIndex) && saved.attackIndex>=0 && saved.attackIndex<100000
     && Number.isFinite(saved.attackTime) && saved.attackTime>=0 && saved.attackTime<=3.1
     && Number.isFinite(saved.shieldUntil) && saved.shieldUntil>=0 && saved.shieldUntil<=elapsed+12.1
     && Number.isFinite(saved.warningX) && saved.warningX>=original.minX-10 && saved.warningX<=original.maxX+10

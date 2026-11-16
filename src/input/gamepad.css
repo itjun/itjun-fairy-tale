@@ -27,7 +27,16 @@ html[data-input-mode="gamepad"] #root .reward-choice[aria-pressed="true"]:is([da
 }
 #root .level-choices button:focus :is(span, strong, small) { color: #1c340f; }
 .gamepad-notice { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 2000; max-width: 85vw; padding: 9px 18px; background: #fff8e9; color: #4e583b; border: 2px solid #9d9b71; border-radius: 9px; pointer-events: none; font-size: 18px; }
-.gamepad-guide { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1800; padding: 7px 16px; background: #fff8e9ee; color: #4e583b; text-align: center; font-size: 16px; pointer-events: none; }
+.gamepad-guide { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1800; display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 30px; padding: 7px 16px; background: #fff8e9ee; color: #4e583b; font-size: 18px; pointer-events: none; }
+.pad-hint { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+/* 按键小图标：粗黑边、略歪的圆，颜色跟手柄上的字母一致。 */
+.pad-key { display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; box-sizing: border-box; border: 2.5px solid #2f2a25; border-radius: 52% 48% 50% 50% / 48% 52% 48% 52%; background: #fffdf6; color: #2f2a25; font: 17px/1 var(--hand-font, sans-serif); font-style: normal; }
+.pad-key-a { background: #9bd66b; }
+.pad-key-b { background: #f08a84; }
+.pad-key-x { background: #86bdf0; }
+.pad-key-y { background: #f6d35b; }
+.pad-key-lb, .pad-key-rb, .pad-key-rt, .pad-key-view, .pad-key-menu, .pad-key-stick { border-radius: 11px 13px 12px 10px; font-size: 15px; }
+.pad-map dt { display: flex; gap: 6px; align-items: center; }
 body:has([data-game-status="playing"]) .gamepad-guide { display: none; }
 html[data-input-mode="gamepad"] body:not(:has([data-game-status="playing"])) { padding-bottom: 42px; }
 .gamepad-settings { grid-column: 1 / -1; padding: 18px 0; text-align: left; }

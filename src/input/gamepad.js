@@ -1,7 +1,7 @@
 import { GamepadGate, confirmMenu, readXboxPad, nearestControl } from './gamepad-state.js';
 
 const listeners = new Set();
-let state = { mode: 'keyboard', context: 'menu', connected: false, name: '', notice: '', vibration: true, deadzone: 0.22 };
+let state = { mode: 'keyboard', context: 'menu', connected: false, name: '', notice: '', vibration: true, deadzone: 0.22, hasBack: false, backLabel: '', shoulder: '' };
 try {
   const saved = JSON.parse(localStorage.getItem('garden-gamepad-settings-v1'));
   if (saved) state = { ...state, vibration: saved.vibration !== false, deadzone: Math.max(0.1, Math.min(0.4, Number(saved.deadzone) || 0.22)) };
@@ -65,7 +65,27 @@ function navigate(scope, direction) {
   const next = nearestControl(center(current), items.map(center), direction);
   if (next >= 0) focus(items[next]);
 }
-function back(scope) { controls(scope).find(node => node.hasAttribute('data-gamepad-back'))?.click(); }
+function backControl(scope) { return controls(scope).find(node => node.hasAttribute('data-gamepad-back')); }
+// B 只关掉当前这一层。必须选的弹窗里没有返回按钮，按 B 不起作用。
+function back(scope) { backControl(scope)?.click(); }
+function tabsOf(scope) { return [...scope.querySelectorAll('[data-gamepad-tabs]')].find(isVisible); }
+// LB、RB 用来翻页、换分类、换难度。页面没有标出来时，仍然逐项走。
+function shoulder(scope, direction) {
+  const group = tabsOf(scope);
+  if (!group) return false;
+  const tabs = [...group.querySelectorAll('button:not(:disabled)')].filter(isVisible);
+  if (!tabs.length) return false;
+  const current = tabs.findIndex(tab => tab.getAttribute('aria-pressed') === 'true');
+  const step = direction === 'next' ? 1 : -1;
+  const target = current < 0 ? tabs.at(step > 0 ? -1 : 0) : tabs[(current + step + tabs.length) % tabs.length];
+  target.click();
+  if (current >= 0) focus(target);
+  return true;
+}
+function describe(scope) {
+  const control = backControl(scope), label = control?.getAttribute('data-gamepad-back');
+  publish({ hasBack: !!control, backLabel: label && label !== 'true' ? label : '', shoulder: tabsOf(scope)?.getAttribute('data-gamepad-tabs') || '' });
+}
 function scroll(scope, delta) {
   let node = document.activeElement;
   while (node && scope.contains(node)) {
@@ -77,7 +97,7 @@ function scroll(scope, delta) {
 
 export function startGamepad() {
   const gate = new GamepadGate(), abort = new AbortController();
-  let frame, identity = '', context = null, contextKey = '', lastTime = 0, focused = null, isFocused = document.hasFocus(), stickUntil = 0;
+  let frame, identity = '', context = null, contextKey = '', lastTime = 0, focused = null, isFocused = document.hasFocus(), stickUntil = 0, describedAt = 0;
   function release() { gameplay?.release(); document.activeElement?.dispatchEvent(new CustomEvent('garden:practice-input', { detail: null })); gate.reset(); }
   function keyboard() { if (performance.now() < stickUntil) return; publish({ mode: 'keyboard' }); }
   window.addEventListener('keydown', keyboard, { signal: abort.signal });
@@ -111,12 +131,15 @@ export function startGamepad() {
     if (context !== scope || contextKey !== key) {
       release(); context = scope; contextKey = key; focused = null;
       publish({ context: isPlaying ? 'playing' : isPractice ? 'practice' : isStamp ? 'stamps' : 'menu' });
+      describedAt = 0;
     }
+    if (!isPlaying && time - describedAt > 250) { describedAt = time; describe(scope); }
     const step = gate.step(input, time);
     if (!step.isReady) return;
     if (step.navigation || step.pressed.size || input.scroll) { stickUntil = performance.now() + 500; publish({ mode: 'gamepad', notice: '' }); }
     if (isPlaying) {
-      if (step.pressed.has('pause') || step.pressed.has('back')) { release(); gameplay.pause(); return; }
+      // 游玩中 B 不暂停，孩子乱按也不会被打断。
+      if (step.pressed.has('pause')) { release(); gameplay.pause(); return; }
       if (step.pressed.has('interact')) { gameplay.interact(); return; }
       gameplay.input(input);
       return;
@@ -139,6 +162,7 @@ export function startGamepad() {
       }
       return;
     }
+    if (['previous', 'next'].includes(step.navigation) && shoulder(scope, step.navigation)) { focused = document.activeElement; return; }
     if (step.navigation) { navigate(scope, step.navigation); focused = document.activeElement; }
     if (input.scroll) scroll(scope, input.scroll * dt * 0.65);
     if (step.pressed.has('back')) { back(scope); return; }

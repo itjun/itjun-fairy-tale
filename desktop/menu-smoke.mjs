@@ -2,7 +2,7 @@ import { app, dialog } from 'electron';
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { rogueliteFixture } from '../tests/helpers/adventure-fixtures.mjs';
+import { roomFixture } from '../tests/helpers/adventure-fixtures.mjs';
 
 export async function runMenuSmoke({ win, tray, trayMenu, requestClose }) {
   const profile = app.getPath('userData');
@@ -36,7 +36,7 @@ export async function runMenuSmoke({ win, tray, trayMenu, requestClose }) {
   trayMenu.getMenuItemById('garden-fullscreen').click();
   await until(() => !win.isFullScreen() && !trayMenu.getMenuItemById('garden-fullscreen').checked);
 
-  const fixture = rogueliteFixture('rogue-score');
+  const fixture = roomFixture('score');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(fixture))})`);
   await win.loadURL('garden://app/');
   await until(() => evaluate('!!document.querySelector(".home-play")'));
@@ -48,14 +48,21 @@ export async function runMenuSmoke({ win, tray, trayMenu, requestClose }) {
     localStorage.setItem('menu-close-count', String(count));
     if (count === 1) event.preventDefault();
   })`);
+  // 确认页画在应用里，手柄也能选；系统窗口只在页面没接住时才弹，这里不应该出现。
   const originalMessageBox = dialog.showMessageBox;
-  let isFailureShown = false;
-  dialog.showMessageBox = async () => { isFailureShown = true; await wait(150); return { response: 0 }; };
+  let isNativeShown = false;
+  dialog.showMessageBox = async () => { isNativeShown = true; return { response: 0 }; };
   trayMenu.getMenuItemById('garden-restart').click();
   trayMenu.getMenuItemById('garden-restart').click();
   requestClose();
-  await until(() => isFailureShown);
-  await wait(250);
+  await until(() => evaluate('!!document.querySelector(".close-failed-page")'));
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".close-failed-page button"), button => button.textContent)'), ['留在游戏', '仍然退出']);
+  assert.equal(await evaluate('document.activeElement.textContent'), '留在游戏', '默认停在不会丢东西的那一项');
+  // 等过 3 秒的兜底时限，确认页面接住以后系统窗口不会再冒出来。
+  await wait(3300);
+  assert.equal(isNativeShown, false);
+  await evaluate('document.querySelector(".close-failed-page .primary-button").click()');
+  await until(() => evaluate('!document.querySelector(".close-failed-page")'));
   dialog.showMessageBox = originalMessageBox;
   assert.equal(await evaluate('localStorage.getItem("menu-close-count")'), '1');
   assert.equal(win.isDestroyed(), false);

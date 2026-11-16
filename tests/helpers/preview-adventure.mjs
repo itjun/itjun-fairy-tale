@@ -2,15 +2,17 @@ import { createServer } from 'vite';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createGardenServer } from '../../server/app.mjs';
-import { adventureFixture, expansionFixture, rogueliteFixture, bossFixture } from './adventure-fixtures.mjs';
+import { roomFixture } from './adventure-fixtures.mjs';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const vite = await createServer({root,server:{middlewareMode:true,ws:{port:4276}},appType:'spa'});
 const middleware = async (request,response,next) => {
   const url = new URL(request.url,'http://127.0.0.1:4275');
   const mode = url.searchParams.get('fixture');
-  if (url.pathname === '/' && (mode?.startsWith('boss-') || mode?.startsWith('rogue-') || ['reward','workbench','duo','completed','fallen','over','expanded-reward','expanded-camp','expanded-play'].includes(mode))) {
+  // 例：/?fixture=room&stage=snow-world&seed=42&room=3 直接站到那间房的起点。
+  if (url.pathname === '/' && mode) {
     try {
-      const fixture = mode.startsWith('boss-') ? bossFixture(mode,url.searchParams.get('stage') || 'forest-3') : mode.startsWith('rogue-') ? rogueliteFixture(mode, url.searchParams.get('stage') || 'rainbow-1', Number(url.searchParams.get('zone') || 0)) : mode.startsWith('expanded-') ? expansionFixture(mode) : adventureFixture(mode);
+      const { run, state } = roomFixture(mode, url.searchParams.get('stage') || undefined, { seed: Number(url.searchParams.get('seed') || 42), roomId: Number(url.searchParams.get('room') || 0) });
+      const fixture = { run, state };
       let html = await readFile(root+'index.html','utf8');
       const key = JSON.stringify(`qa-loaded:${url.search}`);
       html = html.replace('<head>',`<head><script>if(!sessionStorage.getItem(${key})){localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(fixture))});sessionStorage.setItem(${key},'1');}</script>`);

@@ -1,91 +1,98 @@
 import { newSurvival } from '../../src/game/characters.js';
-// 仅供本地隔离预览注入，生产入口不导入此文件。
-import { createCampaignWorld } from '../../shared/campaign.js';
+// 仅供本地隔离预览、测试和烟测注入，生产入口不导入此文件。
+import { ADVENTURE_GENERATION_VERSION } from '../../shared/adventure-catalog.js';
+import { createRoomWorld, doorPosition } from '../../shared/room-world.js';
 import { newAdventure, newJourney } from '../../src/game/adventure.js';
-import { newCombatLoot, rollCombatLoot } from '../../src/game/combat-loot.js';
-export function adventureFixture(mode = 'reward') {
-  const seed = 42, levelId = 'forest', count = mode === 'duo' ? 2 : 1;
-  const world = createCampaignWorld(seed, levelId, 2), adventure = newAdventure(seed, count), journey = newJourney();
-  adventure.weapons = ['blade', 'moonblade', 'boomerang', 'bubble', 'stars', 'seed', 'firefly'];
-  adventure.upgrades = { frost:1, split:1, magnet:1, double:1, landing:1, companion:1, returnSplit:1 };
-  adventure.loadouts.forEach(l => { l.weapon = 'boomerang'; l.upgrades = ['frost', 'returnSplit']; });
-  if (mode === 'reward' || mode === 'duo') { delete adventure.upgrades.returnSplit; adventure.loadouts.forEach(l => { l.upgrades = ['frost', 'split']; }); }
-  const fork = world.forks[0];
-  let safeId = fork.startId;
-  if (mode === 'reward' || mode === 'duo') journey.pending = { id:'zone:0',family:'flight',title:'蘑菇挑战完成',player:0,choices:[{type:'upgrade',id:'frost'},{type:'upgrade',id:'returnSplit'},{type:'upgrade',id:'magnet'}] };
-  const isCompleted = mode === 'completed';
-  if (isCompleted) safeId = world.finish.id;
-  const collectedIds = isCompleted ? world.treasures.slice(0,world.requiredFlowers).map(t=>t.id) : [];
-  const state = { version:2,seed,levelId,elapsed:30,isCompleted,collectedIds,defeatedIds:[],visited:isCompleted ? world.zones.map(z=>z.id+1) : [],switches:[],enemies:world.enemies,players:Array.from({length:count},()=>({safeId,recoveries:0,facing:1})),adventure,journey };
-  if (mode !== 'duo') { state.survival = newSurvival('mom'); state.survival.lives = 2; state.survival.attacks = 3; state.checkpointId = safeId; }
-  if (['fallen','over'].includes(mode)) { state.survival.phase = mode; state.survival.hp=0; if(mode === 'over')state.survival.lives=0; }
-  if (mode === 'fallen') {
-    const platform=world.platforms.find(p=>!p.isMoving && !p.isCheckpoint && p.isEnabled!==false && p.x>60);
-    state.checkpointId=world.start.id;state.players[0].safeId=platform.id;state.players[0].safeX=platform.x+0.6;
-    state.revival={platformId:platform.id,offsetX:0.6};
-  }
-  const run = { id:crypto.randomUUID(),startedAt:new Date().toISOString(),levelId,players:count,seed,scoringVersion:3,generationVersion:2,revision:1,status:mode === 'over' ? 'ended' : isCompleted?'completed':'paused',flowers:collectedIds.length,collectedIds,defeatedIds:[],platform:state.visited.length,seconds:30 };
-  return {run,state};
-}
+import { newCombatLoot } from '../../src/game/combat-loot.js';
+import { WORLD_ACTS } from '../../shared/levels.js';
+import { newRoomState, enterDoor } from '../../src/game/rooms.js';
+import { openRoomReward } from '../../src/game/room-rewards.js';
+import { starterAdventure, recommendedStarter } from '../../src/game/starter-build.js';
 
-export function expansionFixture(mode = 'expanded-reward') {
-  const seed=42, levelId='rainbow', world=createCampaignWorld(seed,levelId,3), adventure=newAdventure(seed), journey=newJourney(), survival=newSurvival('sister');
-  adventure.resources.balance=18;
-  adventure.upgrades={chain:1,petal:1,recycle:1,armor:1,snack:1,bind:1,feather:1,cleanse:1,guide:1,thrift:1};
-  adventure.loadouts[0].upgrades=['petal','recycle','armor'];
-  if(mode==='expanded-reward') { delete adventure.upgrades.petal;delete adventure.upgrades.recycle;adventure.loadouts[0].upgrades=['armor'];journey.pending={id:'preview:choice',family:'nature',title:'挑战完成',player:0,choices:[{type:'upgrade',id:'chain'},{type:'upgrade',id:'petal'},{type:'upgrade',id:'recycle'}]}; }
-  survival.lives=7;
-  const firstEnemy=world.enemies.find(e => e.kind==='flowerpot');
-  const nearEnemy=world.platforms.filter(p => !p.isMoving && p.x < firstEnemy.x-3 && p.x > firstEnemy.x-12 && Math.abs(p.y-firstEnemy.y)<3).sort((a,b)=>b.x-a.x)[0];
-  const safeId=mode==='expanded-play' ? nearEnemy?.id || 0 : 0;
-  const state={version:3,seed,levelId,elapsed:0,isCompleted:false,survival,checkpointId:0,collectedIds:[],defeatedIds:[],visited:[],switches:[],enemies:world.enemies,players:[{safeId,recoveries:0,facing:1}],adventure,journey};
-  const run={id:crypto.randomUUID(),startedAt:new Date().toISOString(),levelId,players:1,seed,scoringVersion:3,generationVersion:3,revision:1,status:'paused',flowers:0,collectedIds:[],defeatedIds:[],platform:0,seconds:0};
-  return {run,state};
+function defeat(enemy, defeatedIds) {
+  Object.assign(enemy, { hp: 0, isDefeated: true, isDormant: false, defeatedAt: 0 });
+  defeatedIds.push(enemy.id);
 }
-
-export function rogueliteFixture(mode = 'rogue-play', levelId = 'rainbow-1', zoneIndex = 0) {
-  const seed=42,world=createCampaignWorld(seed,levelId,4),adventure=newAdventure(seed),journey=newJourney(),survival=newSurvival('sister');
-  const zone=world.zones[Math.min(zoneIndex,world.zones.length-1)];
-  let safeId=zone.startId;
-  if(mode==='rogue-stack'){adventure.weapons=['blade','bubble','boomerang'];adventure.loadouts[0].weapons=[...adventure.weapons];adventure.loadouts[0].weapon=adventure.weapons[0];adventure.upgrades={frost:1,chain:1,double:1,wide:1,magnet:1};adventure.loadouts[0].upgrades=Object.keys(adventure.upgrades);adventure.effects={rainbowBoost:40,frostTreat:75};}
-  if(mode==='rogue-traps'){safeId=world.hazards[0]?.platformId || safeId;}
-  if(mode==='rogue-finish')safeId=world.finish.id;
-  if(mode==='rogue-score')safeId=world.treasures[0].platformId;
-  survival.lives=6;
-  if(mode==='rogue-fallen'){survival.phase='fallen';survival.hp=0;}
-  const visited=world.zones.filter(z=>z.id<zoneIndex || mode==='rogue-finish').map(z=>z.id+1);
-  const state={version:4,seed,levelId,elapsed:0,isCompleted:false,survival,checkpointId:safeId,collectedIds:[],defeatedIds:[],visited,switches:[],enemies:world.enemies,players:[{safeId,...(mode==='rogue-score'?{safeX:world.treasures[0].x-2}:{}),protection:2,recoveries:0,facing:1}],adventure,journey,supplies:[],mechanisms:[]};
-  if(mode==='rogue-fallen')state.revival={platformId:safeId,offsetX:0};
-  const run={id:crypto.randomUUID(),startedAt:new Date().toISOString(),levelId,players:1,seed,scoringVersion:3,generationVersion:4,revision:1,status:'paused',flowers:0,collectedIds:[],defeatedIds:[],platform:visited.length,seconds:0};
-  return {run,state};
+// 把当前这间房算作清完：怪都打倒，记三颗星。
+function clearRoom(world, rooms, defeatedIds) {
+  const room = world.rooms[rooms.roomId];
+  for (const id of room.enemyIds) defeat(world.enemies[id - 1], defeatedIds);
+  if (room.bossId) defeat(world.enemies[room.bossId - 1], defeatedIds);
+  rooms.cleared.push(room.id); rooms.stars[room.id] = 3;
+  return room;
 }
+function firstDoor(world, room) { return world.doors.find(door => door.roomId === room.id); }
 
-export function bossFixture(mode='boss-play',levelId='forest-3') {
-  const seed=42,world=createCampaignWorld(seed,levelId,5),adventure=newAdventure(seed),journey=newJourney(),survival=newSurvival('sister');
-  if(!['boss-moon','boss-homing','boss-stack-reward'].includes(mode)&&!mode.startsWith('boss-loot')) {
-    adventure.weapons=['blade','bubble','boomerang'];adventure.loadouts[0].weapons=[...adventure.weapons];adventure.loadouts[0].weapon=adventure.weapons[0];adventure.growth={collected:3,power:2,hearts:3};adventure.effects={rainbowBoost:40};
-    survival.maxHp=160;survival.hp=140;
+// 第 10 版选门闯房间的固定存档。mode 决定人站在哪儿、带着什么：
+// door 开场房清完站在第一扇门前；stack 同上但叠了三把武器和限时道具；reward 开场房清完、奖励还没选；
+// score 站在开场房一件宝物左边；loot、loot-pending 脚边有一份小怪掉的补给；fallen、over 血条耗尽；
+// boss、boss-moon、boss-high 一路清到首领房；finish 首领打完站在终点；room 一路清到 roomId 那间房，站在它的起点。
+export function roomFixture(mode = 'door', levelId = WORLD_ACTS[0].id, { seed = 42, roomId = 0 } = {}) {
+  const world = createRoomWorld(seed, levelId), journey = newJourney(), key = `${levelId}:${seed}`;
+  const isBossRoom = mode.startsWith('boss') || mode === 'finish', isDown = ['fallen', 'over'].includes(mode);
+  const survival = newSurvival(isDown ? 'mom' : 'sister');
+  const adventure = isBossRoom ? newAdventure(seed) : starterAdventure(seed, recommendedStarter(survival.character));
+  adventure.ruleset = 9; adventure.difficulty = 'easy'; adventure.locked = [];
+  if (['boss', 'boss-high', 'finish', 'stack'].includes(mode)) {
+    adventure.weapons = ['blade', 'bubble', 'boomerang']; adventure.loadouts[0].weapons = [...adventure.weapons]; adventure.loadouts[0].weapon = adventure.weapons[0];
+    adventure.growth = { collected: 3, power: 2, hearts: 3 }; adventure.effects = { rainbowBoost: 40 };
+    survival.maxHp = 160; survival.hp = 140;
   }
-  const arena=world.bossArenas[['boss-small','boss-moon'].includes(mode)?0:world.bossArenas.length-1];
-  const defeatedIds=[];
-  for(const prior of world.bossArenas.filter(a=>a.id<arena.id)){const e=world.enemies[prior.bossId-1];e.hp=0;e.isDefeated=true;e.isDormant=false;e.defeatedAt=0;defeatedIds.push(e.id);}
-  let safeId=arena.floorId,safeX=arena.left+3;
-  if(mode==='boss-moon')safeX=arena.left+9;
-  if(['boss-high','boss-homing'].includes(mode)){const high=world.platforms.filter(p=>p.zone===world.platforms[arena.floorId].zone&&p.id!==arena.exitId).sort((a,b)=>b.y-a.y)[0];safeId=high.id;safeX=high.x;}
-  if(mode==='boss-growth'){safeId=world.treasures[0].platformId;safeX=world.treasures[0].x-2;}
-  if(mode==='boss-finish'){for(const a of world.bossArenas){const e=world.enemies[a.bossId-1];e.hp=0;e.isDefeated=true;e.isDormant=false;e.defeatedAt=0;if(!defeatedIds.includes(e.id))defeatedIds.push(e.id);}safeId=world.finish.id;safeX=world.finish.x;}
-  if(mode==='boss-stack-reward')journey.pending={id:'qa:weapon-stack',family:'flight',title:'小关通关啦',player:0,tier:'small',pickCount:1,choices:[{type:'weapon',id:'moonblade'},{type:'weapon',id:'stars'},{type:'upgrade',id:'frost'}]};
-  let combatLoot;
-  if(mode.startsWith('boss-loot')) {
-    combatLoot=newCombatLoot();survival.hp=50;
-    for(const enemy of world.enemies.filter(e=>!e.isBoss&&!e.parentId&&!e.isSummoned)) {
-      enemy.hp=0;enemy.isDefeated=true;enemy.defeatedAt=0;defeatedIds.push(enemy.id);
-      const drop=rollCombatLoot(combatLoot,world,enemy,{safe:world.start});
-      if(drop){safeId=drop.platformId;safeX=world.platforms[safeId].x+drop.offsetX;if(mode==='boss-loot-pending')combatLoot.pendingId=drop.enemyId;break;}
-    }
+  if (mode === 'stack') { adventure.upgrades = { frost: 1, chain: 1, double: 1, wide: 1, magnet: 1 }; adventure.loadouts[0].upgrades = Object.keys(adventure.upgrades); adventure.effects.frostTreat = 75; }
+
+  const rooms = newRoomState(world), defeatedIds = [];
+  // 一路走到要去的那间房：有门直通就走那扇，没有就走第一扇；路过的房间奖励都算领过。
+  const targetId = isBossRoom ? world.rooms.at(-1).id : mode === 'room' ? roomId : 0;
+  while (rooms.roomId !== targetId) {
+    const passed = clearRoom(world, rooms, defeatedIds);
+    journey.claimed.push(`room:${key}:${passed.id}`);
+    enterDoor(world, rooms, world.doors.find(door => door.roomId === passed.id && door.targetRoomId === targetId) || firstDoor(world, passed));
   }
-  const state={version:5,seed,levelId,elapsed:0,isCompleted:false,survival,checkpointId:safeId,collectedIds:[],defeatedIds,visited:world.zones.filter(z=>z.id<world.platforms[safeId].zone).map(z=>z.id+1),switches:[],enemies:world.enemies,players:[{safeId,safeX,protection:2,recoveries:0,facing:mode==='boss-homing'?-1:1}],adventure,journey,supplies:[],mechanisms:[]};
-  if(combatLoot)state.combatLoot=combatLoot;
-  const run={id:crypto.randomUUID(),startedAt:new Date().toISOString(),levelId,players:1,seed,scoringVersion:3,generationVersion:5,revision:1,status:'paused',flowers:0,collectedIds:[],defeatedIds,platform:state.visited.length,seconds:0};
-  return {run,state};
+  const room = world.rooms[rooms.roomId], inRoom = platform => platform.roomId === room.id;
+  let safeId = room.startId, safeX, doorKind, combatLoot, revival;
+  if (mode === 'room') safeX = world.platforms[room.startId].x - 2;
+  if (['door', 'stack', 'reward'].includes(mode)) {
+    clearRoom(world, rooms, defeatedIds);
+    const door = firstDoor(world, room);
+    safeId = room.exitId; safeX = doorPosition(world, door).x; doorKind = door.kind;
+    if (mode === 'reward') openRoomReward(adventure, journey, survival, `room:${key}:${room.id}`, room.reward ? `door-${room.reward}` : 'door-upgrade', 'power');
+    else journey.claimed.push(`room:${key}:${room.id}`);
+  }
+  if (mode === 'score') {
+    // 站在一件宝物左边两步，往右走就能捡到。先挑没有怪和陷阱的平台，没有就退一步只要平台不动。
+    const home = item => world.platforms[item.platformId];
+    const reachable = world.treasures.filter(item => item.roomId === room.id && !home(item).isMoving && !home(item).isCrumbling && !home(item).isSeesaw && item.x - 2 > home(item).x - home(item).width / 2 + 0.4);
+    const treasure = reachable.find(item => !world.enemies.some(enemy => enemy.platformId === item.platformId) && !world.hazards.some(hazard => hazard.platformId === item.platformId)) || reachable[0];
+    safeId = treasure.platformId; safeX = treasure.x - 2;
+  }
+  if (mode.startsWith('loot')) {
+    const enemy = world.enemies[room.enemyIds[0] - 1], platform = world.platforms[enemy.platformId];
+    defeat(enemy, defeatedIds);
+    const offsetX = Math.max(-platform.width / 2 + 0.5, Math.min(platform.width / 2 - 0.5, enemy.x - platform.x));
+    combatLoot = newCombatLoot(); combatLoot.drops.push({ enemyId: enemy.id, platformId: platform.id, offsetX, choice: null });
+    if (mode === 'loot-pending') combatLoot.pendingId = enemy.id;
+    safeId = platform.id; safeX = platform.x + offsetX; survival.hp = 50;
+  }
+  if (isDown) {
+    const platform = world.platforms.find(item => inRoom(item) && item.id !== room.startId && !item.isMoving && !item.isCrumbling && !item.isCheckpoint && !item.slope && !item.isSeesaw && item.width >= 5);
+    safeId = platform.id; safeX = platform.x + 0.6; revival = { platformId: platform.id, offsetX: 0.6 };
+    Object.assign(survival, { lives: mode === 'over' ? 0 : 2, attacks: 3, phase: mode, hp: 0 });
+  }
+  if (mode.startsWith('boss')) {
+    const arena = world.bossArenas[0];
+    safeId = arena.floorId; safeX = arena.left + (mode === 'boss-moon' ? 9 : 3);
+    if (mode === 'boss-high') { const high = world.platforms.filter(platform => inRoom(platform) && platform.id !== arena.exitId).sort((a, b) => b.y - a.y)[0]; safeId = high.id; safeX = high.x; }
+  }
+  if (mode === 'finish') {
+    clearRoom(world, rooms, defeatedIds);
+    safeId = world.finish.id; safeX = world.finish.x;
+  }
+  const visited = world.zones.filter(zone => zone.id < room.depth || rooms.cleared.includes(room.id) && zone.id === room.depth).map(zone => zone.id + 1);
+  const state = { version: ADVENTURE_GENERATION_VERSION, seed, levelId, elapsed: 20, isCompleted: false, survival, checkpointId: isDown ? world.start.id : safeId, collectedIds: [], defeatedIds, visited, switches: [],
+    enemies: world.enemies, players: [{ safeId, safeX, protection: 2, recoveries: 0, facing: 1 }], adventure, journey, supplies: [], mechanisms: [], rooms };
+  if (combatLoot) state.combatLoot = combatLoot;
+  if (revival) state.revival = revival;
+  const run = { id: crypto.randomUUID(), startedAt: new Date().toISOString(), levelId, players: 1, seed, scoringVersion: 3, generationVersion: ADVENTURE_GENERATION_VERSION, revision: 1, status: mode === 'over' ? 'ended' : 'paused',
+    flowers: 0, collectedIds: [], defeatedIds, platform: visited.length, seconds: 20 };
+  return { run, state, doorKind };
 }

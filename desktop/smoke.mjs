@@ -1,5 +1,5 @@
-import { adventureFixture, rogueliteFixture } from '../tests/helpers/adventure-fixtures.mjs';
-import { TIMED_ITEMS } from '../shared/adventure-catalog.js';
+import { roomFixture } from '../tests/helpers/adventure-fixtures.mjs';
+import { ADVENTURE_GENERATION_VERSION, TIMED_ITEMS } from '../shared/adventure-catalog.js';
 import { app } from 'electron';
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -94,7 +94,8 @@ export async function runSmoke({ win, requestClose }) {
     await evaluate('document.querySelector(".death-menu .text-button").click()');
     await until('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"');
     const fresh = await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1"))');
-    assert.equal(fresh.state.levelId,'rainbow-1');assert.equal(fresh.state.survival.lives,3);assert.equal(fresh.state.survival.hp,100);assert.equal(fresh.state.survival.character,'mom');
+    // 重来是一次新冒险，用最新的选门地图，从第一个世界的开场房出发。
+    assert.equal(fresh.state.levelId,'rainbow-world');assert.equal(fresh.state.version,ADVENTURE_GENERATION_VERSION);assert.equal(fresh.state.rooms.roomId,0);assert.equal(fresh.state.survival.lives,3);assert.equal(fresh.state.survival.hp,100);assert.equal(fresh.state.survival.character,'mom');
     await writeFile(join(profile,'zero-life-reopen.png'),(await capture()).toPNG());
     requestClose(); return;
   }
@@ -119,17 +120,28 @@ export async function runSmoke({ win, requestClose }) {
   assert.equal(await evaluate('document.querySelectorAll(".reward-panel").length'),0);
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.survival.lives'),3);
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.survival.hp'),100);
-  await evaluate('document.querySelector(".camp-open").click()');
-  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "workbench"');
-  await evaluate('document.querySelector(".weapon-practice button").click()');
-  await wait(1000);
-  await writeFile(join(profile, 'workbench.png'), (await capture()).toPNG());
-  await evaluate('document.querySelector(".workbench-depart").click()');
-  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"');
+  // 新冒险是选门闯房间：顶上是这一章的五层，暂停里有本领一览和选项两张整页。
+  await until('document.querySelectorAll(".room-hud-path li").length === 5');
+  assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.rooms.roomId'),0);
+  await writeFile(join(profile, 'room.png'), (await capture()).toPNG());
+  await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button"), button => button.textContent.trim())'), ['继续探险', '本领一览', '选项', '回到我的花园']);
+  await evaluate('document.querySelectorAll(".adventure-menu-actions .quiet-button")[0].click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "overview"');
+  assert.equal(await evaluate('document.querySelectorAll(".platform-game [role=dialog], .platform-game .adventure-overlay").length'),0,'本领一览是整页，不是弹窗');
+  await writeFile(join(profile, 'overview.png'), (await capture()).toPNG());
+  await evaluate('document.querySelector(".run-overview .home-back").click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
+  await evaluate('document.querySelectorAll(".adventure-menu-actions .quiet-button")[1].click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "options"');
+  await writeFile(join(profile, 'game-options.png'), (await capture()).toPNG());
+  await evaluate('document.querySelector(".home-options .home-back").click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
   // 稀疏宝物不保证出现在任意随机路线；用固定局的真实宝物验证键盘拾取。
-  await evaluate('document.querySelector(".adventure-home").click()');
+  await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
   await until('!!document.querySelector(".home-play")');
-  const scoring=rogueliteFixture('rogue-score');
+  const scoring=roomFixture('score');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(scoring))})`);
   await new Promise(resolve=>{wc.once('did-finish-load',resolve);wc.reload();});
   await until('!!document.querySelector(".home-play")');
@@ -158,10 +170,12 @@ export async function runSmoke({ win, requestClose }) {
   await evaluate('window.gardenDesktop.toggleMaximize()'); await wait(800); assert.equal(win.isMaximized(),true); assert.equal(win.isFullScreen(),false);
   await evaluate('window.gardenDesktop.toggleMaximize()'); await wait(800); assert.equal(win.isMaximized(),false);
   // 隔离配置中注入受伤/死亡边界，再通过真实按钮验证持久化与跨关。
-  await evaluate('document.querySelector(".adventure-home").click()');
+  await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
+  await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
   await until('!!document.querySelector(".home-play")');
-  const completed = rogueliteFixture('rogue-finish');
-  completed.state.adventure = rogueliteFixture('rogue-stack').state.adventure;
+  const completed = roomFixture('finish');
+  completed.state.adventure = roomFixture('stack').state.adventure;
   completed.state.survival.character='mom';completed.state.survival.attacks=3;
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(completed))})`);
   await new Promise(resolve => { wc.once('did-finish-load',resolve); wc.reload(); }); await until('!!document.querySelector(".home-play")');
@@ -197,12 +211,14 @@ export async function runSmoke({ win, requestClose }) {
   await evaluate('document.querySelector(".adventure-menu-actions .primary-button").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"');
   const carried = await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state');
-  assert.equal(carried.levelId,'rainbow-2');assert.equal(carried.survival.character,'mom');assert.equal(carried.survival.hp,100);assert.equal(carried.survival.lives,6);assert.equal(carried.survival.attacks,3);assert.ok(carried.adventure.loadouts[0].weapons.length>=3);
+  // 下一关是第二个世界的开场房；角色、命数、血量、攻击累计和武器都带过去，不补满。
+  assert.equal(carried.levelId,'family-world');assert.equal(carried.version,ADVENTURE_GENERATION_VERSION);assert.equal(carried.rooms.roomId,0);
+  assert.equal(carried.survival.character,'mom');assert.equal(carried.survival.hp,afterReward.survival.hp);assert.equal(carried.survival.lives,afterReward.survival.lives);assert.equal(carried.survival.attacks,3);assert.ok(carried.adventure.loadouts[0].weapons.length>=3);
   for (const [id, remaining] of Object.entries(expectedEffects)) assert.ok(carried.adventure.effects[id] > remaining - 1 && carried.adventure.effects[id] <= remaining, `${id} 的领奖后时长应带入下一关`);
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
   await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
   await until('!!document.querySelector(".home-play")');
-  const fallen=adventureFixture('fallen');
+  const fallen=roomFixture('fallen');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(fallen))})`);
   await new Promise(resolve => { wc.once('did-finish-load',resolve); wc.reload(); }); await until('!!document.querySelector(".home-play")');
   await evaluate('document.querySelector(".home-play").click()');
@@ -218,7 +234,7 @@ export async function runSmoke({ win, requestClose }) {
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
   await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
   await until('!!document.querySelector(".home-play")');
-  const over=adventureFixture('over');
+  const over=roomFixture('over');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(over))})`);
   await new Promise(resolve => { wc.once('did-finish-load',resolve); wc.reload(); }); await until('!!document.querySelector(".home-play")');
   await evaluate('document.querySelector(".home-play").click()');

@@ -1,20 +1,11 @@
 import * as THREE from 'three';
-import { currentSkill } from './skills.js';
 
 // 仅使用已有彩笔素材组合动效；所有几何和材质复用，不逐帧创建 GPU 资源。
 export class SkillEffects {
-  constructor(scene, geometry, materials, rewards, isReducedMotion) {
+  constructor(scene, geometry, materials, isReducedMotion) {
     this.scene = scene; this.geometry = geometry; this.materials = materials;
     this.isReducedMotion = isReducedMotion;
     this.magicViews = new Map(); this.shots = new Map(); this.bursts = []; this.halos = [];
-    this.rewards = rewards.map(reward => {
-      const group = this.group();
-      this.add(group, 'bubble', 2.5, 2.5);
-      this.add(group, reward.kind === 'stars' ? 'stars' : 'bubble', 1.35, 1.35);
-      for (let i = 0; i < 3; i++) this.add(group, 'stars', 0.4, 0.4);
-      group.position.set(reward.x, reward.y, 1);
-      return { reward, group };
-    });
   }
   group() { const group = new THREE.Group(); this.scene.add(group); return group; }
   add(group, kind, width, height) {
@@ -66,17 +57,7 @@ export class SkillEffects {
       });
     }
   }
-  update(waves, state, players, elapsed, cameraX, halfWidth, playerKinds) {
-    const kind = currentSkill(state, elapsed);
-    for (const { reward, group } of this.rewards) {
-      group.visible = !state.collectedIds.includes(reward.id) && Math.abs(reward.x - cameraX) < halfWidth + 3;
-      if (!group.visible) continue;
-      group.position.y = reward.y + (this.isReducedMotion ? 0 : Math.sin(elapsed * 2.5 + reward.id) * 0.2);
-      group.children.slice(2).forEach((mesh, i) => {
-        const angle = i * Math.PI * 2 / 3 + (this.isReducedMotion ? 0 : elapsed);
-        mesh.position.set(Math.cos(angle) * 1.4, Math.sin(angle) * 1.4, 0.1);
-      });
-    }
+  update(waves, players, elapsed, cameraX, halfWidth, playerKinds) {
     // 高叠加只简化绘制，全部弹道仍由战斗层结算。已经画出来的继续用，避免每帧拆掉重建。
     const budget = 120, reach = halfWidth + 5, wanted = [];
     for (const wave of waves) if (wave.isActive && (wave.kind !== 'pulse' || wave.source==='flame' && wave.delay>.8) && Math.abs(wave.x-cameraX)<=reach) wanted.push(wave);
@@ -112,7 +93,7 @@ export class SkillEffects {
         this.add(group, 'stars', 0.6, 0.6).position.set(1.2, 1, 0);
         this.halos[i] = group;
       }
-      const playerKind = playerKinds?.[i] || kind;
+      const playerKind = playerKinds[i];
       const halo = this.halos[i]; halo.visible = playerKind !== 'blade';
       halo.position.set(player.x, player.y + 1.1, 0.4);
       halo.rotation.z = this.isReducedMotion ? 0 : Math.sin(elapsed * 2) * 0.12;

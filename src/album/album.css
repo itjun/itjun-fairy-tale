@@ -1,0 +1,29 @@
+.home-album .home-page-header, .home-album .home-page-content { max-width: 1280px; }
+.home-album .home-page-header { display: flex; align-items: center; justify-content: space-between; flex-direction: row-reverse; padding-bottom: 14px; }
+.home-album .home-page-header h1 { margin: 0; font-size: 36px; }
+.home-album .home-page-content { padding-top: 18px; }
+.album-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
+.album-picture { position: relative; margin: 0; }
+.album-picture img { display: block; width: 100%; aspect-ratio: 1672 / 941; object-fit: cover; border: 3px solid #2f2a25; border-radius: 6px 9px 7px 10px; }
+.album-pieces { position: absolute; left: 3px; right: 3px; top: 3px; aspect-ratio: 1672 / 941; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }
+.album-pieces span { display: grid; place-items: center; background: #f4eedd; border: 2px dashed #9d9b71; color: #9d9b71; font-size: 54px; }
+.album-pieces span.is-lit { background: none; border-color: #2f2a2533; }
+.album-picture figcaption { margin-top: 10px; text-align: center; font-size: 24px; color: #514f45; }
+.album-unlock h2 { margin: 0 0 8px; font-size: 24px; font-weight: 400; color: #a83e66; }
+.album-unlock h2:not(:first-child) { margin-top: 22px; }
+.album-unlock p { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 20px; color: #777761; }
+.album-unlock p.is-open { color: #304a2b; }
+.album-unlock p img { width: 44px; height: 44px; object-fit: contain; }
+.album-unlock ul { margin: 0; padding: 0; list-style: none; font-size: 17px; color: #514f45; }
+.album-unlock li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #ded9c9; }
+.album-unlock small { display: block; margin-top: 12px; font-size: 15px; line-height: 1.6; color: #777761; }
+.album-pages { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+.album-pages button { position: relative; padding: 4px; border: 2px solid #9d9b71; border-radius: 6px; background: #fffdf6; min-height: 44px; }
+.album-pages button[aria-pressed="true"] { background: #b6e84a; border-color: #3d6b1e; }
+.album-pages img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 3px; }
+.album-pages img.is-dim { filter: grayscale(1) opacity(.35); }
+.album-pages :is(span, svg) { position: absolute; right: 4px; bottom: 4px; padding: 0 4px; background: #fffdf6; border-radius: 4px; font-size: 13px; color: #c47a1c; }
+@media (max-width: 900px) {
+  .album-layout { grid-template-columns: minmax(0, 1fr); }
+  .album-pages { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}

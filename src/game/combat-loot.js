@@ -9,10 +9,11 @@ export const LIFE_CHOICES = {
 };
 export function newCombatLoot() { return {drops:[],misses:0,pendingId:null}; }
 export function rollCombatLoot(loot,world,enemy,player) {
-  if(enemy.isBoss||enemy.parentId||enemy.isSummoned||loot.drops.length>=3||loot.drops.some(d=>d.enemyId===enemy.id))return null;
+  // 一章最多一份。前 11 只不掉，之后大约五只里才有一只掉，打满 18 只还没有才给。
+  if(enemy.isBoss||enemy.parentId||enemy.isSummoned||loot.drops.length>=1||loot.drops.some(d=>d.enemyId===enemy.id))return null;
   loot.misses++;
   const random=randomGenerator((world.seed ^ Math.imul(enemy.id,2654435761))>>>0);
-  if(loot.misses<3 || loot.misses<8&&random()>=.24)return null;
+  if(loot.misses<12 || loot.misses<18&&random()>=.2)return null;
   const platform=world.platforms.filter(p=>!p.isMoving&&!p.isCrumbling&&p.isEnabled!==false&&p.y<=enemy.y+1&&Math.abs(p.x-enemy.x)<p.width/2+4).sort((a,b)=>Math.hypot(a.x-enemy.x,a.y-enemy.y)-Math.hypot(b.x-enemy.x,b.y-enemy.y))[0] || player.safe;
   const offsetX=Math.max(-platform.width/2+.5,Math.min(platform.width/2-.5,enemy.x-platform.x));
   const drop={enemyId:enemy.id,platformId:platform.id,offsetX,choice:null};
@@ -38,7 +39,7 @@ export function chooseLifeLoot(loot,adventure,survival,enemyId,id) {
 }
 export function isValidCombatLoot(loot,world,defeatedIds) {
   if(loot===undefined)return true;
-  if(!loot||!Array.isArray(loot.drops)||loot.drops.length>3||new Set(loot.drops.map(d=>d?.enemyId)).size!==loot.drops.length||!Number.isInteger(loot.misses)||loot.misses<0||loot.misses>8)return false;
+  if(!loot||!Array.isArray(loot.drops)||loot.drops.length>1||new Set(loot.drops.map(d=>d?.enemyId)).size!==loot.drops.length||!Number.isInteger(loot.misses)||loot.misses<0||loot.misses>18)return false;
   if(!loot.drops.every(d=>{const e=world.enemies[d?.enemyId-1],p=world.platforms[d?.platformId];return e&&!e.isBoss&&!e.parentId&&defeatedIds.includes(d.enemyId)&&p&&!p.isMoving&&!p.isCrumbling&&Number.isFinite(d.offsetX)&&Math.abs(d.offsetX)<=p.width/2&&(d.isDeferred===undefined||typeof d.isDeferred==='boolean')&&(d.choice===null||Object.hasOwn(LIFE_CHOICES,d.choice));}))return false;
   return loot.pendingId===null||loot.drops.some(d=>d.enemyId===loot.pendingId&&d.choice===null&&!d.isDeferred);
 }

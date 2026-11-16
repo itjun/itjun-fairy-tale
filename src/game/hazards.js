@@ -2,6 +2,8 @@ import { heal, resourcesFor } from './expedition.js';
 import { addLife } from './characters.js';
 
 export function hazardState(hazard, elapsed) {
+  // 刺丛、积木堆这类障碍一直在原地，没有节拍。
+  if(hazard.kind==='block')return {isWarning:false,isActive:true,angle:0,x:hazard.x,y:hazard.y};
   const beat=(elapsed+hazard.phase)%hazard.period;
   const isWarning=beat<hazard.warning, isActive=beat>=hazard.warning&&beat<hazard.warning+hazard.active;
   const swing=Math.sin(elapsed*1.25+hazard.phase)*.7;
@@ -20,6 +22,7 @@ export function stepMechanisms(world, player, elapsed, dt) {
 export function touchingHazard(player,hazard,elapsed){
   if(player.protection>0)return false;
   const state=hazardState(hazard,elapsed);
+  if(hazard.kind==='block')return Math.abs(player.x-hazard.x)<.9&&player.y<hazard.y+1.1&&player.y+1.6>hazard.y;
   if(hazard.kind==='pendulum')return Math.abs(player.x-state.x)<1.2&&Math.abs(player.y+.8-state.y)<1.4;
   if(hazard.kind==='icicle')return state.isActive&&Math.abs(player.x-hazard.x)<1.1&&Math.abs(player.y+.8-state.y-.8)<1.6;
   return state.isActive&&Math.abs(player.x-hazard.x)<1.3&&player.y<hazard.y+(hazard.kind==='thorns'?1.2:3)&&player.y+1.6>hazard.y;

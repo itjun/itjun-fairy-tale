@@ -1,43 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STAGES } from '../shared/levels.js';
-import { createCampaignWorld, validateCampaign } from '../shared/campaign.js';
+import { WORLD_ACTS } from '../shared/levels.js';
+import { createRoomWorld } from '../shared/room-world.js';
 import { newSurvival, takeDamage } from '../src/game/characters.js';
-import { newAdventure, newJourney, queueReward, openReward, chooseReward, weaponPressure } from '../src/game/adventure.js';
-import { bossTargetHp } from '../shared/boss-health.js';
+import { newAdventure, weaponPressure } from '../src/game/adventure.js';
+import { bossBaseline, bossTargetHp } from '../shared/boss-health.js';
 import { collectGrowth, weaponDamage } from '../src/game/growth.js';
 import { heal } from '../src/game/expedition.js';
 import { damageEnemy } from '../src/game/combat.js';
 import { fireLoadout, stepAdventureWave } from '../src/game/adventure-combat.js';
 import { stepBosses, constrainBossArena, currentBoss } from '../src/game/bosses.js';
 import { createPlayer, rescue } from '../src/game/physics.js';
-import { GardenEngine } from '../src/game/engine.js';
 import { readAdventure, writeAdventure } from '../src/game/save.js';
-import { bossFixture, rogueliteFixture } from './helpers/adventure-fixtures.mjs';
+import { roomFixture } from './helpers/adventure-fixtures.mjs';
+import { headless, run } from './helpers/headless-engine.mjs';
 import { validateRun } from '../server/store.mjs';
 
-const storage=()=>{const data=new Map();return {getItem:key=>data.get(key),setItem:(key,value)=>data.set(key,value)};};
-function headless(mode='boss-play',level='rainbow-1') {
-  const f=bossFixture(mode,level),w=createCampaignWorld(f.run.seed,level,5),state=f.state;
-  state.enemies.forEach((e,i)=>Object.assign(w.enemies[i],e));
-  const player=createPlayer(w.platforms[state.players[0].safeId]);player.x=state.players[0].safeX;player.safeX=player.x;
-  return Object.assign(Object.create(GardenEngine.prototype),{world:w,platforms:w.platforms,stage:STAGES.find(s=>s.id===level),level:STAGES.find(s=>s.id===level),levelKey:`${level}:42`,seed:42,
-    players:[player],survival:state.survival,adventure:state.adventure,journey:state.journey,isPaused:false,elapsed:0,keys:new Set(),touch:new Set(),jumps:[false],waves:[],enemyShots:[],damageNumbers:[],damageSequence:0,
-    visited:new Set(state.visited),furthestPlatform:state.visited.length,checkpoint:0,checkpointId:state.checkpointId,distance:0,collected:0,collectedIds:[],claimedSupplies:[],defeatedIds:state.defeatedIds,pickups:[],skillRewards:[],skillState:{kind:'blade',until:0,collectedIds:[]},
-    camera:{right:24},cameraX:player.x+8,skillEffects:{burst(){}},treasureViews:new Map(w.treasures.map(t=>[t.id,{isCollected:false,kind:t.kind,mesh:{visible:true}}])),supplyViews:new Map(w.supplies.map(s=>[s.id,{visible:true}])),
-    callbacks:{onSound(){},onUpdate(){},onLifeChange(){},onComplete(){}},snapshot(){return {survival:structuredClone(this.survival)};},publish(){}});
-}
+const storage=()=>{const data=new Map();return {getItem:key=>data.get(key) ?? null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};};
+const bossOf=world=>world.enemies[world.bossArenas[0].bossId-1];
 
-test('24 个小关首领与 8 个大关首领都有可达场地，旧地图保持原样',()=>{
-  let bosses=0,worldBosses=0;
-  for(const stage of STAGES)for(const seed of [1,42,137]) {
-    const w=createCampaignWorld(seed,stage,5);assert.ok(validateCampaign(w),stage.id);
-    assert.equal(w.bossArenas.length,stage.chapter===2?2:1);
-    assert.deepEqual(w,createCampaignWorld(seed,stage,5));
-    for(const arena of w.bossArenas){const b=w.enemies[arena.bossId-1];assert.ok(b.isDormant);assert.equal(b.hp,b.maxHp);assert.ok(b.patterns.length>=2);if(seed===1){bosses++;if(b.isWorldBoss)worldBosses++;}}
-    const old=createCampaignWorld(seed,stage,4);assert.equal(old.bossArenas,undefined);assert.equal(old.treasures.length,stage.roomCount);
+test('八个世界各有一场首领，开战前睡着，同一个种子不变',()=>{
+  for(const act of WORLD_ACTS)for(const seed of [1,42,137]) {
+    const w=createRoomWorld(seed,act),b=bossOf(w);
+    assert.equal(w.bossArenas.length,1,act.id);assert.deepEqual(w,createRoomWorld(seed,act));
+    assert.ok(b.isDormant);assert.equal(b.hp,b.maxHp);assert.equal(b.maxHp,bossBaseline(act));assert.equal(b.skills.length,2);
+    assert.equal(w.finish.id,w.bossArenas[0].exitId,'终点就是首领房的出口');
   }
-  assert.equal(bosses,32);assert.equal(worldBosses,8);
 });
 
 test('同一次发射各武器伤害不同，命中扣真实血量，往返与连锁不会沿用固定 1 点',()=>{
@@ -61,160 +49,144 @@ test('收集四份材料增长血量上限和全部武器攻击，命数不变',
   assert.equal(weaponDamage('blade',a.growth.power),33);assert.equal(weaponDamage('seed',a.growth.power),79);
 });
 
-test('BOSS 进入场地才激活，活着时出口封闭，机关破盾和半血第二阶段有效',()=>{
-  const w=createCampaignWorld(42,'forest-3',5),arena=w.bossArenas[1],boss=w.enemies[arena.bossId-1],p=createPlayer(w.platforms[arena.floorId]);
-  const prior=w.enemies[w.bossArenas[0].bossId-1];prior.isDefeated=true;prior.hp=0;
+test('首领进了场地才醒，活着时出不了场地，半血后两招轮着来',()=>{
+  const w=createRoomWorld(42,WORLD_ACTS[6]),arena=w.bossArenas[0],boss=bossOf(w),p=createPlayer(w.platforms[arena.floorId]);
   p.x=arena.left-2;const shots=[];stepBosses(w,p,.1,.1,shots);assert.equal(currentBoss(w),undefined);
   assert.equal(damageEnemy(boss,.1,{damage:100}),false);assert.equal(boss.hp,boss.maxHp);
-  p.x=arena.left+2;stepBosses(w,p,.1,.2,shots);assert.equal(currentBoss(w).id,boss.id);assert.ok(boss.isShielded);
-  damageEnemy(boss,.3,{damage:20});assert.equal(boss.lastDamage,14);assert.equal(boss.lastBlocked,6);
+  p.x=arena.left+2;stepBosses(w,p,.1,.2,shots);assert.equal(currentBoss(w).id,boss.id);assert.equal(boss.isShielded,false);
+  damageEnemy(boss,.3,{damage:20});assert.equal(boss.lastDamage,20);
   p.x=arena.right+5;constrainBossArena(w,p);assert.ok(p.x<arena.right);
-  p.x=arena.switchX;stepBosses(w,p,.1,.4,shots);assert.equal(boss.isShielded,false);damageEnemy(boss,.4,{damage:20});assert.equal(boss.lastDamage,20);
-  p.x=arena.left+2;stepBosses(w,p,.1,12.5,shots);assert.ok(boss.isShielded);
-  boss.hp=Math.floor(boss.maxHp/2);stepBosses(w,p,.1,12.6,shots);assert.ok(boss.isEnraged);
+  p.x=arena.left-5;constrainBossArena(w,p);assert.ok(p.x>arena.left);
+  boss.hp=Math.floor(boss.maxHp/2);stepBosses(w,p,.1,.4,shots);assert.ok(boss.isEnraged);
 });
 
-test('每场 BOSS 各招式先预告至少 2 秒，不能从远处触发伤害',()=>{
-  for(const stage of STAGES){const w=createCampaignWorld(42,stage,5);for(const arena of w.bossArenas){
-    for(const earlier of w.bossArenas.filter(a=>a.id<arena.id)){w.enemies[earlier.bossId-1].isDefeated=true;w.enemies[earlier.bossId-1].hp=0;}
-    const p=createPlayer(w.platforms[arena.floorId]);p.x=arena.left+2;const shots=[];let firstWarning,firstShot;
-    for(let n=0;n<900;n++){const t=n/120;stepBosses(w,p,1/120,t,shots);const b=w.enemies[arena.bossId-1];if(b.isWarning&&firstWarning===undefined)firstWarning=t;if(shots.length&&firstShot===undefined)firstShot=t;}
-    assert.ok(firstWarning>=.99&&firstWarning<1.1);assert.ok(firstShot-firstWarning>=1.99,`${stage.id}/${arena.id}`);
-  }}
+test('每场首领出招前先预告至少 2 秒，站在场地外不会挨打',()=>{
+  for(const act of WORLD_ACTS){
+    const w=createRoomWorld(42,act),arena=w.bossArenas[0],b=bossOf(w),p=createPlayer(w.platforms[arena.floorId]),shots=[];
+    p.x=arena.left-3;for(let n=0;n<600;n++)stepBosses(w,p,1/120,n/120,shots);
+    assert.equal(shots.length,0,act.id);assert.ok(b.isDormant);
+    p.x=arena.left+2;let firstWarning,firstShot;
+    for(let n=0;n<900;n++){const t=n/120;stepBosses(w,p,1/120,t,shots);if(b.isWarning&&firstWarning===undefined)firstWarning=t;if(shots.length&&firstShot===undefined)firstShot=t;}
+    assert.ok(firstWarning>=.99&&firstWarning<1.1,act.id);assert.ok(firstShot-firstWarning>=1.99,act.id);
+  }
 });
 
-test('BOSS 未击败不能通关或伪造通关计分；完成后只奖励一次',()=>{
-  const game=headless('boss-finish','rainbow-3'),last=game.world.enemies.at(-1);last.isDefeated=false;last.hp=last.maxHp;game.defeatedIds=game.defeatedIds.filter(id=>id!==last.id);
-  game.tick();assert.equal(game.isCompleted,undefined);assert.equal(game.journey.pending,null);
-  const f=bossFixture('boss-finish','rainbow-3');f.run.status='completed';f.run.platform=game.world.zones.length;f.run.defeatedIds=[];assert.throws(()=>validateRun(f.run),/BOSS/);
-  last.hp=0;last.isDefeated=true;game.defeatedIds.push(last.id);rescue(game.players[0],game.world.finish);game.tick();assert.ok(game.isCompleted);assert.equal(game.journey.pending.tier,'world');assert.equal(game.journey.pending.choices.length,4);assert.equal(game.journey.pending.pickCount,2);
-  assert.equal(game.adventure.resources.balance,12);assert.equal(game.survival.maxHp,180);assert.equal(game.adventure.growth.power,3);
-  const frozen=game.adventure.effects.rainbowBoost;game.tick();assert.equal(game.adventure.effects.rainbowBoost,frozen);assert.equal(game.adventure.resources.balance,12);
+test('首领没打倒不能通关，也不能伪造通关成绩；打倒后走到出口只奖励一次',()=>{
+  const game=headless('finish'),boss=bossOf(game.world);
+  boss.isDefeated=false;boss.hp=boss.maxHp;game.defeatedIds=game.defeatedIds.filter(id=>id!==boss.id);
+  game.tick();assert.equal(game.isCompleted,false);assert.equal(game.journey.pending,null);
+  const f=roomFixture('finish');f.run.status='completed';f.run.platform=game.world.zones.length;f.run.defeatedIds=f.run.defeatedIds.filter(id=>id!==boss.id);
+  assert.throws(()=>validateRun(f.run),/BOSS/);
+  const before={balance:game.adventure.resources.balance,maxHp:game.survival.maxHp,power:game.adventure.growth.power};
+  boss.hp=0;boss.isDefeated=true;game.defeatedIds.push(boss.id);rescue(game.players[0],game.world.finish);game.tick();
+  assert.ok(game.isCompleted);assert.equal(game.journey.pending.id,`finish:${game.levelKey}`);assert.equal(game.journey.pending.tier,'boss');
+  assert.ok(game.journey.pending.choices.some(choice=>choice.rarity==='legendary'),'首领保底一张传奇');
+  assert.equal(game.adventure.resources.balance,before.balance+6);assert.equal(game.survival.maxHp,before.maxHp+20);assert.equal(game.adventure.growth.power,before.power+1);
+  // 领完奖励还站在出口上，不会再发第二份。
+  assert.ok(game.selectReward(0,game.journey.pending.id,0));const claimed=structuredClone(game.adventure.growth),balance=game.adventure.resources.balance;
+  game.isPaused=false;game.tick();assert.equal(game.journey.pending,null);assert.deepEqual(game.adventure.growth,claimed);assert.equal(game.adventure.resources.balance,balance);
 });
 
-test('大关四选二必须两项不同，确认一次共同发放，恢复后候选不重抽',()=>{
-  const a=newAdventure(42),j=newJourney(),s=newSurvival();queueReward(j,'boss:test','nature','大关胜利','world');openReward(a,j,s);
-  const original=structuredClone(j);assert.equal(chooseReward(a,j,0,s),false);assert.equal(chooseReward(a,j,[0,0],s),false);assert.deepEqual(j,original);
-  assert.equal(chooseReward(a,j,[0,1],s),true);assert.equal(j.pending,null);const after=structuredClone(a);assert.equal(chooseReward(a,j,[0,1],s),false);assert.deepEqual(a,after);
-  assert.equal(queueReward(j,'boss:test','nature','大关胜利','world'),false);
-});
-
-test('BOSS 血量、招式、护盾剩余时间与成长完整续存，非法状态拒绝',()=>{
-  const g=headless('boss-play','forest-3');g.tick();const b=currentBoss(g.world);b.hp-=37;b.attackTime=.8;b.attackStage='warning';b.warningX=b.x-5;b.warningY=b.baseY+5.2;b.shieldUntil=5;g.adventure.growth.collected=2;g.elapsed=1;
-  const f=bossFixture(),mem=storage();writeAdventure(f.run,g.exportState(),mem);const saved=readAdventure(mem);assert.ok(saved);const restored=headless('boss-play','forest-3');restored.restoreState(saved.state);
-  assert.equal(currentBoss(restored.world).hp,b.hp);assert.equal(currentBoss(restored.world).attackTime,.8);assert.equal(currentBoss(restored.world).shieldUntil,5);assert.equal(currentBoss(restored.world).warningX,b.x-5);assert.equal(currentBoss(restored.world).warningY,b.baseY+5.2);assert.deepEqual(restored.adventure.growth,g.adventure.growth);assert.equal(restored.survival.maxHp,160);
+test('首领的血量、招式、预告落点和成长随存档保留，改坏的状态不收',()=>{
+  const g=headless('boss','forest-world');g.tick();const b=currentBoss(g.world);
+  b.hp-=37;b.attackTime=.8;b.attackStage='warning';b.warningX=b.x-5;b.warningY=b.baseY+5.2;g.adventure.growth.collected=2;
+  const f=roomFixture('boss','forest-world'),mem=storage();writeAdventure(f.run,g.exportState(),mem);
+  const saved=readAdventure(mem);assert.ok(saved);
+  const restored=headless('boss','forest-world');restored.restoreState(saved.state);const again=currentBoss(restored.world);
+  assert.deepEqual([again.hp,again.maxHp,again.attackTime,again.attackStage,again.warningX,again.warningY],[b.hp,b.maxHp,.8,'warning',b.x-5,b.baseY+5.2]);
+  assert.deepEqual(restored.adventure.growth,g.adventure.growth);assert.equal(restored.survival.maxHp,160);
   const invalid=structuredClone(saved);invalid.state.enemies.find(e=>e.id===b.id).attackStage='skip';writeAdventure(invalid.run,invalid.state,mem);assert.equal(readAdventure(mem),null);
 });
 
-test('旧生命档先备份再升级，旧版地图和剩余生命不被重抽',()=>{
-  const f=rogueliteFixture(),mem=storage();f.state.survival.version=2;delete f.state.survival.maxLives;delete f.state.survival.hp;delete f.state.survival.maxHp;delete f.state.adventure.growth;
-  writeAdventure(f.run,f.state,mem);const original=mem.getItem('garden-active-adventure-v1');const saved=readAdventure(mem);assert.ok(saved);assert.equal(saved.state.version,4);assert.equal(saved.state.survival.lives,6);assert.equal(saved.state.survival.maxHp,100);
-  writeAdventure(saved.run,saved.state,mem);assert.equal(mem.getItem('garden-active-adventure-v1-before-boss-growth'),original);
-});
-
-test('初始单光刃能打赢首关 BOSS，伤害数字不挤在同一处',()=>{
-  const g=headless('boss-small','rainbow-1');g.adventure=newAdventure(42);g.adventure.weapons=['blade'];g.adventure.loadouts[0].weapons=['blade'];g.survival=newSurvival('dad');g.keys.add('KeyJ');
-  const b=g.world.enemies.at(-1);for(let n=0;n<3600&&!b.isDefeated&&g.survival.phase==='alive';n++){g.elapsed+=1/120;g.tick();}
-  assert.ok(b.isDefeated);assert.ok(g.elapsed<30);assert.ok(g.survival.lives>0);assert.ok(g.defeatedIds.includes(b.id));
-  assert.ok(g.damageNumbers.filter(item=>item.enemyId===b.id).length<=3);
-});
-
-test('未强化的一把弯刀能在 35 秒内打赢全部 32 位 BOSS，保留足够生命容错',t=>{
+test('只带一把没强化的弯刀，站着不躲也能在 14 秒内打赢八位首领，一条命都不掉',t=>{
   const results=[];
-  for(const stage of STAGES)for(const index of stage.chapter===2?[0,1]:[0]) {
-    const g=headless(index===0?'boss-small':'boss-play',stage.id),arena=g.world.bossArenas[index],boss=g.world.enemies[arena.bossId-1];
-    g.adventure=newAdventure(42);g.survival=newSurvival('little');
-    rescue(g.players[0],g.world.platforms[arena.floorId],arena.left+3);g.players[0].protection=0;g.keys.add('KeyJ');
-    // 不走位、不踩破盾机关、无护盾或追加攻击天赋，验证初始单武器的容错。
-    for(let n=0;n<4200&&!boss.isDefeated&&g.survival.phase==='alive';n++){g.elapsed+=1/120;g.tick();}
-    const result={stage:stage.id,boss:boss.name,seconds:Number(g.elapsed.toFixed(2)),lives:g.survival.lives,hp:boss.hp};results.push(result);
-    assert.ok(boss.isDefeated,JSON.stringify(result));assert.ok(g.survival.lives>=3,JSON.stringify(result));
-    assert.equal(g.adventure.growth.power,0);assert.deepEqual(g.adventure.loadouts[0].weapons,['moonblade']);
+  for(const act of WORLD_ACTS) {
+    const g=headless('boss-moon',act.id),boss=bossOf(g.world),start=g.elapsed;
+    g.adventure.difficulty='normal';g.applyRoomRules();g.survival=newSurvival('little');g.players[0].protection=0;g.keys.add('KeyJ');
+    run(g,30,()=>boss.isDefeated||g.survival.phase!=='alive');
+    const result={stage:act.id,boss:boss.name,seconds:Number((g.elapsed-start).toFixed(2)),lives:g.survival.lives,hp:boss.hp};results.push(result);
+    assert.ok(boss.isDefeated,JSON.stringify(result));assert.ok(result.seconds<=14,JSON.stringify(result));assert.equal(g.survival.lives,3,JSON.stringify(result));
+    assert.ok(g.defeatedIds.includes(boss.id));assert.equal(g.adventure.growth.power,0);assert.deepEqual(g.adventure.loadouts[0].weapons,['moonblade']);
+    assert.ok(g.damageNumbers.filter(item=>item.enemyId===boss.id).length<=3,'伤害数字不挤在同一处');
   }
-  assert.equal(results.length,32);
-  t.diagnostic(`单弯刀战斗：${Math.min(...results.map(r=>r.seconds))}–${Math.max(...results.map(r=>r.seconds))} 秒；最少剩余 ${Math.min(...results.map(r=>r.lives))}/9 生命`);
+  t.diagnostic(`单弯刀战斗：${Math.min(...results.map(r=>r.seconds))}–${Math.max(...results.map(r=>r.seconds))} 秒`);
 });
 
-test('叠厚的武器开战才加厚首领，单把弯刀保持原血量，打掉的比例随存档保留',()=>{
-  const stage=STAGES.find(s=>s.id==='meadow-3'),plain=newAdventure(7);
-  const untouched=createCampaignWorld(42,stage,6),arena=untouched.bossArenas.at(-1),boss=untouched.enemies[arena.bossId-1];
-  for(const prior of untouched.bossArenas){if(prior.id>=arena.id)break;const enemy=untouched.enemies[prior.bossId-1];enemy.hp=0;enemy.isDefeated=true;enemy.isDormant=false;}
+test('同一小段时间里首领最多掉一成二的血，普通小怪仍是一下打倒', () => {
+  const boss = { isBoss: true, combatVersion: 2, hp: 1200, maxHp: 1200, isDefeated: false, attackStage: 'rest' };
+  let dealt = 0;
+  for (let i = 0; i < 40; i++) { damageEnemy(boss, 1, { damage: 400, x: 0 }); dealt += boss.lastDamage; }
+  assert.equal(boss.isDefeated, false);
+  assert.equal(dealt, Math.round(1200 * 0.12));
+  damageEnemy(boss, 1.5, { damage: 400, x: 0 });
+  assert.equal(boss.lastDamage, Math.round(1200 * 0.12));
+  assert.ok(boss.hp > boss.maxHp * 0.7);
+  const minion = { hp: 10, combatVersion: 2, isDefeated: false, attackStage: 'rest' };
+  assert.equal(damageEnemy(minion, 1, { damage: 30, x: 0 }), true);
+});
+
+test('叠满武器按住攻击，半秒打不倒首领', () => {
+  const g = headless('boss-moon', 'meadow-world');
+  g.adventure.difficulty = 'normal'; g.applyRoomRules();
+  g.adventure.growth.power = 6;
+  g.adventure.weapons = ['blade', 'bubble', 'stars', 'boomerang', 'seed', 'firefly', 'flame', 'moonblade'];
+  g.adventure.weaponRanks = Object.fromEntries(g.adventure.weapons.map(id => [id, 4]));
+  g.adventure.upgrades = { double: 1, split: 1, fan: 2, rapid: 3, area: 2 };
+  g.adventure.loadouts[0].weapons = [...g.adventure.weapons];
+  g.adventure.loadouts[0].upgrades = Object.keys(g.adventure.upgrades);
+  const boss = bossOf(g.world);
+  g.keys.add('KeyJ');
+  run(g, 0.5, () => boss.isDefeated);
+  assert.equal(boss.isDefeated, false);
+  assert.ok(boss.hp > boss.maxHp * 0.5, `半秒后还剩 ${boss.hp}/${boss.maxHp}`);
+});
+
+test('叠厚的武器开战才加厚首领，最多 1.8 倍；单把弯刀保持原血量，打掉的比例随存档保留',()=>{
+  const act=WORLD_ACTS[4],plain=newAdventure(7),baseline=bossBaseline(act);
+  const untouched=createRoomWorld(42,act),arena=untouched.bossArenas[0],boss=bossOf(untouched);
   stepBosses(untouched,{x:arena.left+2,y:arena.y},1/60,1,[],plain);
-  assert.ok(weaponPressure(plain)<=1);assert.equal(boss.maxHp,880);
+  assert.ok(weaponPressure(plain)<=1);assert.equal(boss.maxHp,baseline);
   const stacked=newAdventure(7);
   stacked.growth.power=5;stacked.weapons=['blade','boomerang','stars','seed','firefly','bubble','moonblade'];stacked.weaponRanks={blade:2,moonblade:2};stacked.upgrades={double:1,fan:1};
   stacked.loadouts[0].weapons=[...stacked.weapons];stacked.loadouts[0].weapon='blade';stacked.loadouts[0].upgrades=['double','fan'];
-  const pressure=weaponPressure(stacked);
-  for(const [role,index] of [['mid',0],['small',1],['world',2]]){
-    const world=createCampaignWorld(42,stage,6),nextArena=world.bossArenas[index],enemy=world.enemies[nextArena.bossId-1];
-    for(const prior of world.bossArenas){if(prior.id>=nextArena.id)break;const beaten=world.enemies[prior.bossId-1];beaten.hp=0;beaten.isDefeated=true;beaten.isDormant=false;}
-    const baseline=enemy.maxHp,half=Math.floor(baseline/2);enemy.hp=half;
-    stepBosses(world,{x:nextArena.left+2,y:nextArena.y},1/60,1,[],stacked);
-    const target=bossTargetHp(stage,role,pressure);
-    assert.equal(enemy.maxHp,target,role);assert.equal(enemy.hp,Math.ceil(half/baseline*target),role);assert.ok(target>baseline*8,role);
-    stepBosses(world,{x:nextArena.left+2,y:nextArena.y},1/60,2,[],stacked);assert.equal(enemy.maxHp,target,role);
-  }
-  const f=bossFixture('boss-play','forest-3'),forest=STAGES.find(s=>s.id==='forest-3'),mem=storage();
-  const live=f.state.enemies.find(e=>e.isBoss&&!e.isDefeated),savedTarget=bossTargetHp(forest,'world',weaponPressure(f.state.adventure));
-  live.maxHp=savedTarget;live.hp=savedTarget-80;
+  const world=createRoomWorld(42,act),enemy=bossOf(world),half=Math.floor(baseline/2),target=bossTargetHp(act,weaponPressure(stacked));
+  enemy.hp=half;stepBosses(world,{x:arena.left+2,y:arena.y},1/60,1,[],stacked);
+  assert.equal(target,Math.round(baseline*1.8));assert.equal(enemy.maxHp,target);assert.equal(enemy.hp,Math.ceil(half/baseline*target));
+  stepBosses(world,{x:arena.left+2,y:arena.y},1/60,2,[],stacked);assert.equal(enemy.maxHp,target,'加厚只算一次');
+  const f=roomFixture('boss',act.id),mem=storage(),live=f.state.enemies.find(e=>e.isBoss&&!e.isDefeated);
+  live.isDormant=false;live.maxHp=target;live.hp=target-80;
   writeAdventure(f.run,f.state,mem);const saved=readAdventure(mem);
-  assert.ok(saved);assert.equal(saved.state.enemies.find(e=>e.id===live.id).maxHp,savedTarget);assert.equal(saved.state.enemies.find(e=>e.id===live.id).hp,savedTarget-80);
-});
-
-test('旧 BOSS 按剩余比例降低血量，死亡状态和重复存取稳定，首次覆盖前备份',()=>{
-  for(const hasMaxHp of [false,true])for(const fraction of [0,.37,1]) {
-    const f=bossFixture('boss-play','forest-3'),stage=STAGES.find(s=>s.id===f.run.levelId),mem=storage();
-    const boss=f.state.enemies.at(-1),currentMax=boss.maxHp;
-    for(const e of f.state.enemies)if(e.isBoss){const oldMax=e.isWorldBoss?660+stage.worldIndex*650:240+stage.index*90;e.maxHp=oldMax;e.hp=e.isDefeated?0:oldMax;}
-    boss.hp=Math.floor(boss.maxHp*fraction);const expected=Math.ceil(boss.hp/boss.maxHp*currentMax);
-    if(!fraction){boss.isDefeated=true;f.state.defeatedIds.push(boss.id);}
-    if(!hasMaxHp)for(const e of f.state.enemies)delete e.maxHp;
-    writeAdventure(f.run,f.state,mem);const original=mem.getItem('garden-active-adventure-v1');
-    const saved=readAdventure(mem);assert.ok(saved);assert.equal(saved.state.enemies.at(-1).hp,expected);assert.equal(saved.state.enemies.at(-1).maxHp,currentMax);
-    assert.deepEqual(saved.state.defeatedIds,f.state.defeatedIds);assert.deepEqual(saved.state.adventure,f.state.adventure);
-    for(let i=0;i<3;i++){writeAdventure(saved.run,saved.state,mem);assert.deepEqual(readAdventure(mem),saved);}
-    if(!hasMaxHp)assert.equal(mem.getItem('garden-active-adventure-v1-before-easier-combat'),original);
-  }
-  for(const corrupt of [{maxHp:999999},{maxHp:0},{hp:4561},{hp:-1}]) {
-    const f=bossFixture('boss-play','forest-3'),mem=storage();Object.assign(f.state.enemies.at(-1),{maxHp:4560,hp:2280},corrupt);
-    writeAdventure(f.run,f.state,mem);assert.equal(readAdventure(mem),null);
+  assert.ok(saved);assert.deepEqual([saved.state.enemies[live.id-1].maxHp,saved.state.enemies[live.id-1].hp],[target,target-80]);
+  for(const corrupt of [{maxHp:target*2},{maxHp:0},{hp:target+1},{hp:-1}]) {
+    const broken=roomFixture('boss',act.id);Object.assign(broken.state.enemies.find(e=>e.isBoss),{isDormant:false,maxHp:target,hp:target-80},corrupt);
+    writeAdventure(broken.run,broken.state,mem);assert.equal(readAdventure(mem),null,JSON.stringify(corrupt));
   }
 });
 
-test('包含首领场地的 72 局主路连续可达，沿途平台玩法仍完整',async()=>{
-  const {play}=await import('./helpers/campaign-runner.mjs');
-  for(const stage of STAGES)for(const seed of [1,42,137]){
-    const result=play(stage.id,seed,5);assert.equal(result.failed,undefined,JSON.stringify({seed,...result}));assert.equal(result.recoveries,0,stage.id);assert.equal(result.visited,result.total,stage.id);
-  }
-});
-
-test('每位 BOSS 会用技能威胁停留在地面或高台的玩家，并主动调整位置',()=>{
+test('每位首领会用技能打到停在地面或高台不动的人，自己也会挪位置',()=>{
   const failures=[];
-  for(const stage of STAGES)for(const index of stage.chapter===2?[0,1]:[0])for(const isHigh of [false,true]){
-    const g=headless(index===0?'boss-small':'boss-play',stage.id),arena=g.world.bossArenas[index],boss=g.world.enemies[arena.bossId-1];
-    const ledges=g.world.platforms.filter(p=>p.zone===g.world.platforms[arena.floorId].zone && p.id!==arena.exitId);
-    const perch=isHigh?ledges.reduce((a,b)=>a.y>b.y?a:b):g.world.platforms[arena.floorId];
-    rescue(g.players[0],perch,isHigh?perch.x:arena.left+2);g.players[0].protection=0;
-    const initialLives=g.survival.hp,initialX=boss.x;let distance=0;
-    for(let n=0;n<2400 && g.survival.phase==='alive';n++){g.elapsed+=1/120;g.tick();distance=Math.max(distance,Math.abs(boss.x-initialX));}
-    if(g.survival.hp===initialLives || distance<1)failures.push({stage:stage.id,boss:boss.name,isHigh,lost:initialLives-g.survival.hp,moved:Math.round(distance*10)/10});
+  for(const act of WORLD_ACTS)for(const mode of ['boss','boss-high']){
+    const g=headless(mode,act.id),boss=bossOf(g.world);
+    g.adventure.difficulty='normal';g.applyRoomRules();g.players[0].protection=0;
+    const initialHp=g.survival.hp,initialX=boss.x;let distance=0;
+    run(g,20,()=>{distance=Math.max(distance,Math.abs(boss.x-initialX));return g.survival.phase!=='alive';});
+    if(g.survival.hp===initialHp||distance<1)failures.push({stage:act.id,boss:boss.name,mode,lost:initialHp-g.survival.hp,moved:Math.round(distance*10)/10});
   }
-  assert.deepEqual(failures,[], '停在平台不能永久躲过技能；BOSS 不能始终站在原地');
+  assert.deepEqual(failures,[],'停在平台上不能一直躲过技能；首领不能一直站在原地');
 });
 
-
-test('高台树根锁定位置后可躲开，暂停冻结出招，击败立即清除其技能',()=>{
-  const run=isDodge=>{
-    const g=headless('boss-high','forest-3'),boss=g.world.enemies.at(-1),p=g.players[0];p.protection=0;
-    while(!boss.isWarning){g.elapsed+=1/120;g.tick();}
-    const target={x:boss.warningX,y:boss.warningY},initial=g.survival.hp;
+test('高台上的落点锁定后走下高台就能躲掉，暂停冻结出招，打倒首领立刻清掉它的技能',()=>{
+  const attempt=isDodge=>{
+    const g=headless('boss-high','forest-world'),boss=bossOf(g.world),p=g.players[0],start=g.elapsed;p.protection=0;
+    run(g,10,()=>boss.isWarning);
+    const target={x:boss.warningX,y:boss.warningY},initial=g.survival.hp,warnedAt=g.elapsed;
     g.isPaused=true;const frozen=JSON.stringify({boss,p,shots:g.enemyShots});for(let i=0;i<240;i++)g.tick();assert.equal(JSON.stringify({boss,p,shots:g.enemyShots}),frozen);g.isPaused=false;
     if(isDodge)g.keys.add('ArrowLeft');
-    while(g.elapsed<3.4){if(g.elapsed>1.3)g.keys.clear();g.elapsed+=1/120;g.tick();}
-    assert.equal(boss.warningX,target.x);assert.equal(boss.warningY,target.y);
+    run(g,5,()=>{if(g.elapsed>warnedAt+.8)g.keys.clear();return g.elapsed>=warnedAt+4.4;});
+    assert.ok(warnedAt-start<1.2);assert.equal(boss.warningX,target.x);assert.equal(boss.warningY,target.y);
     const lost=initial-g.survival.hp;
     boss.hp=0;boss.isDefeated=true;g.rewardEnemy(boss);assert.ok(g.enemyShots.every(s=>s.bossId!==boss.id||!s.isActive));
     return lost;
   };
-  assert.ok(run(false)>0,'站在高台原地会被树根打到');assert.equal(run(true),0,'预告时离开高台落点可以避开');
+  assert.ok(attempt(false)>0,'站在高台原地会被打到');assert.equal(attempt(true),0,'预告时走下高台可以避开');
 });

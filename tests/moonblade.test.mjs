@@ -1,12 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WEAPONS } from '../shared/adventure-catalog.js';
-import { newAdventure, activeWeapons, equipWeapon, isValidAdventure } from '../src/game/adventure.js';
+import { newAdventure, activeWeapons, isValidAdventure } from '../src/game/adventure.js';
 import { fireLoadout, fireAdventureWeapon, stepAdventureWave } from '../src/game/adventure-combat.js';
-import { readAdventure, writeAdventure } from '../src/game/save.js';
-import { bossFixture } from './helpers/adventure-fixtures.mjs';
-
-const storage=()=>{const data=new Map();return {getItem:key=>data.get(key),setItem:(key,value)=>data.set(key,value)};};
 
 test('新冒险只带一把弯刀，其他武器基础也只发一枚，分别计算冷却',()=>{
   const adventure=newAdventure(1),player={x:0,y:0,facing:1},bounds={left:-25,right:25};
@@ -114,17 +110,4 @@ test('多把弯刀各自追踪且伤害独立，成长与护盾减伤仍有效',
   const boss={id:1,x:6,y:5,width:3,height:7,hp:600,combatVersion:2,isShielded:true,isBoss:true};
   const hits=[];for(let i=1;i<240;i++)for(const wave of shots)hits.push(...stepAdventureWave(wave,[boss],[],1/120,i/120).hits);
   assert.equal(hits.length,6);assert.equal(boss.hp,276);assert.ok(hits.every(hit=>hit.damage===54&&hit.blocked===23));
-});
-
-test('旧冒险补发弯刀而保留装备成长和时限，主动取下后恢复不再强制装上',()=>{
-  const f=bossFixture(),mem=storage();delete f.state.adventure.starterVersion;
-  const original=structuredClone(f.state);writeAdventure(f.run,f.state,mem);
-  const saved=readAdventure(mem);assert.ok(saved);const adventure=saved.state.adventure;
-  assert.ok(adventure.weapons.includes('moonblade'));assert.ok(activeWeapons(adventure).includes('moonblade'));
-  assert.deepEqual(adventure.weapons.filter(id=>id!=='moonblade'),original.adventure.weapons);
-  assert.deepEqual(adventure.growth,original.adventure.growth);assert.deepEqual(adventure.effects,original.adventure.effects);
-  assert.deepEqual(saved.state.survival,original.survival);assert.deepEqual(saved.state.journey,original.journey);assert.deepEqual(saved.state.enemies,original.enemies);
-  assert.ok(equipWeapon(adventure,0,'moonblade'));const revision=adventure.revision;
-  writeAdventure(saved.run,saved.state,mem);const resumed=readAdventure(mem).state.adventure;
-  assert.ok(!activeWeapons(resumed).includes('moonblade'));assert.equal(resumed.weapons.filter(id=>id==='moonblade').length,1);assert.equal(resumed.revision,revision);
 });

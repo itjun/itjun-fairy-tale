@@ -1,4 +1,16 @@
-// 同一世界的三位小首领各以一招为主，大首领组合使用本世界的招式。
+// 每个世界一位首领：样子、名字，还有它带的小怪种类和偏向的本领一类。
+export const BOSS_THEMES = Object.freeze({
+  rainbow: { image:'boss-flower', leader:'彩虹花王', kinds:['jelly','puff','flowerpot'], family:'power' },
+  family: { image:'boss-clock', leader:'钟楼守卫', kinds:['toy','pillow','bell'], family:'flight' },
+  sweet: { image:'boss-pudding', leader:'布丁国王', kinds:['candy','pillow','mushroom'], family:'bubble' },
+  beach: { image:'boss-crab', leader:'贝壳蟹王', kinds:['sandcastle','fish','crab'], family:'bubble' },
+  meadow: { image:'boss-windmill', leader:'风车守卫', kinds:['leafshield','squirrel','firefly'], family:'nature' },
+  snow: { image:'boss-snowman', leader:'雪人国王', kinds:['snowball','snowflower','icicle'], family:'frost' },
+  forest: { image:'boss-tree', leader:'古树守卫', kinds:['mushroom','squirrel','moth'], family:'nature' },
+  cartoon: { image:'boss-toy', leader:'发条巨人', kinds:['toy','paint','bell'], family:'power' },
+});
+// 首领先用哪一招：半血前只用这一招，半血后和下一招轮着来。
+const FIRST_SKILL = { rainbow: 0, family: 1, sweet: 1, beach: 0, meadow: 2, snow: 0, forest: 0, cartoon: 1 };
 const SKILLS = {
   rainbow: [
     {name:'花瓣散射',kind:'fan',image:'flower',speed:8},
@@ -42,7 +54,7 @@ const SKILLS = {
   ],
 };
 
-export function bossSkills(themeId, chapter, isWorldBoss) {
-  const skills=SKILLS[themeId];
-  return isWorldBoss ? skills : [skills[chapter],skills[(chapter+1)%3]];
+export function bossSkills(themeId) {
+  const skills=SKILLS[themeId],first=FIRST_SKILL[themeId];
+  return [skills[first],skills[(first+1)%skills.length]];
 }

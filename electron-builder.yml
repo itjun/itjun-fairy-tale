@@ -8,6 +8,7 @@ files:
   - desktop/*.mjs
   - desktop/preload.cjs
   - "!desktop/smoke.mjs"
+  - "!desktop/menu-smoke.mjs"
   - server/store.mjs
   - shared/**/*
   - build/icon.png

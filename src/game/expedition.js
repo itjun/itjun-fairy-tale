@@ -11,6 +11,7 @@ export function isValidResources(r) {
   const counters = ['balance', 'petals', 'snack', 'kills', 'wreathShield'];
   const lists = ['armorZones', 'clearedZones', 'courageLevels', 'camps', 'routes', 'rewardedEnemies'];
   return counters.every(k => Number.isSafeInteger(r[k]) && r[k] >= 0 && r[k] <= 100000)
+    && ['rerolls','tierUp'].every(k => r[k] === undefined || Number.isInteger(r[k]) && r[k] >= 0 && r[k] <= 9)
     && r.snack <= 1 && r.wreathShield <= 1 && (r.reserveHearts===undefined||[0,2,25].includes(r.reserveHearts))
     && ['bindCooldown', 'lureCooldown', 'cleanseCooldown'].every(k => Number.isFinite(r[k]) && r[k] >= 0 && r[k] <= 8)
     && lists.every(k => Array.isArray(r[k]) && r[k].length <= 10000 && new Set(r[k]).size === r[k].length && r[k].every(id => typeof id === 'string' && id.length < 120));
@@ -19,13 +20,6 @@ export function heal(survival, amount = 25) {
   if (survival.phase !== 'alive' || survival.hp >= survival.maxHp) return false;
   survival.hp = Math.min(survival.maxHp, survival.hp + amount); survival.revision++;
   return true;
-}
-export function collectFood(adventure, survival, powers) {
-  if (heal(survival)) return '回血 +25';
-  if (powers.snack && survival.phase === 'alive' && !resourcesFor(adventure).snack) {
-    adventure.resources.snack = 1; return '存好一份备用点心';
-  }
-  resourcesFor(adventure).balance++; return '满血补给换成了 1 片碎片';
 }
 export function useRecovery(adventure, survival, powers, isHurt = false) {
   const r = resourcesFor(adventure);
@@ -64,18 +58,6 @@ export function completeEncounter(adventure, powers, world, zone, levelKey) {
   r.clearedZones.push(key);
   if (powers.wreath) r.wreathShield = 1;
   return true;
-}
-export function completeRoute(adventure, powers, levelKey, zone) {
-  const r = resourcesFor(adventure), key = `${levelKey}:${zone}`;
-  if (r.routes.includes(key)) return false;
-  r.routes.push(key);
-  return false; // 探索碎片统一留到小关通关时发放。
-}
-export function campPrice(powers) { return powers.thrift ? 3 : 5; }
-export function buyRecovery(adventure, survival, powers, campKey) {
-  const r = resourcesFor(adventure), price = campPrice(powers);
-  if (survival.phase !== 'alive' || survival.hp >= survival.maxHp || r.camps.includes(campKey) || r.balance < price) return false;
-  r.balance -= price; r.camps.push(campKey); heal(survival); adventure.revision++; return true;
 }
 export function tickResources(adventure, dt) {
   const r = resourcesFor(adventure);

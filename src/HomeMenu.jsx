@@ -5,7 +5,7 @@ import './home-menu.css';
 export const artworkNames = ['爱心花园', '绿色小城堡', '我们在一起', '阳光下的小家', '粉色城堡', '彩虹花园王国', '幸福的一家人', '蓝色大城堡', '我的花园王国', '超级冰淇淋', '高高的城堡'];
 export const turns = [-90, -90, -90, -90, 90, 90, -90, -90, 0, 0, 0];
 
-export function HomeMenu({ savedAdventure, isActive, onAdventure, onNewAdventure, onMiniGames, onOptions }) {
+export function HomeMenu({ savedAdventure, isActive, onAdventure, onNewAdventure, onAlbum, onMiniGames, onOptions }) {
   const [index, setIndex] = useState(8);
   const [isPlaying, setIsPlaying] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [isVisible, setIsVisible] = useState(!document.hidden);
@@ -35,8 +35,9 @@ export function HomeMenu({ savedAdventure, isActive, onAdventure, onNewAdventure
     </div>
     <header className="home-title"><h1>花园王国</h1><p>一个小画家的奇妙世界</p></header>
     <nav className="home-navigation" aria-label="游戏主菜单">
-      <button className="home-menu-button home-play" onClick={onAdventure}>{savedAdventure ? (savedAdventure.state.survival?.phase === 'over' ? '查看探险结算' : '继续跳台探险') : '彩笔跳台探险'}</button>
-      {savedAdventure && <button className="home-menu-button" onClick={onNewAdventure}>新冒险</button>}
+      {savedAdventure && <button className="home-menu-button home-play" onClick={onAdventure}>{savedAdventure.state.survival?.phase === 'over' ? '查看探险结算' : '继续冒险'}</button>}
+      <button className={`home-menu-button${savedAdventure ? '' : ' home-play'}`} onClick={savedAdventure ? onNewAdventure : onAdventure}>新冒险</button>
+      <button className="home-menu-button" onClick={onAlbum}>画册</button>
       <button className="home-menu-button" onClick={onMiniGames}>小游戏</button>
       <button className="home-menu-button" onClick={onOptions}>选项</button>
     </nav>

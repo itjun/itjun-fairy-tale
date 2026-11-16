@@ -1,17 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recommendedStarter, starterAdventure, isValidStarter } from '../src/game/starter-build.js';
-import { isValidAdventure, activeWeapons, migrateAdventure } from '../src/game/adventure.js';
+import { isValidAdventure, activeWeapons, migrateAdventure, newAdventure, newJourney } from '../src/game/adventure.js';
 import { newSurvival } from '../src/game/characters.js';
 import { fireLoadout } from '../src/game/adventure-combat.js';
 import { newCombatLoot, rollCombatLoot, lootPosition, nearbyLoot, chooseLifeLoot, isValidCombatLoot } from '../src/game/combat-loot.js';
 import { damageWithBuild, useRecovery } from '../src/game/expedition.js';
-import { createCampaignWorld } from '../shared/campaign.js';
+import { createRoomWorld } from '../shared/room-world.js';
+import { WORLD_ACTS } from '../shared/levels.js';
 import { GardenEngine } from '../src/game/engine.js';
-import { bossFixture } from './helpers/adventure-fixtures.mjs';
+import { roomFixture } from './helpers/adventure-fixtures.mjs';
 import { readAdventure, writeAdventure } from '../src/game/save.js';
 
-const storage=()=>{const map=new Map();return {getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v)};};
+const storage=()=>{const map=new Map();return {getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};};
 
 test('四位角色推荐搭配有区别，自选组合按实际武器和本领出发，跨关迁移不补回未选弯刀',()=>{
   const builds=['dad','mom','sister','little'].map(recommendedStarter);
@@ -27,14 +28,14 @@ test('四位角色推荐搭配有区别，自选组合按实际武器和本领�
 });
 
 function dropped(seed=42) {
-  const world=createCampaignWorld(seed,'rainbow-1',5),loot=newCombatLoot(),player={x:world.start.x,y:world.start.y,safe:world.start};
+  const world=createRoomWorld(seed,WORLD_ACTS[0]),loot=newCombatLoot(),player={x:world.start.x,y:world.start.y,safe:world.start};
   const defeated=[];
   for(const e of world.enemies.filter(e=>!e.isBoss&&!e.parentId&&!e.isSummoned)){defeated.push(e.id);e.hp=0;e.isDefeated=true;rollCombatLoot(loot,world,e,player);}
   return {world,loot,player,defeated};
 }
-test('小怪低频掉落由种子固定，保底不超过八只、每小关最多三份，BOSS 和召唤物不掉',()=>{
-  const a=dropped(),b=dropped();assert.deepEqual(a.loot,b.loot);assert.ok(a.loot.drops.length>0&&a.loot.drops.length<=3);assert.ok(isValidCombatLoot(a.loot,a.world,a.defeated));
-  assert.ok(a.defeated.indexOf(a.loot.drops[0].enemyId)>=2);assert.ok(a.defeated.indexOf(a.loot.drops[0].enemyId)<8);
+test('小怪补给一章最多一份，前十一只不掉，打满十八只还没有才给，BOSS 和召唤物不掉',()=>{
+  const a=dropped(),b=dropped();assert.deepEqual(a.loot,b.loot);assert.equal(a.loot.drops.length,1);assert.ok(isValidCombatLoot(a.loot,a.world,a.defeated));
+  assert.ok(a.defeated.indexOf(a.loot.drops[0].enemyId)>=11);assert.ok(a.defeated.indexOf(a.loot.drops[0].enemyId)<18);
   assert.notDeepEqual(a.loot.drops,dropped(137).loot.drops);
   const before=structuredClone(a.loot);for(const e of [{id:999,isBoss:true},{id:1000,parentId:1},{id:1001,isSummoned:true}])assert.equal(rollCombatLoot(a.loot,a.world,e,a.player),null);assert.deepEqual(a.loot,before);
   for(const d of a.loot.drops){const p=lootPosition(a.world,d);assert.ok(Math.abs(p.x-a.world.platforms[d.platformId].x)<a.world.platforms[d.platformId].width/2);assert.equal(nearbyLoot(a.loot,a.world,{x:p.x,y:p.y-1})?.enemyId,d.enemyId);}
@@ -56,8 +57,8 @@ test('备用补给保留到下次实际受伤，暂停和普通更新不消耗�
   s.lives=1;s.hp=5;a.resources.reserveHearts=25;assert.equal(damageWithBuild(a,s,{},'rainbow:1',0),'death');assert.equal(s.lives,0);assert.equal(s.phase,'over');
 });
 
-test('掉落、待选择、领取结果与自选初始装备保存恢复，非法掉落拒绝，旧档仍可读',()=>{
-  const f=bossFixture('boss-moon','rainbow-1'),{world,loot,defeated}=dropped(),mem=storage();
+test('掉落、待选择、领取结果与自选初始装备保存恢复，非法掉落拒绝，没有掉落记录的存档仍可读',()=>{
+  const f=roomFixture('boss-moon'),{world,loot,defeated}=dropped(),mem=storage();
   f.state.enemies=world.enemies;f.state.defeatedIds=defeated;f.run.defeatedIds=defeated;f.state.combatLoot=loot;
   f.state.adventure=starterAdventure(42,{weapons:['bubble'],upgrades:['frost']});loot.pendingId=loot.drops[0].enemyId;
   writeAdventure(f.run,f.state,mem);let saved=readAdventure(mem);assert.ok(saved);assert.deepEqual(saved.state.combatLoot,loot);assert.deepEqual(activeWeapons(saved.state.adventure),['bubble']);
@@ -88,7 +89,7 @@ test('先放这里不会原地反复弹出，保存恢复仍暂放，离开再�
   const {game:g,point,opened}=lootEngine();g.tick();const id=g.combatLoot.pendingId;
   assert.ok(g.leaveLifeLoot(id));g.pause(false);
   for(let i=0;i<20;i++)assert.equal(g.updateLifeLoot(),false);assert.equal(opened(),1);
-  const f=bossFixture('boss-loot','rainbow-1'),mem=storage();f.state.combatLoot=structuredClone(g.combatLoot);
+  const f=roomFixture(),mem=storage(),{world,defeated}=dropped();f.state.enemies=world.enemies;f.state.defeatedIds=defeated;f.run.defeatedIds=defeated;f.state.combatLoot=structuredClone(g.combatLoot);
   writeAdventure(f.run,f.state,mem);const saved=readAdventure(mem);assert.ok(saved);assert.equal(saved.state.combatLoot.drops[0].isDeferred,true);
   g.combatLoot=saved.state.combatLoot;assert.equal(g.updateLifeLoot(),false);
   g.players[0].x=point.x+3.2;assert.equal(g.updateLifeLoot(),false);assert.ok(g.combatLoot.drops[0].isDeferred);
@@ -109,11 +110,20 @@ test('引擎只能在近处打开掉落，待选时不能解除暂停，领取�
   assert.equal(g.configureStarter(recommendedStarter('mom')),false);assert.ok(g.chooseLifeLoot(drop.enemyId,'heart'));assert.equal(g.chooseLifeLoot(drop.enemyId,'heart'),false);assert.equal(g.survival.maxHp,120);g.pause(false);assert.equal(g.isPaused,false);
 });
 
-test('真实远处击杀结算产生补给，靠近前不弹窗，同只小怪结算两次不会重抽掉落',()=>{
-  const world=createCampaignWorld(42,'rainbow-1',5),g=Object.assign(Object.create(GardenEngine.prototype),{world,levelKey:'rainbow-1:42',players:[{safe:world.start}],adventure:starterAdventure(42,{weapons:['blade'],upgrades:[]}),survival:newSurvival(),journey:{fragments:0},combatLoot:newCombatLoot(),defeatedIds:[],pickups:[],enemyShots:[],elapsed:1,callbacks:{onSound(){},onReward(){assert.fail('远处击杀不能直接打开补给选择');}},publish(){}});
-  for(const enemy of world.enemies.filter(e=>!e.isBoss&&!e.parentId).slice(0,8)) {
-    enemy.isDefeated=true;enemy.hp=0;g.rewardEnemy(enemy);
-    const before=structuredClone(g.combatLoot);g.rewardEnemy(enemy);assert.deepEqual(g.combatLoot,before);
-  }
-  assert.ok(g.combatLoot.drops.length>0);assert.equal(g.combatLoot.pendingId,null);
+test('打败普通小怪不会马上掉补给，一章打满才有一份，同一只和首领不加', () => {
+  const world = createRoomWorld(42, WORLD_ACTS[0]);
+  const game = Object.assign(Object.create(GardenEngine.prototype), {
+    world, combatLoot: newCombatLoot(), players: [{ safe: world.start }], adventure: newAdventure(42), survival: newSurvival(), journey: newJourney(),
+    roomState: { combo: 0, comboLeft: 0 }, levelKey: `${WORLD_ACTS[0].id}:42`, elapsed: 1, defeatedIds: [], pickups: [], enemyShots: [], callbacks: { onSound() {} }, publish() {},
+  });
+  const normals = world.enemies.filter(enemy => !enemy.isBoss && !enemy.parentId && !enemy.isSummoned);
+  for (const enemy of normals.slice(0, 11)) { enemy.isDefeated = true; game.rewardEnemy(enemy); }
+  assert.equal(game.combatLoot.drops.length, 0, '打十一只还不该弹补给');
+  for (const enemy of normals.slice(11, 18)) { enemy.isDefeated = true; game.rewardEnemy(enemy); game.rewardEnemy(enemy); }
+  assert.equal(game.combatLoot.drops.length, 1);
+  for (const enemy of normals.slice(18, 24)) { enemy.isDefeated = true; game.rewardEnemy(enemy); }
+  assert.equal(game.combatLoot.drops.length, 1, '这一章已经掉过就不再掉');
+  const boss = world.enemies.find(enemy => enemy.isBoss);
+  boss.isDefeated = true; game.rewardEnemy(boss);
+  assert.equal(game.combatLoot.drops.length, 1);
 });

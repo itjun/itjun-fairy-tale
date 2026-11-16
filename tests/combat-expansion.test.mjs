@@ -1,49 +1,47 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCampaignWorld,validateCampaign} from '../shared/campaign.js';
-import {STAGES} from '../shared/levels.js';
+import {createRoomWorld} from '../shared/room-world.js';
+import {WORLD_ACTS} from '../shared/levels.js';
 import {MONSTERS,WEAPONS} from '../shared/adventure-catalog.js';
 import {SPELLS} from '../shared/combat-catalog.js';
 import {newSurvival,migrateSurvival,addLife,takeDamage,reviveSurvival} from '../src/game/characters.js';
 import {heal} from '../src/game/expedition.js';
-import {newAdventure,newJourney,rewardChoices,chooseReward,migratePendingReward,isValidJourney,isValidAdventure} from '../src/game/adventure.js';
+import {newAdventure,newJourney,chooseReward,migratePendingReward,isValidJourney,isValidAdventure} from '../src/game/adventure.js';
+import {doorChoices} from '../src/game/room-rewards.js';
 import {stepMagic,consumeMagicShield,isValidMagic} from '../src/game/magic.js';
 import {fireLoadout,stepAdventureWave} from '../src/game/adventure-combat.js';
 import {stepAdventureEnemies} from '../src/game/adventure-enemies.js';
 import {stepBosses} from '../src/game/bosses.js';
 import {readAdventure,writeAdventure} from '../src/game/save.js';
-import {bossFixture} from './helpers/adventure-fixtures.mjs';
+import {roomFixture} from './helpers/adventure-fixtures.mjs';
 import {damageEnemy} from '../src/game/combat.js';
 import {saveProjectiles,restoreProjectiles,isValidProjectiles} from '../src/game/projectile-state.js';
 import {CombatAudio,AUDIO_FILES} from '../src/game/combat-audio.js';
 import {readFileSync} from 'node:fs';
-import {play} from './helpers/campaign-runner.mjs';
 
 const target=(id=1,x=4)=>({id,x,y:0,width:2,height:3,hp:10000,maxHp:10000,combatVersion:2});
 const player=()=>({x:0,y:0,facing:1});
 const bounds={left:-20,right:20};
 function grant(a,type,id,rarity='legendary',s=newSurvival()) {const j=newJourney();j.pending={id:crypto.randomUUID(),player:0,choices:[{type,id,rarity}]};assert.ok(chooseReward(a,j,0,s));return s;}
 
-test('新版 24 小关有 56 场首领，30 种怪物，密度增加且全部连接可达',()=>{
- let bosses=0,before=0,after=0;const seen=new Set();
+test('八个世界关各一场首领，30 种怪物都会出场，首领房门口有补给',()=>{
+ const seen=new Set();
  assert.equal(Object.keys(MONSTERS).length,30);
- for(const stage of STAGES)for(const seed of [1,42,137]){
-  const w=createCampaignWorld(seed,stage,6),old=createCampaignWorld(seed,stage,5);assert.ok(validateCampaign(w),`${stage.id}/${seed}`);
-  const r=play(stage.id,seed,6);assert.equal(r.failed,undefined,JSON.stringify(r));assert.equal(r.recoveries,0);
-  assert.deepEqual(w,createCampaignWorld(seed,stage,6));assert.equal(w.bossArenas.length,stage.chapter===2?3:2);
-  assert.ok(w.enemies[w.bossArenas[0].bossId-1].isMidBoss);
-  if(seed===42)bosses+=w.bossArenas.length;
-  before+=old.enemies.filter(e=>!e.isBoss&&!e.parentId).length;after+=w.enemies.filter(e=>!e.isBoss&&!e.parentId).length;
-  w.enemies.forEach(e=>seen.add(e.kind));assert.ok(w.supplies.some(s=>s.kind==='medkit'&&s.bossId));
+ for(const act of WORLD_ACTS)for(const seed of [1,42,137,999,2024]){
+  const w=createRoomWorld(seed,act);
+  assert.equal(w.bossArenas.length,1);
+  w.enemies.forEach(e=>seen.add(e.kind));
+  const bossRoom=w.rooms.at(-1);
+  assert.deepEqual(w.supplies.map(s=>s.kind).sort(),['life','medkit']);assert.ok(w.supplies.every(s=>w.platforms[s.platformId].roomId===bossRoom.id));
  }
- assert.equal(bosses,56);assert.equal(seen.size,30);assert.ok(after/before>1.45);assert.ok(after/before<1.8);
+ assert.equal(seen.size,30);
 });
-test('每小关传奇保底，大关两传奇两史诗，候选可领取且品质不降级',()=>{
- for(const stage of STAGES)for(let seed=0;seed<50;seed++){
-  const a=newAdventure(seed),s=newSurvival(),tier=stage.chapter===2?'world':'small';
-  const choices=rewardChoices(a,`finish:${stage.id}`,'nature',0,s,tier);
-  assert.equal(choices.length,tier==='world'?4:3);assert.equal(choices.filter(c=>c.rarity==='legendary').length,tier==='world'?2:1);assert.ok(choices.some(c=>c.rarity==='epic'));
-  assert.deepEqual(choices,rewardChoices(a,`finish:${stage.id}`,'nature',0,s,tier));
+test('首领奖励保底一张传奇，领过的品质不会变低',()=>{
+ for(const act of WORLD_ACTS)for(let seed=0;seed<8;seed++){
+  const a=newAdventure(seed),s=newSurvival();
+  const choices=doorChoices(a,`finish:${act.id}:${seed}`,'boss',s);
+  assert.equal(choices.filter(c=>c.rarity==='legendary').length,1);
+  assert.deepEqual(choices,doorChoices(a,`finish:${act.id}:${seed}`,'boss',s));
   for(const c of choices){const clone=structuredClone(a);grant(clone,c.type,c.id,c.rarity,structuredClone(s));assert.ok(isValidAdventure(clone,1));}
  }
  const a=newAdventure(3);grant(a,'weapon','blade');grant(a,'weapon','blade','rare');assert.equal(a.qualities['weapon:blade'],'legendary');assert.equal(a.weaponRanks.blade,2);
@@ -61,7 +59,7 @@ test('单血条旧档按比例迁移，真实命数旧档保留命数，归零�
 test('旧待选卡不被替换，补传奇后保存再次迁移不变',()=>{
  const a=newAdventure(1),j=newJourney();j.pending={id:'finish:old',title:'通关',family:'flight',player:0,choices:[{type:'weapon',id:'blade'},{type:'weapon',id:'bubble'},{type:'upgrade',id:'rapid'}]};
  migratePendingReward(a,j);assert.equal(j.pending.choices.length,4);assert.deepEqual(j.pending.choices.slice(0,3).map(c=>c.id),['blade','bubble','rapid']);assert.equal(j.pending.choices[3].rarity,'legendary');
- assert.ok(isValidJourney(j,createCampaignWorld(1,'rainbow-1',5),1));const saved=structuredClone(j);migratePendingReward(a,j);assert.deepEqual(j,saved);
+ assert.ok(isValidJourney(j,1));const saved=structuredClone(j);migratePendingReward(a,j);assert.deepEqual(j,saved);
 });
 test('四大招仅攻击可见敌人时充能，火环距离不合适不阻塞其他就绪技能',()=>{
  const a=newAdventure(1),s=newSurvival(),p=player();for(const id of Object.keys(SPELLS))grant(a,'spell',id,'epic');
@@ -114,13 +112,12 @@ test('127 份原创音效离线打包，混音最多 12 声部，同批发射合
  mixer.play('boss-warning');assert.equal(mixer.voices.length,12);assert.ok(mixer.voices.some(v=>v.name==='boss-warning'));mixer.pause();assert.equal(mixer.voices.length,0);assert.equal(mixer.loops.size,0);
 });
 
-test('五类白装基础武器都能在移动与护盾阶段中打败全部 56 位首领',()=>{
+test('五类白装基础武器都能打败八位首领',()=>{
  let fights=0;
- for(const stage of STAGES){
-  const source=createCampaignWorld(42,stage,6);
-  for(const arena of source.bossArenas)for(const kind of ['blade','bubble','stars','moonblade','flame']){
+ for(const act of WORLD_ACTS){
+  const source=createRoomWorld(42,act),arena=source.bossArenas[0];
+  for(const kind of ['blade','bubble','stars','moonblade','flame']){
    const w=structuredClone(source),e=w.enemies[arena.bossId-1];
-   w.enemies.filter(n=>n.isBoss&&n.id!==e.id).forEach(n=>{n.isDefeated=true;n.hp=0;});
    const a=newAdventure(2);a.weapons=[kind];a.loadouts[0].weapons=[kind];a.loadouts[0].weapon=kind;
    const p={x:e.x-6,y:arena.y,facing:1,isGrounded:true,ground:w.platforms[arena.floorId]};let waves=[];
    for(let t=0;t<45&&!e.isDefeated;t+=1/60){
@@ -129,26 +126,23 @@ test('五类白装基础武器都能在移动与护盾阶段中打败全部 56 �
     const spawned=[];for(const wave of waves)spawned.push(...stepAdventureWave(wave,[e],w.platforms,1/60,t).spawned);
     waves=[...waves.filter(w=>w.isActive),...spawned];
    }
-   assert.ok(e.isDefeated,`${stage.id}/${e.name}/${kind} 基础伤害不足或无法命中`);fights++;
+   assert.ok(e.isDefeated,`${act.id}/${e.name}/${kind} 基础伤害不足或无法命中`);fights++;
   }
  }
- assert.equal(fights,280);
+ assert.equal(fights,40);
 });
-test('飞行存档保留同轮共享命中特效，备份旧单血条且不重置新档待复活状态',()=>{
+test('飞行存档保留同轮共享命中特效，血条耗尽等着选的状态读回来不变',()=>{
  const a=newAdventure(1);a.weaponRanks.blade=3;a.weapons=['blade'];a.loadouts[0].weapons=['blade'];
  const waves=fireLoadout(player(),0,bounds,a),charge={isUsed:false};waves.forEach(w=>{w.floralCharge=charge;w.bindingCharge=charge;});
  const restored=restoreProjectiles(JSON.parse(JSON.stringify(saveProjectiles(waves,[]))));
  restored.waves[0].floralCharge.isUsed=true;assert.ok(restored.waves.every(w=>w.floralCharge.isUsed));
- const fixture=bossFixture('boss-play'),key=['garden','active','adventure','v1'].join('-'),data=new Map();
- const storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};
- fixture.state.survival={version:3,character:'sister',lives:5,maxLives:10,phase:'alive',shieldRemaining:0,attacks:0,revision:0};
- data.set(key,JSON.stringify(fixture));const migrated=readAdventure(storage);assert.ok(migrated);
- writeAdventure(migrated.run,migrated.state,storage);assert.equal(data.get(`${key}-before-hp-lives`),JSON.stringify(fixture));
- takeDamage(migrated.state.survival,false,9999);migrated.state.projectiles=saveProjectiles(waves,[]);
- writeAdventure(migrated.run,migrated.state,storage);const loaded=readAdventure(storage);
+ const fixture=roomFixture('boss'),data=new Map();
+ const storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};
+ takeDamage(fixture.state.survival,false,9999);fixture.state.projectiles=saveProjectiles(waves,[]);
+ writeAdventure(fixture.run,fixture.state,storage);const loaded=readAdventure(storage);
  assert.ok(loaded);assert.equal(loaded.state.survival.lives,2);assert.equal(loaded.state.survival.hp,0);assert.equal(loaded.state.survival.phase,'fallen');
+ assert.equal(loaded.state.projectiles.waves.length,waves.length);
 });
-
 test('星雨命中后消失，贯穿光刃连续命中；传奇雷链为回响保留第二击',()=>{
  for(const kind of ['stars','blade']){
   const a=newAdventure(1);a.weapons=[kind];a.loadouts[0].weapons=[kind];const enemies=[target(1,3),target(2,7)],[wave]=fireLoadout(player(),0,bounds,a);

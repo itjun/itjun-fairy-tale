@@ -44,6 +44,19 @@
 .home-options-grid .desktop-update-status,.home-options-grid .garden-backup-note { grid-column:1 / -1; text-align:left; font-size:16px; line-height:1.7; color:#777761; margin:24px 12px 0; }
 .home-options-grid .desktop-update-status { order:1; }
 .home-options-grid .garden-backup-note { order:2; }
+.option-row { display:flex; align-items:center; gap:18px; min-height:96px; padding:24px 12px; border-bottom:1px solid #ded9c9; font-size:24px; }
+.option-row svg { flex-shrink:0; }
+.option-row b { font-weight:400; color:#a83e66; }
+.option-chips { display:flex; gap:12px; margin-left:auto; }
+#root .option-chips button { min-width:96px; min-height:52px; padding:6px 18px; font-size:22px; border:2px solid #9d9b71; border-radius:12px 14px 11px 13px; background:#fffdf6; }
+#root .option-chips button[aria-pressed="true"] { background:#f6b6cb; border-color:#a83e66; color:#5c1f38; }
+.option-note { margin:24px 12px 0; font-size:16px; line-height:1.7; color:#777761; text-align:left; }
+#root .home-options .home-options-grid .quiet-button[aria-pressed="true"] { color:#304a2b; }
+.in-game-page { position:fixed; inset:0; z-index:40; overflow-y:auto; }
+.close-failed-page { position:fixed; inset:0; z-index:1900; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:32px; background:#faf8f1; text-align:center; }
+.close-failed-page h2 { margin:0; font-size:36px; font-weight:400; color:#a83e66; }
+.close-failed-page p { max-width:560px; margin:0; font-size:20px; line-height:1.7; color:#514f45; }
+.close-failed-page div { display:flex; gap:20px; }
 .home-save-warning { position:fixed; top:12px; right:16px; max-width:300px; padding:14px; background:#fffaf1; color:#8f2948; z-index:2; }
 .home-games .quest-list { grid-template-columns:1fr; margin:0 0 22px; gap:0; }
 #root .home-games .quest-card { min-height:138px; padding:24px 12px; border-bottom:1px solid #ded9c9; }

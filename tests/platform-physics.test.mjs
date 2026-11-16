@@ -1,32 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RULES, createPlayer, firstPlatform, nextPlatform, randomGenerator, stepPlayer, rescue, regroup, prunePlatforms } from '../src/game/physics.js';
+import { RULES, createPlayer, stepPlayer, rescue } from '../src/game/physics.js';
+import { touchEnemy } from '../src/game/enemies.js';
 const dt = 1 / 120;
+const ground = { id: 0, x: 0, y: 0, width: 12 };
 
-test('1000 个种子的连续平台均可从边缘留有余量地跳到下一台', () => {
-  for (let seed = 0; seed < 1000; seed++) {
-    const random = randomGenerator(seed);
-    let current = firstPlatform();
-    for (let n = 0; n < 50; n++) {
-      const next = nextPlatform(current, random);
-      const player = createPlayer(current);
-      player.x = current.x + current.width / 2 - 0.6;
-      let isLanded = false;
-      for (let frame = 0; frame < 180; frame++) {
-        stepPlayer(player, { direction: player.x < next.x ? 1 : 0, jump: frame === 0 }, [current, next], dt);
-        if (player.safe.id === next.id && player.isGrounded) { isLanded = true; break; }
-      }
-      assert.ok(isLanded, `seed ${seed}, platform ${next.id}`);
-      current = next;
-    }
-  }
-});
-test('相同种子生成相同地图，不同种子改变地图', () => {
-  function map(seed) { const random = randomGenerator(seed); const platforms = [firstPlatform()]; for (let i = 0; i < 20; i++) platforms.push(nextPlatform(platforms.at(-1), random)); return platforms; }
-  assert.deepEqual(map(42), map(42)); assert.notDeepEqual(map(42), map(43));
-});
 test('无输入时落地稳定，掉落可无限复活到安全台', () => {
-  const platform = firstPlatform(), player = createPlayer(platform);
+  const platform = ground, player = createPlayer(platform);
   for (let i = 0; i < 1200; i++) stepPlayer(player, { direction: 0, jump: false }, [platform], dt);
   assert.equal(player.y, 0); assert.equal(player.isGrounded, true);
   for (let life = 1; life <= 100; life++) {
@@ -36,7 +16,7 @@ test('无输入时落地稳定，掉落可无限复活到安全台', () => {
   }
 });
 test('离台宽容时间与提前按跳可用，空中不能无限连跳', () => {
-  const platform = firstPlatform(), player = createPlayer(platform);
+  const platform = ground, player = createPlayer(platform);
   player.x = 7; player.isGrounded = false; player.coyote = 0.08;
   assert.equal(stepPlayer(player, { direction: 1, jump: true }, [platform], dt).isJumped, true);
   assert.equal(stepPlayer(player, { direction: 1, jump: true }, [platform], dt).isJumped, true);
@@ -47,32 +27,57 @@ test('离台宽容时间与提前按跳可用，空中不能无限连跳', () =>
   for (let i = 0; i < 10; i++) isBufferedJump ||= stepPlayer(player, { direction: 0, jump: false }, [platform], dt).isJumped;
   assert.ok(isBufferedJump); assert.ok(RULES.jump > 0);
 });
-test('双人分开太远会在领先者安全台会合，清理后保留两人安全台', () => {
-  const random = randomGenerator(4), platforms = [firstPlatform()];
-  for (let i = 0; i < 1000; i++) platforms.push(nextPlatform(platforms.at(-1), random));
-  const a = createPlayer(platforms[990]), b = createPlayer(platforms[995]);
-  assert.equal(regroup([a, b]), true); assert.equal(a.safe.id, b.safe.id);
-  const retained = prunePlatforms(platforms, [a, b]);
-  assert.ok(retained.some(platform => platform.id === a.safe.id)); assert.ok(retained.length < 12);
-});
-
-test('全部关卡的不同难度在 300 个种子下均可跳通', async () => {
+test('旧关卡的通关目标和计分还按原来的规则', async () => {
   const { LEVELS, hasCompleted, calculateScore } = await import('../shared/levels.js');
-  for (const level of LEVELS) for (let seed=0;seed<300;seed++) {
-    const random = randomGenerator(seed); let current=firstPlatform();
-    for(let i=0;i<level.platforms;i++) {
-      const next=nextPlatform(current,random,level), player=createPlayer(current);
-      player.x=current.x+current.width/2-0.6;
-      let isLanded=false;
-      for(let frame=0;frame<180;frame++) {
-        stepPlayer(player,{direction:player.x<next.x?1:0,jump:frame===0},[current,next],dt);
-        if(player.safe.id===next.id&&player.isGrounded){isLanded=true;break;}
-      }
-      assert.ok(isLanded,`${level.id}, seed ${seed}, platform ${next.id}`); current=next;
-    }
+  for (const level of LEVELS) {
     assert.equal(hasCompleted(level,level.requiredFlowers-1,level.platforms),false);
     assert.equal(hasCompleted(level,level.requiredFlowers,level.platforms),true);
     assert.equal(calculateScore(4,false,level),40);
     assert.equal(calculateScore(4,true,level),40+level.bonus);
   }
+});
+
+test('人落向正在上升的升降台时站得住，不会从台面穿过去', () => {
+  // 升降台最快每帧升 0.022；从各个高度落下来，都要落在台面上。
+  for (let start = 1; start < 3; start += 0.013) {
+    const lift = { id: 1, x: 0, y: 0, width: 5, isMoving: true, isOneWay: true, deltaX: 0, deltaY: 0 };
+    const player = { ...createPlayer(lift), y: start, vy: 0, isGrounded: false, ground: null, coyote: 0 };
+    for (let frame = 0; frame < 120 && !player.isGrounded; frame++) {
+      lift.deltaY = 0.022; lift.y += lift.deltaY;
+      stepPlayer(player, { direction: 0, jump: false, drop: false }, [lift], dt, { minY: -50 });
+    }
+    assert.equal(player.ground?.id, 1, `从 ${start.toFixed(2)} 高落下穿过了升降台`);
+    assert.ok(Math.abs(player.y - lift.y) < 1e-9);
+  }
+  // 人在台面下面往下掉时，不会被吸到台面上。
+  const lift = { id: 1, x: 0, y: 0, width: 5, isMoving: true, isOneWay: true, deltaX: 0, deltaY: 0.022 };
+  const below = { ...createPlayer(lift), y: -0.5, vy: -1, isGrounded: false, ground: null, coyote: 0 };
+  stepPlayer(below, { direction: 0, jump: false, drop: false }, [lift], dt, { minY: -50 });
+  assert.equal(below.isGrounded, false);
+});
+
+test('多层台按首次穿过的最高台面落地，与数组顺序无关', () => {
+  const floor = {id:0,x:0,y:0,width:10}, upper = {id:1,x:0,y:3,width:6,isOneWay:true};
+  const player = createPlayer(upper); player.y = 3.2; player.vy = -30; player.isGrounded = false;
+  stepPlayer(player,{direction:0,jump:false},[floor,upper],0.15);
+  assert.equal(player.y,3); assert.equal(player.ground.id,1);
+  stepPlayer(player,{direction:0,drop:true},[floor,upper],dt);
+  for (let i=0;i<100;i++) stepPlayer(player,{direction:0},[floor,upper],dt);
+  assert.equal(player.y,0);
+  stepPlayer(player,{direction:0,drop:true},[floor,upper],dt);
+  assert.equal(player.y,0, '实心地面不会被下跳穿透');
+});
+
+test('踩头只算一次，侧碰后有一小段保护，不会连着撞', () => {
+  const floor = {id:0,x:0,y:0,width:20};
+  const monster = x => ({id:1,x,y:0,width:1.3,height:1.55,hp:1,elapsed:0,isDefeated:false});
+  const enemy = monster(3), player = createPlayer(floor);
+  player.x = enemy.x; player.y = enemy.y + enemy.height - 0.05; player.vy = -3;
+  assert.equal(touchEnemy(player, enemy, enemy.y + enemy.height + 0.1), 'stomp');
+  assert.ok(player.vy > 0); assert.equal(enemy.isDefeated, true);
+  assert.equal(touchEnemy(player, enemy, player.y), null);
+  const other = monster(8); player.x = other.x - 0.2; player.y = other.y; player.vy = 0;
+  assert.equal(touchEnemy(player, other, player.y), 'bump');
+  assert.equal(player.protection, 1); assert.equal(touchEnemy(player, other, player.y), null);
+  assert.equal(other.isDefeated, false);
 });

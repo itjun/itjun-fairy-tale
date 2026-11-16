@@ -1,10 +1,15 @@
+import { ADVENTURE_GENERATION_VERSION } from '../../shared/adventure-catalog.js';
 const QUEUE_KEY = ['garden', 'scores', 'pending', 'v2'].join('-');
 let inFlight;
 let memoryQueue = {};
 let isStorageAvailable = true;
+// 旧版地图没发出去的成绩，成绩服务已经不收了。留在队列里会一直失败，还会挡住后面的新成绩，所以读的时候丢掉。
+function isCurrent(run) { return run.scoringVersion !== 3 || run.generationVersion === ADVENTURE_GENERATION_VERSION; }
 function readQueue() {
-  try { return { ...JSON.parse(localStorage.getItem(QUEUE_KEY) || '{}'), ...memoryQueue }; }
-  catch { isStorageAvailable = false; return { ...memoryQueue }; }
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(QUEUE_KEY) || '{}'); }
+  catch { isStorageAvailable = false; }
+  return Object.fromEntries(Object.entries({ ...stored, ...memoryQueue }).filter(([, run]) => isCurrent(run)));
 }
 function writeQueue(queue) {
   memoryQueue = queue;

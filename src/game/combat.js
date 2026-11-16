@@ -3,10 +3,19 @@ export function damageEnemy(enemy, elapsed = enemy.elapsed, source) {
   enemy.lastDamage = 0; enemy.lastBlocked = 0;
   if (enemy.isDefeated || enemy.isHidden || enemy.isDormant) return false;
   if(enemy.hasShell){enemy.hasShell=false;enemy.hitUntil=elapsed+.2;enemy.lastBlocked=Math.round(source?.damage || 12);return false;}
-  const damage = enemy.combatVersion === 2 ? Math.max(1, Math.round(source?.damage || 12)) : 1;
+  // 首领放完招露出破绽时，打中伤害翻倍。
+  const damage = enemy.combatVersion === 2 ? Math.max(1, Math.round((source?.damage || 12) * (enemy.attackStage === 'weak' ? 2 : 1))) : 1;
   if (enemy.isGuarding && source && Math.sign(source.x-enemy.x) === enemy.direction) { enemy.guardHits = (enemy.guardHits || 0) + 1; if (enemy.guardHits % 2) { enemy.hitUntil = elapsed + 0.16; enemy.lastBlocked = damage; return false; } }
-  const actual = enemy.isShielded ? Math.max(1, Math.round(damage * 0.7)) : damage;
-  enemy.lastBlocked = damage - actual; enemy.lastDamage = Math.min(enemy.hp ?? 1, actual);
+  const reduced = enemy.isShielded ? Math.max(1, Math.round(damage * 0.7)) : damage;
+  let actual = reduced;
+  // 叠了很多武器时，同一小段时间里首领最多掉一成二的血，一发打不倒。单把武器一发用不满这个上限。
+  if (enemy.isBoss && enemy.maxHp) {
+    const cap = Math.max(1, Math.round(enemy.maxHp * 0.12));
+    if (!(elapsed < enemy.hurtUntil)) { enemy.hurtUntil = elapsed + 0.45; enemy.hurtTaken = 0; }
+    actual = Math.min(actual, Math.max(0, cap - enemy.hurtTaken));
+    enemy.hurtTaken += actual;
+  }
+  enemy.lastBlocked = damage - reduced; enemy.lastDamage = Math.min(enemy.hp ?? 1, actual);
   enemy.hp = Math.max(0, (enemy.hp ?? 1) - actual);
   enemy.hitUntil = elapsed + 0.16;
   if (enemy.hp) return false;

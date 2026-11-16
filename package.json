@@ -28,7 +28,7 @@
     "three": "0.187.0"
   },
   "engines": {
-    "node": ">=26.13.0 <27"
+    "node": ">=26.13.1 <27"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "6.2.1",

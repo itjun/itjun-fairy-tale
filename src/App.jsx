@@ -1,12 +1,13 @@
-import { GamepadSettings } from './input/GamepadSupport.jsx';
 import { GamepadStampCanvas } from './input/GamepadStampCanvas.jsx';
 import { lazy, Suspense } from 'react';
 import { HomePage } from './HomePage.jsx';
 import { HomeMenu, artworkNames, turns } from './HomeMenu.jsx';
-import { DesktopActions, DesktopRestState } from './DesktopActions.jsx';
-import { GardenBackup } from './GardenBackup.jsx';
+import { DesktopRestState } from './DesktopActions.jsx';
+import { OptionsPage } from './OptionsPage.jsx';
+import { AlbumPage } from './album/AlbumPage.jsx';
+import { ALBUM_STAMPS, readAlbum, writeAlbum, hasAlbum, unlockOwned, unlockedStamps } from './album/album.js';
 import { earnedQuests } from './garden-progress.js';
-import { readMiniGames } from './garden-backup.js';
+import { readMiniGames, STAMP_TYPES } from './garden-backup.js';
 import { createMiniSession, isMiniComplete } from './mini-games/session.js';
 const MiniGame = lazy(() => import('./mini-games/MiniGame.jsx').then(module => ({ default: module.MiniGame })));
 import { readAdventure, clearAdventure } from './game/save.js';
@@ -14,7 +15,7 @@ import { queueRun, flushScores } from './scores/client.js';
 const ScoreHistory = lazy(() => import('./scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
 const PlatformGame = lazy(() => import('./game/PlatformGame.jsx').then(module => ({ default: module.PlatformGame })));
 import { useEffect, useRef, useState } from 'react';
-import { Flower, Rainbow, IceCream, Heart, Star, Sparkle, ArrowRight, ArrowLeft, SpeakerHigh, SpeakerSlash, X, Check, House, Images, PaintBrush, ArrowCounterClockwise, DownloadSimple, Play, Drop, Flag, Butterfly, Trophy } from '@phosphor-icons/react';
+import { Flower, Rainbow, IceCream, Heart, Star, Sparkle, ArrowRight, ArrowLeft, SpeakerHigh, X, Check, PaintBrush, ArrowCounterClockwise, DownloadSimple, Play, Drop, Flag, Butterfly, Trophy } from '@phosphor-icons/react';
 
 const asset = (path) => window.__GAME_ASSETS__?.[path] || `./${path}`;
 const quests = [
@@ -34,13 +35,14 @@ function loadProgress() {
       served: Array.isArray(data.served) && data.served.length === 4 ? data.served.map(v => v === true) : [false, false, false, false],
       achievements: Object.fromEntries(quests.map(({ id }) => [id, data.achievements?.[id] === true])),
       miniGames: readMiniGames(data.miniGames),
-      stamps: Array.isArray(data.stamps) ? data.stamps.filter(v => ['flower', 'heart', 'star', 'butterfly'].includes(v.type) && Number.isFinite(v.x) && Number.isFinite(v.y) && v.x >= 0 && v.x <= 100 && v.y >= 0 && v.y <= 100).slice(-40) : [],
+      stamps: Array.isArray(data.stamps) ? data.stamps.filter(v => STAMP_TYPES.includes(v.type) && Number.isFinite(v.x) && Number.isFinite(v.y) && v.x >= 0 && v.x <= 100 && v.y >= 0 && v.y <= 100).slice(-40) : [],
     };
   } catch { return emptyProgress; }
 }
 function Icon({ as: Component, ...props }) { return <Component weight="duotone" size={26} aria-hidden="true" {...props} />; }
 function Stamp({ type }) {
   if (type === 'flower') return <img src={asset('assets/flower.png')} alt="" />;
+  if (ALBUM_STAMPS[type]) return <img src={asset(`assets/${ALBUM_STAMPS[type].image}.png`)} alt="" />;
   return <Icon as={{ heart: Heart, star: Star, butterfly: Butterfly, Trophy }[type]} weight="fill" size={46} />;
 }
 function Modal({ title, children, onClose, className = '' }) {
@@ -54,12 +56,15 @@ function Modal({ title, children, onClose, className = '' }) {
 export function App() {
   const [progress, setProgress] = useState(loadProgress);
   const [mode, setMode] = useState(null);
-  const [optionsCategory, setOptionsCategory] = useState('settings');
+  const [optionsCategory, setOptionsCategory] = useState('game');
   const [isGarden, setIsGarden] = useState(false);
   const [isAdventure, setIsAdventure] = useState(false);
   const [savedAdventure,setSavedAdventure] = useState(readAdventure);
   const [isScores, setIsScores] = useState(false);
   useEffect(() => { flushScores(); }, []);
+  // 第一次有画册时，这一局已经带着的武器和本领直接算解锁。
+  useEffect(() => { if (!hasAlbum()) writeAlbum(unlockOwned(readAlbum(), readAdventure()?.state.adventure)); }, []);
+  const albumStamps = unlockedStamps(readAlbum());
   const [isSound, setIsSound] = useState(true);
   const [isDecorating, setIsDecorating] = useState(false);
   const [stamp, setStamp] = useState('flower');
@@ -147,6 +152,7 @@ export function App() {
       for (const item of progress.stamps) {
         const x = item.x / 100 * 1536, y = item.y / 100 * 1024;
         if (item.type === 'flower') context.drawImage(flowerImage, x - 40, y - 40, 80, 80);
+        else if (ALBUM_STAMPS[item.type]) context.drawImage(await load(`assets/${ALBUM_STAMPS[item.type].image}.png`), x - 40, y - 40, 80, 80);
         else {
           const element = document.querySelector(`[data-stamp-type="${item.type}"] svg`);
           if (element) {
@@ -164,7 +170,7 @@ export function App() {
     } catch (error) { console.warn('保存花园失败', error); tell('照片还没准备好，请再试一次。'); }
     finally { isExportingRef.current = false; setIsExporting(false); }
   }
-  const isHomePage = ['options', 'mini-games', 'gallery', 'collection'].includes(mode);
+  const isHomePage = ['options', 'mini-games', 'gallery', 'collection', 'album'].includes(mode);
   const activeQuest = quests.find(q => q.id === mode);
   if (activeQuest) return <Suspense fallback={<div className="loading-adventure">正在打开小冒险…</div>}><MiniGame session={progress.miniGames[activeQuest.id]} onChange={saveMiniSession} onExit={() => { setMode(questReturnMode.current); window.speechSynthesis?.cancel(); }} onReplay={() => openQuest(activeQuest.id)} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} onChime={chime} isSaved={isSaved} /></Suspense>;
   if (isScores) return <Suspense fallback={<div className="loading-adventure">正在翻开成绩本…</div>}><ScoreHistory onClose={() => setIsScores(false)} /></Suspense>;
@@ -175,6 +181,7 @@ export function App() {
     {!isGarden ? <HomeMenu savedAdventure={savedAdventure} isActive={!mode}
       onAdventure={() => { window.speechSynthesis?.cancel(); setIsAdventure(true); }}
       onNewAdventure={() => { isStartingAdventureRef.current = false; setMode('new-adventure'); }}
+      onAlbum={() => setMode('album')}
       onMiniGames={() => setMode('mini-games')}
       onOptions={() => setMode('options')} /> : <>
     <header className="garden-return"><h1>我的花园</h1><button data-gamepad-back className="quiet-button" onClick={() => { setIsGarden(false); setIsDecorating(false); }}><Icon as={ArrowLeft} size={20} />返回主菜单</button></header>
@@ -191,37 +198,19 @@ export function App() {
         </GamepadStampCanvas>
         <div className="world-bottom"><div className="guide"><Icon as={Heart} size={23} /><span aria-live="polite">{notice}</span></div><button className={`decorate-toggle ${isDecorating ? 'active' : ''}`} onClick={() => setIsDecorating(!isDecorating)}><Icon as={isDecorating ? Check : PaintBrush} size={22} />{isDecorating ? '装饰好啦' : '装饰花园'}</button></div>
       </section>
-      {isDecorating ? <section className="sticker-tools" aria-label="花园贴纸"><span>我的贴纸</span>{[['flower', '小花'], ['heart', '爱心'], ['star', '星星'], ['butterfly', '蝴蝶']].map(([type, name]) => <button key={type} aria-label={`${name}贴纸`} aria-pressed={stamp === type} className={`sticker-choice stamp-${type} ${stamp === type ? 'selected' : ''}`} onClick={() => setStamp(type)} data-stamp-type={type}><Stamp type={type} /><span>{name}</span></button>)}<button className="quiet-button" disabled={!progress.stamps.length} onClick={() => setProgress(p => ({ ...p, stamps: p.stamps.slice(0, -1) }))}><Icon as={ArrowCounterClockwise} />撤回</button><button className="quiet-button" disabled={isExporting} onClick={saveGarden}><Icon as={DownloadSimple} />{isExporting ? "保存中……" : "保存花园"}</button></section> : <section className="quest-list" aria-label="三个小冒险">{quests.map((quest, i) => <button className={`quest-card ${quest.color} ${completed[i] ? 'complete' : ''}`} key={quest.id} onClick={() => openQuest(quest.id)}><span className="quest-icon"><Icon as={quest.icon} size={34} /></span><span className="quest-copy"><small>小冒险 0{i + 1}</small><strong>{quest.title}</strong><span>{completed[i] ? '做得真棒，再玩一次' : quest.hint}</span></span><span className="quest-arrow"><Icon as={completed[i] ? Check : ArrowRight} size={22} /></span></button>)}</section>}
+      {isDecorating ? <section className="sticker-tools" aria-label="花园贴纸"><span>我的贴纸</span>{[['flower', '小花'], ['heart', '爱心'], ['star', '星星'], ['butterfly', '蝴蝶'], ...albumStamps.map(type => [type, ALBUM_STAMPS[type].name])].map(([type, name]) => <button key={type} aria-label={`${name}贴纸`} aria-pressed={stamp === type} className={`sticker-choice stamp-${type} ${stamp === type ? 'selected' : ''}`} onClick={() => setStamp(type)} data-stamp-type={type}><Stamp type={type} /><span>{name}</span></button>)}<button className="quiet-button" disabled={!progress.stamps.length} onClick={() => setProgress(p => ({ ...p, stamps: p.stamps.slice(0, -1) }))}><Icon as={ArrowCounterClockwise} />撤回</button><button className="quiet-button" disabled={isExporting} onClick={saveGarden}><Icon as={DownloadSimple} />{isExporting ? "保存中……" : "保存花园"}</button></section> : <section className="quest-list" aria-label="三个小冒险">{quests.map((quest, i) => <button className={`quest-card ${quest.color} ${completed[i] ? 'complete' : ''}`} key={quest.id} onClick={() => openQuest(quest.id)}><span className="quest-icon"><Icon as={quest.icon} size={34} /></span><span className="quest-copy"><small>小冒险 0{i + 1}</small><strong>{quest.title}</strong><span>{completed[i] ? '做得真棒，再玩一次' : quest.hint}</span></span><span className="quest-arrow"><Icon as={completed[i] ? Check : ArrowRight} size={22} /></span></button>)}</section>}
       <footer><span><Icon as={Heart} size={16} />灵感来自一位 6 岁小画家的 11 幅画</span><span>{isSaved ? '小心愿会自动记住' : '这次进度暂时无法保存'}<span className="footer-divider">/</span><button onClick={() => setMode('reset')}>重新开始</button></span></footer>
     </main>
     </>}
     </div>
-    {mode === 'options' && <HomePage title="选项" onBack={closeModal} className="home-options">
-      <div className="home-options-layout">
-        <nav className="home-options-categories" aria-label="选项分类">
-          {[["settings", "游戏设置"], ["collection", "作品与成绩"], ["saves", "存档管理"]].map(([id, label]) => <button key={id} aria-pressed={optionsCategory === id} onClick={() => setOptionsCategory(id)}>{label}</button>)}
-        </nav>
-        {optionsCategory === 'settings' && <section className="home-options-grid" aria-label="游戏设置">
-          <button className="quiet-button" aria-pressed={isSound} onClick={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }}><Icon as={isSound ? SpeakerHigh : SpeakerSlash} />声音{isSound ? '开' : '关'}</button>
-          <DesktopActions />
-          <GamepadSettings />
-        </section>}
-        {optionsCategory === 'collection' && <section className="home-options-grid" aria-label="作品与成绩">
-          <button className="quiet-button" onClick={() => setIsScores(true)}><Icon as={Trophy} />我的成绩本</button>
-          <button className="quiet-button" onClick={() => setMode('gallery')}><Icon as={Images} />小小画展</button>
-          <button className="quiet-button" onClick={() => setMode('collection')}><Icon as={Star} />我的小成就</button>
-        </section>}
-        {optionsCategory === 'saves' && <section className="home-options-grid" aria-label="存档管理">
-          <GardenBackup progress={progress} onImport={setProgress} />
-        </section>}
-      </div>
-    </HomePage>}
+    {mode === 'options' && <OptionsPage category={optionsCategory} onCategory={setOptionsCategory} onBack={closeModal} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} progress={progress} onImport={setProgress} onScores={() => setIsScores(true)} onGallery={() => setMode('gallery')} onCollection={() => setMode('collection')} />}
+    {mode === 'album' && <AlbumPage onBack={closeModal} />}
     {mode === 'mini-games' && <HomePage title="小游戏" onBack={closeModal} className="home-games">
       <div className="quest-list">{quests.map((quest, i) => <button className={`quest-card ${quest.color}`} key={quest.id} onClick={() => openQuest(quest.id)}><span className="quest-icon"><Icon as={quest.icon} size={34} /></span><span className="quest-copy"><strong>{quest.title}</strong><span>{completed[i] ? '再来一次' : quest.hint}</span></span><Icon as={ArrowRight} size={22} /></button>)}</div>
       <button className="quiet-button" onClick={() => { closeModal(); setIsGarden(true); }}><Icon as={Flower} />我的花园</button>
     </HomePage>}
     {mode === 'new-adventure' && <Modal title="开始新的跳台探险？" onClose={closeModal}>
-      <p className="modal-subtitle">当前探险会结束，成绩保留。重新选择角色，从第一小关出发。</p>
+      <p className="modal-subtitle">当前探险会结束，成绩保留。重新选择角色，从第一个世界出发。</p>
       <div className="reset-actions"><button className="quiet-button" onClick={closeModal}>继续现在的冒险</button><button className="primary-button" onClick={() => {
         if (!savedAdventure || isStartingAdventureRef.current) return;
         isStartingAdventureRef.current = true;
@@ -231,7 +220,7 @@ export function App() {
     </Modal>}
     {!isSaved && <p role="alert" className="home-save-warning">这次进度暂时无法保存，请先到选项备份花园。</p>}
     {mode === 'photo' && <Modal title="我的花园照片" onClose={closeModal} className="gallery-modal"><p className="modal-subtitle">把今天的快乐留在照片里。</p><img className="garden-photo" src={photo} alt="包含家人和贴纸的花园照片" /><div className="photo-actions"><a className="primary-button" href={photo} download="我的花园王国.png"><Icon as={DownloadSimple} />下载图片</a><span>也可以长按或右键图片保存</span></div></Modal>}
-    {mode === 'gallery' && <HomePage title="小小画家的画展" onBack={() => setMode('options')} backLabel="返回选项" className="home-gallery"><p className="modal-subtitle">每个奇妙的故事，都从一张画开始。</p><div className="artwork-view"><img src={asset(`artworks/${galleryIndex + 1}.jpg`)} className={turns[galleryIndex] ? 'rotated-art' : ''} style={{ transform: `translate(-50%, -50%) rotate(${turns[galleryIndex]}deg)` }} alt={artworkNames[galleryIndex]} /></div><div className="gallery-controls"><button className="icon-button" aria-label="上一幅画" onClick={() => setGalleryIndex((galleryIndex + 10) % 11)}><Icon as={ArrowLeft} /></button><div><strong>{artworkNames[galleryIndex]}</strong><span>{galleryIndex + 1} / 11</span></div><button className="icon-button" aria-label="下一幅画" onClick={() => setGalleryIndex((galleryIndex + 1) % 11)}><Icon as={ArrowRight} /></button></div></HomePage>}
+    {mode === 'gallery' && <HomePage title="小小画家的画展" onBack={() => setMode('options')} backLabel="返回选项" className="home-gallery"><p className="modal-subtitle">每个奇妙的故事，都从一张画开始。</p><div className="artwork-view"><img src={asset(`artworks/${galleryIndex + 1}.jpg`)} className={turns[galleryIndex] ? 'rotated-art' : ''} style={{ transform: `translate(-50%, -50%) rotate(${turns[galleryIndex]}deg)` }} alt={artworkNames[galleryIndex]} /></div><div className="gallery-controls" data-gamepad-tabs="换一幅"><button className="icon-button" aria-label="上一幅画" onClick={() => setGalleryIndex((galleryIndex + 10) % 11)}><Icon as={ArrowLeft} /></button><div><strong>{artworkNames[galleryIndex]}</strong><span>{galleryIndex + 1} / 11</span></div><button className="icon-button" aria-label="下一幅画" onClick={() => setGalleryIndex((galleryIndex + 1) % 11)}><Icon as={ArrowRight} /></button></div></HomePage>}
     {mode === 'collection' && <HomePage title="我的小成就" onBack={() => setMode('options')} backLabel="返回选项" className="home-collection"><p className="modal-subtitle">每一次用心，都值得被记住。</p><div className="achievement-list">{quests.map((q, i) => <button key={q.id} onClick={() => openQuest(q.id)} className={completed[i] ? 'earned' : ''}><Icon as={q.icon} size={48} /><strong>{q.reward}</strong><span>{completed[i] ? '已经收集到啦' : '去玩一玩'}</span></button>)}</div><p className="game-counter">已经收集 {total} / 3 份小成就</p></HomePage>}
     {mode === 'party' && <Modal title="一家人在一起，就是最好的魔法" onClose={closeModal} className="party-modal"><Icon as={Heart} className="party-heart" size={52} weight="fill" /><p className="modal-subtitle">谢谢你，让花园变得这么温暖！</p><img src={asset('assets/family.png')} alt="一家四口手牵手庆祝" className="party-family dancing" /><div className="party-badges">{quests.map(q => <span key={q.id}><Icon as={q.icon} />{q.reward}</span>)}</div><button className="primary-button" onClick={() => { closeModal(); setIsDecorating(true); tell('把花园装饰成你喜欢的样子吧！'); }}><Icon as={PaintBrush} />一起装饰花园</button><button className="text-button" onClick={closeModal}>再逛一会儿</button></Modal>}
     {mode === 'help' && <Modal title="小小冒险家，这样玩" onClose={closeModal}><div className="help-list"><p><Icon as={Play} />点“开始冒险”，或者选下面的小冒险。</p><p><Icon as={SpeakerHigh} />点小喇叭，就能听玩法。</p><p><Icon as={PaintBrush} />点“装饰花园”，把贴纸放到喜欢的位置。</p><p><Icon as={Heart} />没有倒计时，点错也没关系。</p></div><button className="primary-button" onClick={closeModal}>我知道啦<Icon as={Check} /></button></Modal>}

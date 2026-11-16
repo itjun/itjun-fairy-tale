@@ -1,13 +1,27 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { findLevel, calculateScore, hasCompleted } from '../shared/levels.js';
+import { findLevel, calculateScore, hasCompleted, WORLD_ACTS } from '../shared/levels.js';
 import { collectionForPlatforms } from '../shared/collectibles.js';
-import { createCampaignWorld, campaignScore, GENERATION_VERSION } from '../shared/campaign.js';
+import { campaignScore } from '../shared/campaign.js';
+import { createRoomWorld } from '../shared/room-world.js';
+import { ADVENTURE_GENERATION_VERSION } from '../shared/adventure-catalog.js';
 
 export class InputError extends Error { constructor(message) { super(message); this.status = 400; } }
 function integer(value, min, max, label) { if (!Number.isInteger(value) || value < min || value > max) throw new InputError(`${label}不正确`); return value; }
-export function validateRun(input) {
+function isRetired(run) { return run.scoringVersion === 3 && run.generationVersion !== ADVENTURE_GENERATION_VERSION; }
+// 旧版地图的生成器已经删掉，分数没法再算一遍。从备份里读到的旧记录只查格式，分数照原样留着。
+function validateRetired(input, base) {
+  const ids = (list, label) => {
+    if (!Array.isArray(list) || new Set(list).size !== list.length) throw new InputError(`${label}不正确`);
+    return list.map(id => integer(id, 1, 100000, label)).sort((a, b) => a - b);
+  };
+  const collectedIds = ids(input.collectedIds, '宝物明细'), defeatedIds = ids(input.defeatedIds, '小怪明细');
+  return { ...base, generationVersion: integer(input.generationVersion, 1, ADVENTURE_GENERATION_VERSION - 1, '地图版本'), collectedIds, defeatedIds,
+    flowers: integer(input.flowers, collectedIds.length, collectedIds.length, '小花数量'), platform: integer(input.platform, 0, 100000, '跳台进度'), score: integer(input.score, 0, 100000000, '积分') };
+}
+// isHistory 只在导入备份时为真：这时才收旧版地图的记录。平时新写进来的成绩只收当前这一版。
+export function validateRun(input, isHistory = false) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new InputError('游玩记录不正确');
   const level = findLevel(input.levelId);
   if (!level) throw new InputError('找不到这个关卡');
@@ -16,9 +30,15 @@ export function validateRun(input) {
   if (!Number.isFinite(started) || started < Date.UTC(2020, 0, 1) || started > Date.now() + 300000) throw new InputError('游玩时间不正确');
   const scoringVersion = input.scoringVersion === undefined ? 1 : integer(input.scoringVersion, 1, 3, '计分规则');
   const seed = integer(input.seed, 0, 4294967295, '地图编号');
-  const generationVersion = scoringVersion === 3 ? integer(input.generationVersion, GENERATION_VERSION, 8, '地图版本') : 0;
-  if (level.themeId && generationVersion < 4) throw new InputError('小关需要使用新版地图');
-  const world = scoringVersion === 3 ? createCampaignWorld(seed, level, generationVersion) : null;
+  if (!['playing', 'paused', 'ended', 'completed'].includes(input.status)) throw new InputError('记录状态不正确');
+  const base = { id: input.id, levelId: level.id, startedAt: new Date(started).toISOString(), players: integer(input.players, 1, 2, '玩家数量'), seed, scoringVersion, seconds: integer(input.seconds, 0, 604800, '游玩时长'), revision: integer(input.revision, 1, 10000000, '记录版本'), status: input.status };
+  if (isRetired({ scoringVersion, generationVersion: input.generationVersion })) {
+    if (!isHistory) throw new InputError('这一版地图已经停用，旧成绩只在成绩本里保留');
+    return validateRetired(input, base);
+  }
+  const generationVersion = scoringVersion === 3 ? ADVENTURE_GENERATION_VERSION : 0;
+  if (scoringVersion === 3 && !WORLD_ACTS.includes(level)) throw new InputError('新地图只有八个世界关');
+  const world = scoringVersion === 3 ? createRoomWorld(seed, level) : null;
   const treasureCount = world?.treasures.length ?? level.platforms;
   const flowers = integer(input.flowers, 0, treasureCount, '小花数量');
   let collectedIds = [];
@@ -35,11 +55,10 @@ export function validateRun(input) {
     if (new Set(defeatedIds).size !== defeatedIds.length) throw new InputError('同一只小怪不能重复计分');
   }
   const platform = integer(input.platform, 0, world?.zones.length ?? level.platforms, '跳台进度');
-  if (!['playing', 'paused', 'ended', 'completed'].includes(input.status)) throw new InputError('记录状态不正确');
   if (input.status === 'completed' && world?.bossArenas?.some(arena => !defeatedIds.includes(arena.bossId))) throw new InputError('还没有打赢全部 BOSS');
   if (input.status === 'completed' && !(world ? flowers >= world.requiredFlowers && platform === world.zones.length : hasCompleted(level, flowers, platform))) throw new InputError('还没完成关卡目标');
   const collection = scoringVersion === 2 ? collectionForPlatforms(level.id, seed, collectedIds, level.platforms) : flowers;
-  return { id: input.id, levelId: level.id, startedAt: new Date(started).toISOString(), players: integer(input.players, 1, 2, '玩家数量'), seed, scoringVersion, generationVersion, collectedIds, defeatedIds, flowers, platform, seconds: integer(input.seconds, 0, 604800, '游玩时长'), revision: integer(input.revision, 1, 10000000, '记录版本'), status: input.status, score: world ? campaignScore(world, collectedIds, defeatedIds, input.status === 'completed', level.bonus).score : calculateScore(collection, input.status === 'completed', level) };
+  return { ...base, generationVersion, collectedIds, defeatedIds, flowers, platform, score: world ? campaignScore(world, collectedIds, defeatedIds, input.status === 'completed', level.bonus).score : calculateScore(collection, input.status === 'completed', level) };
 }
 export function openStore(path) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -75,8 +94,10 @@ export function openStore(path) {
     platform=excluded.platform, seconds=excluded.seconds, revision=excluded.revision,
     status=excluded.status, score=excluded.score, collectedIds=excluded.collectedIds, defeatedIds=excluded.defeatedIds`);
   return {
-    save(input) {
-      const run = validateRun(input), previous = readRun(run.id);
+    save(input, isHistory = false) {
+      const run = validateRun(input, isHistory), previous = readRun(run.id);
+      // 旧版地图的记录只补进来，已经有的不再改。
+      if (previous && isRetired(run)) return previous;
       if (previous) {
         if (previous.levelId !== run.levelId || previous.startedAt !== run.startedAt || previous.players !== run.players || previous.seed !== run.seed) throw new InputError('这次游玩的关卡或开始时间不能改变');
         if (previous.scoringVersion !== run.scoringVersion || previous.generationVersion !== run.generationVersion) throw new InputError('这次游玩的计分规则不能改变');
@@ -92,7 +113,7 @@ export function openStore(path) {
         const collection = run.scoringVersion === 2 ? collectionForPlatforms(run.levelId, run.seed, run.collectedIds, level.platforms) : run.flowers;
         if (run.scoringVersion === 3) {
           run.defeatedIds = [...new Set([...previous.defeatedIds, ...run.defeatedIds])].sort((a,b) => a-b);
-          run.score = campaignScore(createCampaignWorld(run.seed, level, run.generationVersion), run.collectedIds, run.defeatedIds, run.status === 'completed', level.bonus).score;
+          run.score = campaignScore(createRoomWorld(run.seed, level), run.collectedIds, run.defeatedIds, run.status === 'completed', level.bonus).score;
         } else run.score = calculateScore(collection, run.status === 'completed', level);
       }
       write.run(run.id, run.levelId, run.startedAt, new Date().toISOString(), run.players, run.seed, run.flowers, run.platform, run.seconds, run.revision, run.status, run.score, run.scoringVersion, JSON.stringify(run.collectedIds), run.generationVersion, JSON.stringify(run.defeatedIds));
@@ -126,7 +147,7 @@ export function openStore(path) {
     importRuns(rows) {
       // A malformed/conflicting backup must not leave a partially imported history.
       db.exec('BEGIN');
-      try { for (const row of rows) this.save(row); db.exec('COMMIT'); }
+      try { for (const row of rows) this.save(row, true); db.exec('COMMIT'); }
       catch (error) { db.exec('ROLLBACK'); throw error; }
     },
     close() { db.close(); },
