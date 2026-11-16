@@ -170,7 +170,7 @@ export class GardenEngine {
       if (this.isDisposed) return;
       this.roomViews = new RoomViews(this);
       this.isReady = true; this.callbacks.onReady();
-      this.publish('清完一间房，走到门前按上进门。');
+      this.publish('清完一间房，跳到发光的门上。');
     } catch (error) {
       if (!this.isDisposed) this.callbacks.onError('彩笔素材还没准备好。请检查文件是否完整，再试一次。');
       console.error('花园素材加载失败', error);
@@ -270,7 +270,7 @@ export class GardenEngine {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'Enter', 'Escape', 'KeyP'].includes(event.code)) event.preventDefault();
     if (event.code === 'Escape' || event.code === 'KeyP') { if (!event.repeat) this.requestPause(); return; }
     if (!this.keys.has(event.code)) {
-      // 站在开着的门或摊位前，“上”用来进门和买东西，不跳。
+      // 站在摊位前，“上”用来买东西，不跳。门是跳上去就进。
       if (['KeyW', 'ArrowUp'].includes(event.code) && this.canInteract()) this.isInteracting = true;
       else if (['Space', 'KeyW'].includes(event.code) || this.players.length === 1 && event.code === 'ArrowUp') this.jumps[0] = true;
       if (event.code === 'KeyK') this.isCasting = true;
@@ -354,7 +354,7 @@ export class GardenEngine {
   }
   canInteract() {
     const player = this.players[0];
-    return !!(doorAt(this.world, this.roomState, player) || stallAt(this.world, this.roomState, player));
+    return !!stallAt(this.world, this.roomState, player);
   }
   cameraTarget() {
     const averageX = this.players.reduce((sum, player) => sum + player.x, 0) / this.players.length;
@@ -392,13 +392,19 @@ export class GardenEngine {
     }
     // 选卡的奖励晚一点点弹出来，让最后一只怪的效果放完；存档恢复后没领的也在这里补上。
     const rewardId = `room:${this.levelKey}:${room.id}`;
-    const isRewardDue = isRoomCleared(state) && DOOR_REWARDS[room.reward]?.isChoice && !this.journey.claimed.includes(rewardId);
-    if (isRewardDue && !this.journey.pending && this.elapsed >= this.rewardAt) {
+    const isChoiceWaiting = isRoomCleared(state) && !!DOOR_REWARDS[room.reward]?.isChoice && !this.journey.claimed.includes(rewardId);
+    if (isChoiceWaiting && !this.journey.pending && this.elapsed >= this.rewardAt) {
       openRoomReward(this.adventure, this.journey, this.survival, rewardId, room.kind === 'elite' ? 'elite' : `door-${room.reward}`, 'power', this.difficulty.rarityBonus);
       this.pause(true); this.publish(); this.callbacks.onReward?.();
     }
-    // 这间房的奖励还没领就不能进门，免得一着急把奖励落下。
-    if (this.isInteracting) { this.isInteracting = false; if (!isRewardDue) this.interact(player); }
+    // 奖励还没领就不能进门。领完之后，跳到发光的门上就进去，不用再按上。
+    const wasInteracting = this.isInteracting;
+    this.isInteracting = false;
+    if (!isChoiceWaiting && !this.journey.pending) {
+      const door = doorAt(this.world, state, player);
+      if (door) this.enterRoom(player, door);
+    }
+    if (wasInteracting && !isChoiceWaiting) this.interact(player);
   }
   clearRoom(room, stars, powers) {
     this.rewardAt = this.elapsed + 0.7;
@@ -411,7 +417,7 @@ export class GardenEngine {
     if (room.kind === 'boss') return;
     this.callbacks.onSound('checkpoint');
     this.skillEffects.burst(this.players[0].x, this.players[0].y + 1, this.elapsed, true);
-    this.publish(room.kind === 'shop' ? '小店到了，站到摊位前按上买东西。' : `这一间过关，拿到 ${stars} 颗星！门开了。`);
+    this.publish(room.kind === 'shop' ? '小店到了，站到摊位前按上买东西。' : `这一间过关，拿到 ${stars} 颗星！门亮了，跳过去吧。`);
     this.callbacks.onLifeChange?.(this.snapshot());
   }
   takeDrop(kind, player) {
@@ -422,16 +428,18 @@ export class GardenEngine {
     this.skillEffects.burst(player.x, player.y + 1, this.elapsed, true); this.callbacks.onSound('skill');
     this.callbacks.onLifeChange?.(this.snapshot());
   }
+  enterRoom(player, door) {
+    const room = enterDoor(this.world, this.roomState, door), start = this.platforms[room.startId];
+    rescue(player, start, start.x - 2); player.recoveries--; player.protection = 1;
+    this.waves = []; this.enemyShots = []; this.lure = undefined; this.checkpointId = start.id;
+    this.snapCamera(); this.callbacks.onSound('checkpoint');
+    this.publish(`${ROOM_KINDS[room.kind].name}：${room.puzzle ? PUZZLES[room.puzzle.kind].hint : ROOM_KINDS[room.kind].hint}`);
+    this.callbacks.onLifeChange?.(this.snapshot());
+  }
   interact(player) {
     const state = this.roomState, door = doorAt(this.world, state, player), stall = stallAt(this.world, state, player);
-    if (door) {
-      const room = enterDoor(this.world, state, door), start = this.platforms[room.startId];
-      rescue(player, start, start.x - 2); player.recoveries--; player.protection = 1;
-      this.waves = []; this.enemyShots = []; this.lure = undefined; this.checkpointId = start.id;
-      this.snapCamera(); this.callbacks.onSound('checkpoint');
-      this.publish(`${ROOM_KINDS[room.kind].name}：${room.puzzle ? PUZZLES[room.puzzle.kind].hint : ROOM_KINDS[room.kind].hint}`);
-      this.callbacks.onLifeChange?.(this.snapshot());
-    } else if (stall) {
+    if (door) this.enterRoom(player, door);
+    else if (stall) {
       const item = SHOP_ITEMS[stall.id];
       if (isStallSold(state, stall)) { this.publish('这个摊位卖完了。'); return; }
       const message = buyStall(this.adventure, this.survival, state, stall.id);
@@ -446,7 +454,7 @@ export class GardenEngine {
   }
   roomSnapshot() {
     const world = this.world, state = this.roomState, room = currentRoom(world, state), player = this.players[0];
-    const door = doorAt(world, state, player), stall = stallAt(world, state, player), resources = resourcesFor(this.adventure);
+    const stall = stallAt(world, state, player), resources = resourcesFor(this.adventure);
     return {
       roomId: room.id, depth: room.depth, kind: room.kind, name: ROOM_KINDS[room.kind].name, isCleared: isRoomCleared(state), trait: room.trait || null,
       ...roomProgress(world, state, this.difficulty.isExtraWave),
@@ -454,7 +462,7 @@ export class GardenEngine {
       stars: starTotal(state), combo: state.combo, difficulty: this.adventure.difficulty,
       puzzle: room.puzzle ? { kind: room.puzzle.kind, ...PUZZLES[room.puzzle.kind] } : null,
       doors: world.doors.filter(item => item.roomId === room.id).map(item => ({ id: item.id })),
-      prompt: door ? '进门' : stall ? (isStallSold(state, stall) ? '卖完了' : `买${SHOP_ITEMS[stall.id].name}`) : '',
+      prompt: stall ? (isStallSold(state, stall) ? '卖完了' : `买${SHOP_ITEMS[stall.id].name}`) : '',
       sets: setCounts(this.adventure), rerolls: resources.rerolls || 0, tierUp: resources.tierUp || 0,
     };
   }

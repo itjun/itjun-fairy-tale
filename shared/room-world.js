@@ -359,9 +359,11 @@ export function createRoomWorld(seed, selected) {
   }
   for (const room of world.rooms) {
     const targets = world.rooms.filter(next => next.depth === room.depth + 1);
-    const exit = world.platforms[room.exitId];
+    // 门放在这间房最高和最低的跳台上，分开放。玩家跳到发光的那扇上就进去。
+    const landings = doorLandings(world, room, targets.length);
     targets.forEach((target, index) => {
-      world.doors.push({ id: world.doors.length, roomId: room.id, targetRoomId: target.id, platformId: exit.id, offsetX: targets.length === 1 ? 2.4 : index ? 3.6 : -1.2, kind: target.kind, reward: target.reward });
+      const platform = landings[index];
+      world.doors.push({ id: world.doors.length, roomId: room.id, targetRoomId: target.id, platformId: platform.id, offsetX: doorOffset(world, room, platform), kind: target.kind, reward: target.reward });
     });
   }
   world.start = world.platforms[world.rooms[0].startId];
@@ -383,6 +385,44 @@ export function createRoomWorld(seed, selected) {
   }
   world.signature = `${world.rooms.map(room => `${room.kind}:${room.reward || '-'}:${room.puzzle?.kind || room.trait || room.shape || room.arena || ''}`).join('|')}#${world.mainPath.map(id => { const platform = world.platforms[id]; return `${platform.x.toFixed(1)},${platform.y.toFixed(1)}`; }).join(';')}`;
   return world;
+}
+
+// 能站稳、不是起点也不是出口的跳台。优先躲开陷阱。
+function doorLandings(world, room, count) {
+  if (!count) return [];
+  const blocked = new Set(world.hazards.filter(hazard => world.platforms[hazard.platformId]?.roomId === room.id).map(hazard => hazard.platformId));
+  const usable = (isAvoidingHazards) => room.platformIds.map(id => world.platforms[id]).filter(platform => platform.id !== room.startId && platform.id !== room.exitId && !platform.isMoving && !platform.isCrumbling && platform.width >= 4 && (!isAvoidingHazards || !blocked.has(platform.id)));
+  const pair = (pool) => {
+    let best = null;
+    for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) {
+      const dy = Math.abs(pool[i].y - pool[j].y);
+      if (dy < LAYER - 0.2) continue;
+      const score = dy * 3 + Math.abs(pool[i].x - pool[j].x);
+      if (!best || score > best.score) best = { high: pool[i].y >= pool[j].y ? pool[i] : pool[j], low: pool[i].y >= pool[j].y ? pool[j] : pool[i], score };
+    }
+    return best;
+  };
+  if (count === 1) {
+    const pool = usable(true).length ? usable(true) : usable(false);
+    const exit = world.platforms[room.exitId];
+    const landing = [...pool].sort((a, b) => Math.abs(b.y - exit.y) - Math.abs(a.y - exit.y) || Math.abs(b.x - exit.x) - Math.abs(a.x - exit.x))[0];
+    return [landing || exit];
+  }
+  const best = pair(usable(true)) || pair(usable(false));
+  return best ? [best.high, best.low] : [world.platforms[room.exitId], world.platforms[room.startId]];
+}
+
+// 摊位或陷阱占着台面中间时，门挪到边上，跳上去不会压在上面。
+function doorOffset(world, room, platform) {
+  const stalls = (room.stalls || []).filter(stall => stall.platformId === platform.id).map(stall => stall.offsetX || 0);
+  const hazards = world.hazards.filter(hazard => hazard.platformId === platform.id).map(hazard => hazard.x - platform.x);
+  const taken = [...stalls, ...hazards];
+  if (!taken.length) return 0;
+  const edge = platform.width / 2 - 1.2;
+  const left = -edge, right = edge;
+  const leftGap = Math.min(...taken.map(spot => Math.abs(spot - left)));
+  const rightGap = Math.min(...taken.map(spot => Math.abs(spot - right)));
+  return leftGap >= rightGap ? left : right;
 }
 
 export function doorPosition(world, door) {

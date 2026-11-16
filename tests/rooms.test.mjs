@@ -22,7 +22,7 @@ function roomOf(kind, isMatch = () => true) {
 const enemiesOf = (world, room, wave) => room.enemyIds.map(id => world.enemies[id - 1]).filter(enemy => enemy.wave === wave);
 const types = events => events.map(event => event.type);
 
-test('开场房走到出口才开门，门前按上进下一间', () => {
+test('开场房走到出口才开门，跳到门上才进下一间', () => {
   const world = createRoomWorld(42, WORLD_ACTS[0]), state = newRoomState(world), room = world.rooms[0];
   const player = createPlayer(world.platforms[room.startId]);
   assert.deepEqual(stepRoom(world, state, player, STEP), []);
@@ -36,12 +36,14 @@ test('开场房走到出口才开门，门前按上进下一间', () => {
   assert.deepEqual(stepRoom(world, state, player, STEP), [], '清完只报一次');
   const doors = world.doors.filter(door => door.roomId === 0);
   assert.equal(doors.length, 2);
+  assert.equal(doorAt(world, state, player), null, '站在出口上不算进门');
   for (const door of doors) {
-    player.x = doorPosition(world, door).x;
+    const spot = doorPosition(world, door);
+    Object.assign(player, createPlayer(world.platforms[door.platformId], spot.x - world.platforms[door.platformId].x));
     assert.equal(doorAt(world, state, player), door);
+    player.x = spot.x + 3;
+    assert.equal(doorAt(world, state, player), null, '离门远了不算');
   }
-  player.x = exit.x - exit.width / 2 + 0.5;
-  assert.equal(doorAt(world, state, player), null, '离门远了不算');
   const next = enterDoor(world, state, doors[1]);
   assert.equal(next.id, doors[1].targetRoomId);
   assert.deepEqual(state.path, [0, next.id]);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { WORLD_ACTS } from '../shared/levels.js';
 import { ADVENTURE_GENERATION_VERSION } from '../shared/adventure-catalog.js';
 import { DOOR_REWARDS, ROOM_KINDS, createRoomWorld, doorPosition } from '../shared/room-world.js';
+import { LAYER } from '../shared/room-terrain.js';
 import { ELITE_TRAITS } from '../shared/monster-roles.js';
 import { playRoom } from './helpers/room-runner.mjs';
 
@@ -25,11 +26,18 @@ test('第 10 版一章五层：开场房、三次两扇门、首领房', () => {
         const doors = world.doors.filter(door => door.roomId === room.id);
         assert.deepEqual(doors.map(door => door.targetRoomId), targets.map(target => target.id));
         for (const door of doors) {
-          assert.equal(door.platformId, room.exitId);
+          assert.notEqual(door.platformId, room.exitId, '门不放在刚踩到就会通关的出口上');
+          assert.notEqual(door.platformId, room.startId);
           assert.equal(door.kind, world.rooms[door.targetRoomId].kind);
           assert.equal(door.reward, world.rooms[door.targetRoomId].reward);
-          const exit = world.platforms[room.exitId];
-          assert.ok(Math.abs(doorPosition(world, door).x - exit.x) < exit.width / 2 - 1, '门立在出口平台上');
+          const platform = world.platforms[door.platformId];
+          assert.equal(platform.isMoving || platform.isCrumbling || false, false, '门要放在站得稳的跳台上');
+          assert.ok(Math.abs(door.offsetX) <= platform.width / 2 - 1, '人跳上去站得住');
+        }
+        if (doors.length === 2) {
+          const [high, low] = doors.map(door => doorPosition(world, door));
+          assert.ok(Math.abs(high.y - low.y) >= LAYER - 0.21, `${act.id} ${seed} 两扇门要一高一低`);
+          assert.notEqual(doors[0].platformId, doors[1].platformId);
         }
       }
       // 两扇门后面的房间不一样，玩家自己挑，门上不写是什么。

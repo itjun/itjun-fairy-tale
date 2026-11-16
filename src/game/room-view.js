@@ -17,14 +17,19 @@ export class RoomViews {
     for (const door of world.doors) {
       const spot = doorPosition(world, door);
       const gate = engine.sprite(engine.material(engine.bossGateMaterial.clone()), spot.x, spot.y + 1.7, 3.3, 3.3, -0.3);
-      // 两扇门长得一样，不写后面是小店还是战斗，进去才知道。
-      const sign = this.paper(spot.x, spot.y + 4.5, 3.2, 1.5, 256, 120);
-      sign.draw('door', (context, width, height) => this.text(context, '进门', width / 2, height / 2 + 22, 64));
+      const glow = this.glow(spot.x, spot.y + 1.7);
+      // 两扇门长得一样，不写字。能进去的时候才发光，跳上去就进。
       this.items.push({ roomId: door.roomId, update: (state, isCurrent) => {
-        const isOpen = isCurrent && isRoomCleared(state);
-        gate.visible = sign.mesh.visible = isCurrent;
-        gate.material.color.set(isOpen ? '#ffffff' : '#8f877c');
-        sign.mesh.material.opacity = isOpen ? 1 : 0.8;
+        const home = world.rooms[door.roomId];
+        const isWaiting = DOOR_REWARDS[home.reward]?.isChoice && !engine.journey.claimed.includes(`room:${engine.levelKey}:${home.id}`);
+        const isOpen = isCurrent && isRoomCleared(state) && !isWaiting;
+        gate.visible = isCurrent;
+        glow.visible = isOpen;
+        gate.material.color.set(isOpen ? '#fff6c2' : '#6e675e');
+        const pulse = isOpen && !engine.isReducedMotion ? 1 + Math.sin(engine.elapsed * 5) * 0.08 : 1;
+        gate.scale.set(3.3 * pulse, 3.3 * pulse, 1);
+        glow.scale.set(5.4 * pulse, 5.4 * pulse, 1);
+        glow.material.opacity = isOpen ? 0.55 + (pulse - 1) * 2 : 0;
       } });
     }
     for (const room of world.rooms) {
@@ -128,6 +133,22 @@ export class RoomViews {
         this.text(context, isSold ? '卖完了' : `${item.price} 片碎片`, width / 2, 112, 36, isSold ? '#a09482' : '#8a6a4c');
       });
     } });
+  }
+  glow(x, y) {
+    const engine = this.engine, canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    const context = canvas.getContext('2d');
+    const gradient = context.createRadialGradient(64, 64, 8, 64, 64, 64);
+    gradient.addColorStop(0, 'rgba(255, 236, 140, 0.95)');
+    gradient.addColorStop(1, 'rgba(255, 236, 140, 0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 128, 128);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    engine.textures.push(texture);
+    const mesh = engine.sprite(engine.material(new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false })), x, y, 5.4, 5.4, -0.45);
+    mesh.visible = false;
+    return mesh;
   }
   text(context, value, x, y, size, color = '#5c4a3a', align = 'center') {
     context.font = `${size}px ${FONT}`;

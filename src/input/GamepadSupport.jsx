@@ -19,7 +19,7 @@ export function GamepadSettings() {
     <h2>Xbox 手柄</h2>
     <p role="status">{state.connected ? `已连接：${state.name}` : '连接 USB 或蓝牙手柄后，按一下 A 唤醒。'}</p>
     <dl className="pad-map">
-      <dt><PadKey name="stick" /></dt><dd>左摇杆或方向键：移动。门前按上进门，按下再按 A 往下跳</dd>
+      <dt><PadKey name="stick" /></dt><dd>左摇杆或方向键：移动。跳到发光的门上就进去。小店里站到摊位前按上买东西。按下再按 A 往下跳</dd>
       <dt><PadKey name="A" /></dt><dd>跳，空中再按一次。页面上是确定</dd>
       <dt><PadKey name="X" /><PadKey name="RT" /></dt><dd>攻击，按住连发</dd>
       <dt><PadKey name="Y" /></dt><dd>大招攒满后放出去</dd>

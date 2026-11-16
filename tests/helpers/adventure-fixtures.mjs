@@ -1,7 +1,7 @@
 import { newSurvival } from '../../src/game/characters.js';
 // 仅供本地隔离预览、测试和烟测注入，生产入口不导入此文件。
 import { ADVENTURE_GENERATION_VERSION } from '../../shared/adventure-catalog.js';
-import { createRoomWorld, doorPosition } from '../../shared/room-world.js';
+import { createRoomWorld } from '../../shared/room-world.js';
 import { newAdventure, newJourney } from '../../src/game/adventure.js';
 import { newCombatLoot } from '../../src/game/combat-loot.js';
 import { WORLD_ACTS } from '../../shared/levels.js';
@@ -24,7 +24,7 @@ function clearRoom(world, rooms, defeatedIds) {
 function firstDoor(world, room) { return world.doors.find(door => door.roomId === room.id); }
 
 // 第 10 版选门闯房间的固定存档。mode 决定人站在哪儿、带着什么：
-// door 开场房清完站在第一扇门前；stack 同上但叠了三把武器和限时道具；reward 开场房清完、奖励还没选；
+// door 开场房清完站在出口，不站在门上，恢复后不会马上被送走；stack 同上但叠了三把武器和限时道具；reward 开场房清完、奖励还没选；
 // score 站在开场房一件宝物左边；loot、loot-pending 脚边有一份小怪掉的补给；fallen、over 血条耗尽；
 // boss、boss-moon、boss-high 一路清到首领房；finish 首领打完站在终点；room 一路清到 roomId 那间房，站在它的起点。
 export function roomFixture(mode = 'door', levelId = WORLD_ACTS[0].id, { seed = 42, roomId = 0 } = {}) {
@@ -53,8 +53,8 @@ export function roomFixture(mode = 'door', levelId = WORLD_ACTS[0].id, { seed = 
   if (mode === 'room') safeX = world.platforms[room.startId].x - 2;
   if (['door', 'stack', 'reward'].includes(mode)) {
     clearRoom(world, rooms, defeatedIds);
-    const door = firstDoor(world, room);
-    safeId = room.exitId; safeX = doorPosition(world, door).x; doorKind = door.kind;
+    const exit = world.platforms[room.exitId];
+    safeId = exit.id; safeX = exit.x; doorKind = firstDoor(world, room).kind;
     if (mode === 'reward') openRoomReward(adventure, journey, survival, `room:${key}:${room.id}`, room.reward ? `door-${room.reward}` : 'door-upgrade', 'power');
     else journey.claimed.push(`room:${key}:${room.id}`);
   }

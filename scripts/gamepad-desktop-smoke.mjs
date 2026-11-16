@@ -234,17 +234,12 @@ try {
   await until(status('paused'), '门前存档恢复');
   await evaluate('tap(9)');
   await until(status('playing'), 'Menu 继续');
-  await until(() => evaluate('!!document.querySelector(".room-hud-prompt")'), '门前提示');
-  assert.ok(await evaluate('document.querySelector(".room-hud-prompt").textContent.includes("往上推")'), '手柄提示写的是推摇杆');
+  assert.equal(await evaluate('document.body.textContent.includes("进门")'), false, '画面上不写进门');
   const depth = '[...document.querySelectorAll(".room-hud-path li")].findIndex(item => item.hasAttribute("aria-current"))';
   await evaluate('testPad.buttons[0]={pressed:true,value:1};testPad.buttons[2]={pressed:true,value:1}'); await wait(500);
   await evaluate('testPad.buttons[0]={pressed:false,value:0};testPad.buttons[2]={pressed:false,value:0}'); await wait(900);
-  assert.equal(await evaluate(depth), 0, '连按跳和攻击不会进门');
-  await until(() => evaluate('!!document.querySelector(".room-hud-prompt")'), '落回门前');
-  await evaluate('testPad.axes[1]=-1'); await wait(200); await evaluate('testPad.axes[1]=0');
-  await until(async () => await evaluate(depth) === 1, '往上推进门');
-  assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.rooms.path.length`), 2, '进门后存档记下走过的房间');
-  console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['选难度、本领一览、暂停里的选项', '门前提示和推摇杆进门', '画册翻页、应用内备份和恢复', '菜单、选关、角色、装备', '移动、跳跃、暂停', '断连、重连、防误触、失焦', '设置持久化', '三个小游戏操作、放置与撤回', '花园贴纸', '奖励、补给、死亡、零命存档防误触'], before, after }));
+  assert.equal(await evaluate(depth), 0, '没跳到发光的门上，连按跳和攻击不会进门');
+  console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['选难度、本领一览、暂停里的选项', '没跳到发光的门上不会进门', '画册翻页、应用内备份和恢复', '菜单、选关、角色、装备', '移动、跳跃、暂停', '断连、重连、防误触、失焦', '设置持久化', '三个小游戏操作、放置与撤回', '花园贴纸', '奖励、补给、死亡、零命存档防误触'], before, after }));
   app.exit(0);
 } catch (error) { console.error(error); app.exit(1); }
 

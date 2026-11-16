@@ -12,7 +12,7 @@ import './rooms.css';
 const KIND_MARKS = { intro: '起', battle: '战', mechanism: '机', puzzle: '宝', shop: '店', elite: '精', boss: '王' };
 
 function roomLine(rooms) {
-  if (rooms.isCleared) return rooms.kind === 'boss' ? '打赢了，往右走到终点' : rooms.kind === 'shop' ? '逛完了就去门前' : '门开了，去门前';
+  if (rooms.isCleared) return rooms.kind === 'boss' ? '打赢了，往右走到终点' : rooms.kind === 'shop' ? '买完就跳到发光的门上' : '门亮了，跳过去';
   if (['battle', 'elite'].includes(rooms.kind)) return `第 ${rooms.wave} / ${rooms.waves} 波，还剩 ${rooms.left} 只`;
   if (rooms.puzzle) return rooms.puzzle.hint;
   return ROOM_KINDS[rooms.kind].hint;
@@ -89,7 +89,7 @@ export function RunOverview({ stats, onBack }) {
     {rooms && <section aria-label="这一章的门">
       <h2>这一章的门</h2>
       <ol className="overview-path">{rooms.layers.map((layer, index) => <li key={index} aria-current={index === rooms.depth || undefined}><b>{KIND_MARKS[layer.kind] || '？'}</b>{layer.kind ? ROOM_KINDS[layer.kind].name : '还没选'}{layer.stars > 0 && <small>{layer.stars} 颗星</small>}</li>)}</ol>
-      {rooms.doors.length > 0 && <p className="option-note">{rooms.isCleared ? '门开着' : '清完这间房'}，前面有{rooms.doors.length === 2 ? '两扇门，挑一扇进去' : '一扇门'}。</p>}
+      {rooms.doors.length > 0 && <p className="option-note">{rooms.isCleared ? '门亮着' : '清完这间房，门才会亮'}。前面有{rooms.doors.length === 2 ? '两扇门，一扇在高处，一扇在低处，跳到哪扇就进哪扇' : '一扇门，跳上去就能进'}。</p>}
       <p className="option-note">难度：{DIFFICULTIES[rooms.difficulty].name}。一共拿到 {rooms.stars} 颗星。重抽券 {rooms.rerolls} 张{rooms.tierUp > 0 && '，下一次奖励高一档'}。</p>
     </section>}
   </HomePage>;
