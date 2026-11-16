@@ -23,7 +23,8 @@ Electron 桌面版启动即全屏，安装后无需 Node 或浏览器，游戏�
 npm ci
 npm start              # 构建并打开全屏 Electron
 npm run build
-npm test               # 物理、计分、SQLite、桌面协议、迁移和 Sites
+npm test               # 并行跑功能检查，再单独跑性能检查，避免计时受其他测试抢占 CPU 影响
+npm run test:performance # 满配战斗性能检查，保留单步 P95 < 4ms 的门槛
 npm run desktop:test   # 独立临时存档：全屏、真实跳跃、关闭保存、重启检查
 npm run pack:mac       # macOS Apple Silicon + Intel
 npm run pack:win       # Windows 安装包

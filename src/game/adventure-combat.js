@@ -7,6 +7,8 @@ export function fireLoadout(player, elapsed, bounds, adventure, index = 0) {
   player.weaponShots ||= {}; player.weaponCycles ||= {};
   const shots = [];
   for (const weapon of activeWeapons(adventure,index)) {
+    // 冷却期间没有弹道要生成，不必每个物理步长重算这一把武器的全部本领。
+    if (elapsed < (player.weaponShots[weapon] || 0)) continue;
     const emitter = {...player, nextShot:player.weaponShots[weapon] || 0};
     const waves = fireAdventureWeapon(emitter, elapsed, bounds, weapon, upgradePower(adventure,index,weapon));
     player.weaponShots[weapon] = emitter.nextShot;

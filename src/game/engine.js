@@ -113,7 +113,8 @@ export class GardenEngine {
       }));
       if (this.isDisposed) return;
       const textureFor = name => textures[names.indexOf(name)];
-      const spriteMaterial = name => this.material(new THREE.MeshBasicMaterial({ map: textureFor(name), transparent: true, alphaTest: 0.08, side: THREE.DoubleSide }));
+      // 彩笔素材都是平面，翻面也只画一次；双面透明材质的默认两遍绘制只会增加开销。
+      const spriteMaterial = name => this.material(new THREE.MeshBasicMaterial({ map: textureFor(name), transparent: true, alphaTest: 0.08, side: THREE.DoubleSide, forceSinglePass: true }));
       this.textureFor = textureFor; this.spriteMaterial = spriteMaterial;
       const grass = textureFor(surfaceImage);
       grass.wrapS = grass.wrapT = THREE.RepeatWrapping; grass.repeat.set(2, 1);
@@ -152,7 +153,7 @@ export class GardenEngine {
       this.blockMaterials={thorns:this.trapMaterials.thorns,blocks:this.material(new THREE.MeshBasicMaterial({map:pile,transparent:true,alphaTest:.08}))};
       this.newTowerMaterial = spriteMaterial('new-drawing-tower'); this.newFlowersMaterial = spriteMaterial('new-drawing-flowers');
       const background = textureFor(landscape);
-      const gardenMaterial = this.material(new THREE.MeshBasicMaterial({ map: background, side: THREE.DoubleSide, transparent: true, opacity: landscape === this.level.image ? 0.55 : 1 }));
+      const gardenMaterial = this.material(new THREE.MeshBasicMaterial({ map: background, side: THREE.DoubleSide, forceSinglePass: true, transparent: true, opacity: landscape === this.level.image ? 0.55 : 1 }));
       this.backdrops = [0].map(() => {
         const mesh = new THREE.Mesh(this.planeGeometry, gardenMaterial);
         mesh.scale.set(44, 44 * background.image.height / background.image.width, 1); mesh.position.set(0, 6, -18);
