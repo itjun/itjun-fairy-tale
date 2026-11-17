@@ -16,10 +16,10 @@ const range = { from: '2026-01-01', until: '2027-01-01' };
 const retired = { id: '44444444-4444-4444-8444-444444444444', levelId: 'rainbow-1', startedAt: '2026-11-13T08:00:00.000Z', players: 1, seed: 7, scoringVersion: 3, generationVersion: 9,
   flowers: 3, collectedIds: [2, 5, 9], defeatedIds: [1, 4], platform: 3, seconds: 240, revision: 6, status: 'completed', score: 465 };
 
-test('续关只认第 10 版：别的版本的存档和旧备份都删掉，第 10 版的留着', () => {
-  assert.equal(ADVENTURE_GENERATION_VERSION, 10);
+test('续关只认第 11 版：别的版本的存档和旧备份都删掉，第 11 版的留着', () => {
+  assert.equal(ADVENTURE_GENERATION_VERSION, 11);
   const { run, state } = roomFixture();
-  for (const version of [1, 7, 8, 9, 11]) {
+  for (const version of [1, 7, 8, 9, 10, 12]) {
     const old = storage({ [KEY]: JSON.stringify({ run: { ...run, generationVersion: version }, state: { ...state, version } }), 'garden-album-v1': '画册', ...Object.fromEntries(BACKUPS.map(key => [key, '{"run":{}}'])) });
     assert.equal(readAdventure(old), null, `第 ${version} 版不能续关`);
     assert.deepEqual([...old.values.keys()], ['garden-album-v1'], '只删冒险存档和它的备份，别的不动');
@@ -32,8 +32,8 @@ test('续关只认第 10 版：别的版本的存档和旧备份都删掉，第 
   const current = storage({ [BACKUPS[0]]: '{}' });
   writeAdventure(run, state, current);
   const saved = readAdventure(current);
-  assert.equal(saved.state.version, 10); assert.equal(saved.run.id, run.id);
-  assert.deepEqual([...current.values.keys()], [KEY], '第 10 版的存档留着，旧备份清掉');
+  assert.equal(saved.state.version, 11); assert.equal(saved.run.id, run.id);
+  assert.deepEqual([...current.values.keys()], [KEY], '第 11 版的存档留着，旧备份清掉');
   assert.equal(readAdventure(storage()), null);
 });
 
@@ -41,12 +41,12 @@ test('成绩服务不再收旧版地图的新成绩，也不收旧的小关编�
   const store = openStore(':memory:');
   try {
     const { run } = roomFixture();
-    for (const version of [1, 8, 9]) assert.throws(() => store.save({ ...run, generationVersion: version }), /这一版地图已经停用/);
+    for (const version of [1, 8, 9, 10]) assert.throws(() => store.save({ ...run, generationVersion: version }), /这一版地图已经停用/);
     assert.throws(() => store.save(retired), /这一版地图已经停用/);
     assert.throws(() => store.save({ ...run, levelId: 'rainbow-1' }), /新地图只有八个世界关/);
     assert.throws(() => store.save({ ...run, levelId: 'rainbow' }), /新地图只有八个世界关/);
     assert.equal(store.report(range).summary.sessions, 0);
-    assert.equal(store.save(run).generationVersion, 10);
+    assert.equal(store.save(run).generationVersion, 11);
     assert.equal(store.report(range).summary.sessions, 1);
   } finally { store.close(); }
 });

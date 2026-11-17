@@ -31,7 +31,13 @@ export function playRoom(world, room) {
       else if (next.isMoving && (Math.abs(next.y - player.y) > 2 || Math.abs(delta) > ground.width / 2 + next.width / 2 + 3)) direction = 0;
       // 升降台正往上走就等它下来再跳，只跳一次追不上它。
       else if (next.isMoving && next.deltaY > 0.004 && next.y > player.y + 0.5) direction = 0;
-      else if (ground.isMoving) { if (next.y - ground.y > 2 || Math.abs(delta) > 7) direction = 0; else jump = true; }
+      else if (ground.isMoving) {
+        // 横移木筏上先走到出发侧，避免站在左端却永远等不到“中心距小于 7”。
+        if (next.y - ground.y > 2) direction = 0;
+        else if (Math.abs(delta) > 7) {
+          if (ground.axis !== 'x' || (player.x - ground.x) * direction >= ground.width / 2 - 0.7) direction = 0;
+        } else jump = true;
+      }
       // 下一块在头顶就原地起跳；在下面就直接走下去，不跳。
       else if (isUnder) jump = true;
       else if (next.y < ground.y - 1) jump = false;

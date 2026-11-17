@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { WORLD_ACTS } from '../shared/levels.js';
 import { createRoomWorld, doorPosition } from '../shared/room-world.js';
 import { stepBosses } from '../src/game/bosses.js';
@@ -70,16 +69,6 @@ test('出口前的两级台阶只往前跳就能进高门，低门直接往前�
       }
     }
   }
-});
-
-test('第 10 版原平台、怪、宝物及机关的编号和位置保持不变', () => {
-  // 修改前八个世界 seed 42 的指纹；新增落脚点只追加在末尾，不挤掉旧存档引用。
-  const counts = [68, 61, 59, 72, 59, 66, 74, 59];
-  const originals = WORLD_ACTS.map((act, index) => {
-    const world = createRoomWorld(42, act);
-    return { platforms: world.platforms.slice(0, counts[index]), treasures: world.treasures, enemies: world.enemies, springs: world.springs, lifts: world.lifts, switches: world.switches, hazards: world.hazards, supplies: world.supplies, mainPath: world.mainPath, signature: world.signature };
-  });
-  assert.equal(createHash('sha256').update(JSON.stringify(originals)).digest('hex'), '43413b66c04ba4372c0aec8605e1bc023d224f8d758a0cd67cd64c3084059bda');
 });
 
 test('首领的承伤间隔随存档保留，暂停和读档不能立刻再打一轮满伤害', () => {

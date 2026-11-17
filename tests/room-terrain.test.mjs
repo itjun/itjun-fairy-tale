@@ -55,7 +55,7 @@ test('开场房和机关房用五种房型，挨着的两间不重样，房间�
     assert.equal(world.rooms[0].kind, 'intro');
     for (const [index, room] of shaped.entries()) {
       assert.ok(ROOM_SHAPES[room.shape], `${act.id} ${seed} ${room.shape}`);
-      seen.add(room.shape);
+      room.sections.forEach(section => seen.add(section.shape));
       if (index) assert.notEqual(room.shape, shaped[index - 1].shape, `${act.id} ${seed} 连着两间 ${room.shape}`);
       assert.ok(room.top - room.bottom >= LAYER * 2 || room.shape === 'river', `${act.id} ${seed} ${room.shape} 只有 ${room.top - room.bottom} 高`);
       assert.equal(room.look, ROOM_SHAPES[room.shape].look);
@@ -63,7 +63,8 @@ test('开场房和机关房用五种房型，挨着的两间不重样，房间�
     const arenas = world.rooms.filter(room => ['battle', 'elite'].includes(room.kind));
     for (const [index, room] of arenas.entries()) {
       assert.ok(ARENAS[room.arena]);
-      if (index) assert.notEqual(room.arena, arenas[index - 1].arena);
+      const sequence = arenas.flatMap(item => item.encounters.map(encounter => encounter.arena));
+      sequence.forEach((arena, n) => { if (n) assert.notEqual(arena, sequence[n - 1]); });
       assert.ok(room.top - room.bottom >= LAYER);
     }
     for (const room of world.rooms.filter(item => ['puzzle', 'shop'].includes(item.kind))) assert.ok(room.top - room.bottom >= LAYER * 2 - 0.01, `${room.kind} 是平的`);
@@ -78,9 +79,9 @@ test('陷阱和障碍按规则摆：数量、离边距离、互相的间隔', ()
     for (const room of world.rooms) {
       const hazards = hazardsOf(world, room), label = `${act.id} ${seed} ${room.kind} ${room.shape || room.arena || ''}`;
       if (['puzzle', 'shop', 'boss'].includes(room.kind)) assert.equal(hazards.length, 0, label);
-      if (room.kind === 'intro') assert.ok(hazards.length >= 1 && hazards.length <= 2, `${label} ${hazards.length} 处`);
-      if (room.kind === 'mechanism') assert.ok(hazards.length >= 2 && hazards.length <= 3, `${label} ${hazards.length} 处`);
-      if (['battle', 'elite'].includes(room.kind)) assert.equal(hazards.length, room.depth >= 2 ? 1 : 0, label);
+      if (room.kind === 'intro') assert.ok(hazards.length >= 2 && hazards.length <= 3, `${label} ${hazards.length} 处`);
+      if (room.kind === 'mechanism') assert.ok(hazards.length >= 4 && hazards.length <= 6, `${label} ${hazards.length} 处`);
+      if (['battle', 'elite'].includes(room.kind)) assert.equal(hazards.length, (room.depth >= 2 ? 2 : 0) + (['family', 'beach', 'snow'].includes(act.themeId) ? 3 : 0), label);
       for (const hazard of hazards) {
         kinds.add(hazard.kind);
         const platform = world.platforms[hazard.platformId];
@@ -104,8 +105,8 @@ test('怪按落脚点摆，数量比原来多，离起点远一点', () => {
     for (const room of world.rooms) {
       const enemies = room.enemyIds.map(id => world.enemies[id - 1]), start = world.platforms[room.startId];
       const label = `${act.id} ${seed} ${room.kind} ${room.shape || room.arena || ''}`;
-      if (room.kind === 'intro') assert.equal(enemies.length, 3, label);
-      if (room.kind === 'mechanism') assert.ok(enemies.length >= 4 && enemies.length <= 6, `${label} ${enemies.length} 只`);
+      if (room.kind === 'intro') assert.ok(enemies.length >= 8 && enemies.length <= 13, `${label} ${enemies.length} 只`);
+      if (room.kind === 'mechanism') assert.ok(enemies.length >= 12 && enemies.length <= 21, `${label} ${enemies.length} 只`);
       for (const enemy of enemies) {
         assert.ok(enemy.x - (start.x - 2) >= 6, `${label} 怪离起点太近`);
         const home = world.platforms[enemy.platformId];
@@ -116,7 +117,10 @@ test('怪按落脚点摆，数量比原来多，离起点远一点', () => {
         if (['battle', 'elite'].includes(room.kind) && home.spot === 'perch') assert.equal(enemy.role, 'shooter', `${label} 高台上只站会射的`);
       }
       if (['intro', 'mechanism'].includes(room.kind)) {
-        assert.equal(new Set(enemies.map(enemy => enemy.behavior)).size, enemies.length, `${label} 同一间房动作不重复`);
+        for (let section = 0; section < 3; section++) {
+          const group = enemies.filter(enemy => enemy.section === section);
+          assert.equal(new Set(group.map(enemy => enemy.behavior)).size, group.length, `${label} 同一段动作不重复`);
+        }
         for (let i = 0; i < enemies.length; i++) for (let j = i + 1; j < enemies.length; j++) assert.ok(Math.hypot(enemies[i].x - enemies[j].x, enemies[i].y - enemies[j].y) >= 6, `${label} 两只怪挤在一起`);
       }
     }

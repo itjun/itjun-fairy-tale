@@ -32,7 +32,6 @@ export const PUZZLES = Object.freeze({
 });
 export const TILE_COLORS = Object.freeze(['#e8747c', '#f2c14e', '#6fb6e0', '#8ccf7e']);
 export const SHOP_STALLS = Object.freeze(['heal', 'skill', 'reroll', 'tierUp']);
-const ROLE_COST = { scout: 1, hopper: 1, flyer: 1, charger: 2, shooter: 2, armored: 3, shell: 2, summoner: 3 };
 const PICKUPS = ['heart', 'fragments', 'sticker'];
 const CARDS = { battle: ['weapon', 'upgrade', 'spell'], elite: ['weapon', 'spell', 'upgrade'] };
 // 房间隔得够远，镜头锁在一间房里时看不到别的房间。
@@ -153,22 +152,6 @@ function addElite(world, stage, room, platform, kind, trait, random, wave, x) {
   return enemy;
 }
 
-// 按预算挑一波怪：贵的少放，同一波里动作不重复，最多四只。
-function pickWave(stage, budget, random, isLightOnly) {
-  const pool = shuffled(EXPANDED_THEME_MONSTERS[stage.themeId], random);
-  const kinds = [], behaviors = new Set();
-  let left = budget;
-  for (const kind of pool) {
-    const spec = monsterVitality(kind, stage), cost = ROLE_COST[spec.role];
-    if (kinds.length >= 4 || cost > left || behaviors.has(MONSTERS[kind].behavior) || isLightOnly && spec.showBar) continue;
-    kinds.push(kind);
-    behaviors.add(MONSTERS[kind].behavior);
-    left -= cost;
-  }
-  if (!kinds.length) kinds.push(pool.find(kind => ROLE_COST[monsterVitality(kind, stage).role] === 1) || pool[0]);
-  return kinds;
-}
-
 // 战斗房和精英房的场地三选一，同一章里挨着的两间不重样。
 function buildArena(builder, room, random) {
   const names = Object.keys(ARENAS).filter(name => name !== builder.state.lastArena);
@@ -179,9 +162,9 @@ function buildArena(builder, room, random) {
 // 会射的站高台，一块高台只站一只；其余的在地面上散开。
 function fillWave(world, stage, room, arena, kinds, random, wave) {
   const perches = shuffled(arena.perches.filter(Boolean), random);
-  const spots = shuffled(arena.grounds.flatMap(ground => (ground.width >= 20 ? [-7, -2.5, 2.5, 7] : [-2.5, 2.5]).map(offset => ({ ground, x: ground.x + offset }))), random);
+  const spots = arena.isRoute ? arena.grounds.map(ground => ({ ground, x: ground.x })) : shuffled(arena.grounds.flatMap(ground => (ground.width >= 20 ? [-7, -2.5, 2.5, 7] : [-2.5, 2.5]).map(offset => ({ ground, x: ground.x + offset }))), random);
   kinds.forEach((kind, index) => {
-    const perch = monsterVitality(kind, stage).role === 'shooter' ? perches.pop() : null;
+    const perch = !arena.isRoute && monsterVitality(kind, stage).role === 'shooter' ? perches.pop() : null;
     const spot = spots[index % spots.length];
     if (perch) addEnemy(world, stage, room, perch, kind, random, wave);
     else addEnemy(world, stage, room, spot.ground, kind, random, wave, spot.x);
@@ -193,41 +176,59 @@ function heavyKind(stage, random) {
   return pool.find(kind => monsterVitality(kind, stage).showBar) || pool[0];
 }
 
-// 第二层门起，场地的地面上多一处带预告的陷阱。
-function addArenaTrap(builder, room, arena) {
-  if (room.depth >= 2) builder.trap(arena.trapHome, undefined, arena.trapX);
-}
-
-function buildBattle(world, builder, stage, room, random) {
-  const arena = buildArena(builder, room, random);
-  const waves = stage.worldIndex >= 3 ? 3 : 2;
-  const budget = 5 + stage.worldIndex + room.depth;
-  for (let wave = 0; wave < waves; wave++) fillWave(world, stage, room, arena, pickWave(stage, Math.max(2, Math.round(budget / waves)), random, wave === 0), random, wave);
-  room.waves = waves;
-  // 挑战难度才叫醒的一波：一只精英带一只小怪。别的难度里它们一直睡着，不算进清场。
-  const traits = Object.keys(ELITE_TRAITS);
-  const far = arena.grounds.at(-1), near = arena.grounds[0];
-  const elite = addElite(world, stage, room, far, heavyKind(stage, random), traits[Math.floor(random() * traits.length)], random, waves, far.x + 2.5);
-  const helper = addEnemy(world, stage, room, near, pickWave(stage, 1, random, true)[0], random, waves, near.x - 2.5);
-  elite.isChallenge = true;
-  helper.isChallenge = true;
-  room.hasChallenge = true;
-  addArenaTrap(builder, room, arena);
-}
-
-function buildElite(world, builder, stage, room, random) {
-  const arena = buildArena(builder, room, random);
-  const traits = Object.keys(ELITE_TRAITS);
-  const far = arena.grounds.at(-1);
-  room.trait = traits[Math.floor(random() * traits.length)];
-  addElite(world, stage, room, far, heavyKind(stage, random), room.trait, random, 0, far.x + 2.5);
-  fillWave(world, stage, room, { ...arena, perches: [] }, pickWave(stage, 2, random, true).slice(0, 2), random, 0);
-  room.waves = 1;
-  if (stage.worldIndex >= 4) {
-    fillWave(world, stage, room, arena, pickWave(stage, 3, random, true), random, 1);
-    room.waves = 2;
+// 一间战斗房沿前进方向连三个战区，每区两波。波次同时确定场地，恢复时不会重刷已清掉的战区。
+function encounterKinds(stage, count, random, isLightOnly = false) {
+  const pool = shuffled(EXPANDED_THEME_MONSTERS[stage.themeId], random);
+  const kinds = [], behaviors = new Set();
+  for (const kind of pool) {
+    if (behaviors.has(MONSTERS[kind].behavior) || isLightOnly && monsterVitality(kind, stage).showBar) continue;
+    kinds.push(kind); behaviors.add(MONSTERS[kind].behavior);
+    if (kinds.length === count) return kinds;
   }
-  addArenaTrap(builder, room, arena);
+  return kinds;
+}
+
+function buildCombatRoom(world, builder, stage, room, random, isElite) {
+  room.encounters = [];
+  room.waves = 6;
+  let lastArena;
+  for (let section = 0; section < 3; section++) {
+    const firstId = world.platforms.length;
+    // 每一战区先穿过主题地形，再到交战场地；首波守在沿途，第二波在场地接战。
+    const shape = section === 0 ? 'hill' : section === 1 ? 'decks' : shuffled(['river', 'shaft', 'cave'], random)[0];
+    if (section) builder.next(0, 12, 1.2, { isCheckpoint: true, spot: 'run' });
+    ROOM_SHAPES[shape].build(builder);
+    patternsFor(stage.structure)(builder);
+    const approachIds = world.platforms.slice(firstId).map(p => p.id);
+    const arena = buildArena(builder, room, random);
+    room.arena = room.encounters[0]?.arena || room.arena;
+    const arenaName = builder.state.lastArena;
+    for (let group = 0; group < 2; group++) {
+      const wave = section * 2 + group;
+      const count = (isElite ? 2 : 3) + Number(wave < Math.round(stage.worldIndex * 6 / 7));
+      const kinds = encounterKinds(stage, count, random, wave === 0);
+      const approach = homesOf(world, { platformIds: approachIds }).filter(home => !home.platform.isCheckpoint && !['perch', 'high'].includes(home.spot));
+      const routeHomes = [...new Set([approach[0], approach[Math.floor(approach.length / 2)], approach.at(-1)])].filter(Boolean);
+      const grounds = group === 0 && routeHomes.length ? [...routeHomes.map(home => home.platform), arena.grounds.at(-1)] : arena.grounds;
+      const formation = { ...arena, grounds, isRoute: group === 0 };
+      if (isElite && wave === 5) {
+        const traits = Object.keys(ELITE_TRAITS), far = arena.grounds.at(-1);
+        room.trait = traits[Math.floor(random() * traits.length)];
+        fillWave(world, stage, room, formation, kinds.slice(1), random, wave);
+        addElite(world, stage, room, far, heavyKind(stage, random), room.trait, random, wave, far.x + far.width / 2 - 2);
+      } else fillWave(world, stage, room, formation, kinds, random, wave);
+    }
+    if (room.depth >= 2 && section > 0) builder.trap(arena.trapHome, undefined, arena.trapX);
+    const end = builder.next(0, 10, 1.2, { spot: 'run', isCheckpoint: true });
+    room.encounters.push({ arena: arenaName, firstWave: section * 2, lastWave: section * 2 + 1, endId: end.id, platformIds: world.platforms.slice(firstId).map(p => p.id) });
+    lastArena = arena;
+  }
+  if (!isElite) {
+    const traits = Object.keys(ELITE_TRAITS), far = lastArena.grounds.at(-1), near = lastArena.grounds[0];
+    const elite = addElite(world, stage, room, far, heavyKind(stage, random), traits[Math.floor(random() * traits.length)], random, room.waves, far.x + 2.5);
+    const helper = addEnemy(world, stage, room, near, encounterKinds(stage, 1, random, true)[0], random, room.waves, near.x - 2.5);
+    elite.isChallenge = helper.isChallenge = room.hasChallenge = true;
+  }
 }
 
 // 宝箱房和小店进门先上或先下一级台阶，谜题和摊位在另一层。
@@ -258,35 +259,48 @@ function buildShop(builder, room) {
   room.stalls = SHOP_STALLS.map((id, index) => ({ id, platformId: floor.id, offsetX: -7.5 + index * 5 }));
 }
 
-// 开场房和机关房：先走一种房型，再接这个世界自己的机关。同一章里挨着的两间房型不重样。
+// 三段主路：地形学习、上下分路、主题机关组合。每段的怪只从本段落脚点挑。
 function buildMechanism(builder, stage, room, random) {
-  const names = Object.keys(ROOM_SHAPES).filter(name => name !== builder.state.lastShape);
-  room.shape = builder.state.lastShape = names[Math.floor(random() * names.length)];
-  const shape = ROOM_SHAPES[room.shape];
-  shape.build(builder);
-  if (shape.look) room.look = shape.look;
-  patternsFor(stage.structure)(builder);
+  const { world } = builder;
+  const names = Object.keys(ROOM_SHAPES).filter(name => name !== builder.state.lastShape && name !== 'decks');
+  room.shape = names[Math.floor(random() * names.length)];
+  builder.state.lastShape = room.shape;
+  room.look = ROOM_SHAPES[room.shape].look;
+  room.sections = [];
+  const lastShape = shuffled(['hill', 'shaft', 'cave', 'river'].filter(name => name !== room.shape), random)[0];
+  for (const [index, name] of [room.shape, 'decks', lastShape].entries()) {
+    const start = builder.state.cursor, firstId = world.platforms.length, pathAt = world.mainPath.length - 1;
+    if (index) builder.next(0, 12, 1.2, { isCheckpoint: true, spot: 'run' });
+    ROOM_SHAPES[name].build(builder);
+    if (room.kind === 'mechanism' || index === 2) patternsFor(stage.structure)(builder);
+    const distance = () => world.mainPath.slice(pathAt + 1).reduce((sum, id, n) => {
+      const a = world.platforms[world.mainPath[pathAt + n]], b = world.platforms[id];
+      return sum + Math.hypot(b.x - a.x, b.y - a.y);
+    }, 0);
+    const target = (room.kind === 'intro' ? 59 : 88) + stage.worldIndex * 2;
+    // 差的路程用高低折返台阶补足，每两块之间留出可辨认的缝，落脚点也用于安排怪和障碍。
+    let step = 0;
+    while (distance() < target) builder.next(step++ % 2 ? -LAYER : LAYER, 10, 1.3, { spot: step % 2 ? 'step' : 'run', isTrapSpot: step % 2 === 0 });
+    room.sections.push({ shape: name, startX: start.x, platformIds: world.platforms.slice(firstId).map(p => p.id), length: distance() });
+  }
 }
 
-// 怪按落脚点摆：离起点 6 以内不放，两只之间至少隔 6。重的怪前三个世界不出，后面最多两只。
-function fillMechanism(world, stage, room, random, count) {
+function fillMechanism(world, stage, room, random) {
   const start = world.platforms[room.startId];
-  const homes = homesOf(world, room).filter(home => home.x - start.x >= 8);
-  const kinds = [], behaviors = new Set();
-  let heavy = stage.worldIndex < 3 ? 0 : 2;
-  for (const kind of shuffled(EXPANDED_THEME_MONSTERS[stage.themeId], random)) {
-    const spec = monsterVitality(kind, stage);
-    if (kinds.length >= count || behaviors.has(MONSTERS[kind].behavior) || spec.showBar && heavy-- <= 0) continue;
-    kinds.push(kind);
-    behaviors.add(MONSTERS[kind].behavior);
+  const allHomes = homesOf(world, room).filter(home => home.x - start.x >= 8);
+  for (const [index, section] of room.sections.entries()) {
+    const count = room.kind === 'intro' ? (index < 2 ? 3 : 2 + Math.floor(stage.worldIndex / 3)) : 4 + Math.floor(stage.worldIndex * 2 / 7);
+    const homes = allHomes.filter(home => section.platformIds.includes(home.platform.id));
+    const kinds = encounterKinds(stage, count, random, stage.worldIndex < 3);
+    for (const kind of kinds) {
+      const free = homes.filter(home => !room.enemyIds.some(id => { const other = world.enemies[id - 1]; return Math.hypot(other.x - home.x, other.y - home.y) < 6; }));
+      if (!free.length) throw new Error(`房间 ${room.id} 的第 ${index + 1} 段放不下怪`);
+      const home = pickHome(free, monsterVitality(kind, stage).role, random);
+      const enemy = addEnemy(world, stage, room, home.platform, kind, random, 0, home.x, home.reach);
+      enemy.section = index;
+    }
   }
-  for (const kind of kinds) {
-    const free = homes.filter(home => !room.enemyIds.some(id => { const other = world.enemies[id - 1]; return Math.hypot(other.x - home.x, other.y - home.y) < 6; }));
-    if (!free.length) break;
-    const home = pickHome(free, monsterVitality(kind, stage).role, random);
-    addEnemy(world, stage, room, home.platform, kind, random, 0, home.x, home.reach);
-  }
-  room.waves = room.enemyIds.length ? 1 : 0;
+  room.waves = 1;
 }
 
 function buildBoss(world, builder, stage, room) {
@@ -332,14 +346,14 @@ export function createRoomWorld(seed, selected) {
       const room = beginRoom(world, builder, depth, kind, reward, left);
       let bossParts = null;
       if (['intro', 'mechanism'].includes(kind)) buildMechanism(builder, stage, room, random);
-      if (kind === 'battle') buildBattle(world, builder, stage, room, random);
-      if (kind === 'elite') buildElite(world, builder, stage, room, random);
+      if (kind === 'battle') buildCombatRoom(world, builder, stage, room, random, false);
+      if (kind === 'elite') buildCombatRoom(world, builder, stage, room, random, true);
       if (kind === 'puzzle') buildPuzzle(world, builder, room, random);
       if (kind === 'shop') buildShop(builder, room);
       if (kind === 'boss') bossParts = buildBoss(world, builder, stage, room);
       const exit = endRoom(world, builder, room, kind === 'boss' ? { isFinish: true } : {});
-      if (kind === 'intro') { addTraps(world, room, builder, 1); fillMechanism(world, stage, room, random, 3); }
-      if (kind === 'mechanism') { addTraps(world, room, builder, 2 + Math.floor(random() * 2)); fillMechanism(world, stage, room, random, 4 + Math.floor(random() * 3)); }
+      if (kind === 'intro') { addTraps(world, room, builder, 2 + Number(stage.worldIndex >= 4)); fillMechanism(world, stage, room, random); }
+      if (kind === 'mechanism') { addTraps(world, room, builder, 4 + Math.floor(stage.worldIndex * 2 / 7)); fillMechanism(world, stage, room, random); }
       if (bossParts) {
         const { floor, boss } = bossParts;
         world.bossArenas = [{ id: 0, bossId: boss.id, floorId: floor.id, exitId: exit.id, left: floor.x - 15, right: floor.x + 15, y: floor.y, layout: 'platform', switchX: floor.x - 9, switchY: floor.y }];
@@ -390,6 +404,25 @@ export function createRoomWorld(seed, selected) {
       parent.childIds.push(child.id);
       world.rooms[parent.roomId].childIds.push(child.id);
       world.enemies.push(child);
+    }
+  }
+  // 原图生成完再补每段一只守卫，保留所有已有平台、敌人和宝物编号。
+  for (const room of world.rooms) {
+    if (!room.sections && !room.encounters) continue;
+    for (let section = 0; section < 3; section++) {
+      const wave = room.sections ? 0 : section * 2 + 1;
+      const group = room.enemyIds.map(id => world.enemies[id - 1]).filter(e => room.sections ? e.section === section : e.wave === wave);
+      const behaviors = new Set(group.map(e => e.behavior));
+      const pool = [...EXPANDED_THEME_MONSTERS[stage.themeId], ...Object.keys(MONSTERS)];
+      const kind = pool.find(id => !behaviors.has(MONSTERS[id].behavior) && !monsterVitality(id, stage).showBar);
+      const segment = (room.sections || room.encounters)[section];
+      const homes = homesOf(world, room).filter(home => segment.platformIds.includes(home.platform.id) && home.x - world.platforms[room.startId].x >= 8
+        && !room.enemyIds.some(id => { const other = world.enemies[id - 1]; return (room.sections || other.wave === wave) && Math.hypot(other.x - home.x, other.y - home.y) < 6; })
+        && (!['battle','elite'].includes(room.kind) || home.spot !== 'perch' || monsterVitality(kind, stage).role === 'shooter'));
+      if (!homes.length || !kind) continue;
+      const home = pickHome(homes, monsterVitality(kind, stage).role, () => 0.5);
+      const extra = addEnemy(world, stage, room, home.platform, kind, () => 0.5, wave, home.x, home.reach);
+      extra.section = section; extra.isReinforcement = true;
     }
   }
   world.signature = `${world.rooms.map(room => `${room.kind}:${room.reward || '-'}:${room.puzzle?.kind || room.trait || room.shape || room.arena || ''}`).join('|')}#${world.mainPath.map(id => { const platform = world.platforms[id]; return `${platform.x.toFixed(1)},${platform.y.toFixed(1)}`; }).join(';')}`;

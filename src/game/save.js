@@ -8,6 +8,7 @@ import { isValidBossState } from './bosses.js';
 import { isValidCombatLoot } from './combat-loot.js';
 import { findStage } from '../../shared/levels.js';
 import { isValidRoomState } from './rooms.js';
+import { saveEnemy } from './enemies.js';
 const KEY = ['garden','active','adventure','v1'].join('-');
 // 以前换规则时留下的旧存档备份，现在跟旧地图一起清掉。
 const OLD_BACKUPS = ['single-player', 'life-only', 'boss-growth', 'easier-combat', 'hp-lives'];
@@ -30,6 +31,14 @@ export function readAdventure(storage=localStorage) {
     const stage=findStage(run.levelId);
     if (!isValidSurvival(state.survival) || state.isCompleted && state.survival.phase !== 'alive' || run.status === 'ended' && state.survival.phase !== 'over') return null;
     const world=createRoomWorld(run.seed,stage);
+    // 第 11 版只在尾部追加守卫；原编号和已清房间保持原样，不重抽本局。
+    const originalCount = world.enemies.findIndex(e => e.isReinforcement);
+    if (originalCount >= 0 && Array.isArray(state.enemies) && state.enemies.length === originalCount && isValidRoomState(state.rooms, world)) {
+      for (const enemy of world.enemies.slice(originalCount)) {
+        const isCurrent = enemy.roomId === state.rooms.roomId && !state.rooms.cleared.includes(enemy.roomId);
+        state.enemies.push(saveEnemy({ ...enemy, isDormant:!isCurrent || enemy.wave !== state.rooms.wave }));
+      }
+    }
     if (!isValidAdventure(state.adventure, 1) || !isValidJourney(state.journey, 1)) return null;
     if(!Array.isArray(state.players)||state.players.length!==1||state.players.some(p=>!world.platforms[p.safeId]||world.platforms[p.safeId].isMoving))return null;
     if (state.players.some(p => p.safeX !== undefined && (!Number.isFinite(p.safeX) || Math.abs(p.safeX-world.platforms[p.safeId].x) > world.platforms[p.safeId].width/2))) return null;

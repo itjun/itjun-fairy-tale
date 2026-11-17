@@ -9,11 +9,11 @@ import { playRoom } from './helpers/room-runner.mjs';
 
 const SEEDS = [1, 42, 137, 999];
 
-test('第 10 版一章五层：开场房、三次两扇门、首领房', () => {
-  assert.equal(ADVENTURE_GENERATION_VERSION, 10);
+test('第 11 版一章五层：开场房、三次两扇门、首领房', () => {
+  assert.equal(ADVENTURE_GENERATION_VERSION, 11);
   for (const act of WORLD_ACTS) for (const seed of SEEDS) {
     const world = createRoomWorld(seed, act);
-    assert.equal(world.version, 10);
+    assert.equal(world.version, 11);
     assert.equal(world.zones.length, 5);
     assert.deepEqual(world.rooms.map(room => room.depth), [0, 1, 1, 2, 2, 3, 3, 4]);
     assert.equal(world.rooms[0].kind, 'intro');
@@ -101,17 +101,17 @@ test('战斗房按预算分波出怪，后面的波先睡着；精英带一种�
     for (const room of world.rooms) {
       const enemies = room.enemyIds.map(id => world.enemies[id - 1]);
       if (room.kind === 'battle') {
-        assert.equal(room.waves, act.index >= 3 ? 3 : 2);
+        assert.equal(room.waves, 6);
         assert.equal(room.hasChallenge, true);
         for (let wave = 0; wave <= room.waves; wave++) {
           const group = enemies.filter(enemy => enemy.wave === wave);
-          assert.ok(group.length >= 1 && group.length <= 4, `${act.id} 第 ${wave} 波 ${group.length} 只`);
+          assert.ok(group.length >= 1 && group.length <= (wave < room.waves && wave % 2 ? 5 : 4), `${act.id} 第 ${wave} 波 ${group.length} 只`);
           assert.equal(group.every(enemy => !!enemy.isDormant === wave > 0), true);
         }
         assert.equal(enemies.filter(enemy => enemy.wave === room.waves).every(enemy => enemy.isChallenge), true);
       }
       if (room.kind === 'elite') {
-        const elites = enemies.filter(enemy => enemy.isElite && enemy.wave === 0);
+        const elites = enemies.filter(enemy => enemy.isElite && enemy.wave === 5);
         assert.equal(elites.length, 1);
         assert.ok(ELITE_TRAITS[elites[0].trait]);
         assert.equal(room.trait, elites[0].trait);
@@ -136,7 +136,7 @@ test('每间房都能从起点走到出口', () => {
       const world = createRoomWorld(seed, act), room = world.rooms[id];
       const result = playRoom(world, room);
       assert.equal(result.failed, undefined, `${act.id} ${seed} ${room.kind} ${JSON.stringify(result)}`);
-      assert.ok(result.seconds <= 60, `${act.id} ${room.kind} 走了 ${result.seconds} 秒`);
+      assert.ok(result.seconds <= 150, `${act.id} ${room.kind} 走了 ${result.seconds} 秒`);
     }
   }
 });

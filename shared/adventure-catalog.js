@@ -1,5 +1,5 @@
-// 服务端和游戏共用怪物奖励定义。地图只留这一版：第 10 版，选门闯房间加上有高低的房型。
-export const ADVENTURE_GENERATION_VERSION = 10;
+// 服务端和游戏共用怪物奖励定义。地图只留这一版：第 11 版，三段路线和逐波推进的战区。
+export const ADVENTURE_GENERATION_VERSION = 11;
 export const MONSTERS = Object.freeze({
   plane:{name:'纸飞机怪',points:25,family:'flight',behavior:'swoop',image:'monster-plane'},
   balloon:{name:'气球团',points:25,family:'flight',behavior:'balloon',image:'monster-balloon'},
