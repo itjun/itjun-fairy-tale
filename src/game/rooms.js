@@ -21,10 +21,33 @@ export function starTotal(state) { return Object.values(state.stars).reduce((sum
 // 挑战那一波只在挑战难度里算数。
 function waveCount(room, isExtraWave) { return room.waves + (isExtraWave && room.hasChallenge ? 1 : 0); }
 function waveEnemies(world, room, wave) { return room.enemyIds.map(id => world.enemies[id - 1]).filter(enemy => enemy.wave === wave); }
+function waveDone(world, room, wave) {
+  return waveEnemies(world, room, wave).every(enemy => enemy.isDefeated && (enemy.childIds || []).every(id => {
+    const child = world.enemies[id - 1];
+    return child.isDormant || child.isDefeated;
+  }));
+}
+// 战区尽头的彩笔栅栏：清完这一段才放行，下一战区不会把玩家拉回旧场地。
+export function encounterBarrier(world, state, isExtraWave = false) {
+  const room = currentRoom(world, state);
+  if (isRoomCleared(state)) return null;
+  const encounter = room.encounters?.find((item, index) => {
+    const last = index === room.encounters.length - 1 ? waveCount(room, isExtraWave) - 1 : item.lastWave;
+    return state.wave < last || state.wave === last && !waveDone(world, room, last);
+  });
+  if (!encounter) return null;
+  const end = world.platforms[encounter.endId];
+  return { endId: end.id, x: end.x + 2, y: end.y };
+}
+
+export function remainingRoomEnemies(world, state, isExtraWave = false) {
+  const room = currentRoom(world, state), total = waveCount(room, isExtraWave);
+  const enemies = room.enemyIds.map(id => world.enemies[id - 1]).filter(enemy => enemy.wave <= state.wave && enemy.wave < total && !enemy.isDefeated);
+  return [...enemies, ...room.childIds.map(id => world.enemies[id - 1]).filter(enemy => !enemy.isDormant && !enemy.isDefeated)];
+}
 export function roomProgress(world, state, isExtraWave) {
   const room = currentRoom(world, state), total = waveCount(room, isExtraWave);
-  const left = room.enemyIds.map(id => world.enemies[id - 1]).filter(enemy => enemy.wave <= state.wave && enemy.wave < total && !enemy.isDefeated).length
-    + room.childIds.map(id => world.enemies[id - 1]).filter(enemy => !enemy.isDormant && !enemy.isDefeated).length;
+  const left = remainingRoomEnemies(world, state, isExtraWave).length;
   return { wave: Math.min(state.wave + 1, Math.max(1, total)), waves: total, left };
 }
 
@@ -79,7 +102,7 @@ export function stepRoom(world, state, player, dt, isExtraWave = false) {
   if (!state.comboLeft) state.combo = 0;
   if (!isRoomCleared(state)) {
     const total = waveCount(room, isExtraWave);
-    const isWaveDone = waveEnemies(world, room, state.wave).every(enemy => enemy.isDefeated);
+    const isWaveDone = waveDone(world, room, state.wave);
     const isLastWave = state.wave + 1 >= total;
     if (isWaveDone && !isLastWave) {
       state.wave++;

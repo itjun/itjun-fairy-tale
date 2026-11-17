@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { DOOR_REWARDS, TILE_COLORS, doorPosition, spotPosition } from '../../shared/room-world.js';
 import { ELITE_TRAITS } from '../../shared/monster-roles.js';
 import { SHOP_ITEMS } from './room-rewards.js';
-import { currentRoom, dropPosition, isRoomCleared, isStallSold } from './rooms.js';
+import { currentRoom, dropPosition, isRoomCleared, isStallSold, encounterBarrier } from './rooms.js';
 
 const FONT = 'GardenHand, "Kaiti SC", "KaiTi", sans-serif';
 const CARD_FACES = ['collectible-heart', 'collectible-star', 'collectible-rainbow'];
@@ -33,6 +33,7 @@ export class RoomViews {
       } });
     }
     for (const room of world.rooms) {
+      for (const encounter of room.encounters || []) this.addBarrier(room, encounter);
       const spot = dropPosition(world, room);
       if (room.reward && !DOOR_REWARDS[room.reward].isChoice) {
         const drop = engine.sprite(engine.spriteMaterial(DOOR_REWARDS[room.reward].image), spot.x, spot.y, 1.5, 1.5, 0.7);
@@ -54,6 +55,28 @@ export class RoomViews {
         if (enemy.hasShell && !enemy.isDefeated) engine.enemyViews.get(enemy.id).material.color.set('#9fd8ff');
       } });
     }
+  }
+  addBarrier(room, encounter) {
+    const engine = this.engine, floor = engine.world.platforms[encounter.endId];
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 576;
+    const context = canvas.getContext('2d');
+    context.lineCap = 'round'; context.lineWidth = 12;
+    for (const [offset, color] of [[0, '#c88ba6'], [2, '#e6b1c4']]) {
+      context.strokeStyle = color; context.beginPath();
+      context.moveTo(28 + offset, 562); context.lineTo(32 + offset, 18);
+      context.moveTo(100 + offset, 562); context.lineTo(96 + offset, 18);
+      for (let y = 38; y < 490; y += 94) {
+        context.moveTo(28, y); context.lineTo(100, y + 74);
+        context.moveTo(100, y); context.lineTo(28, y + 74);
+      }
+      context.stroke();
+    }
+    const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; engine.textures.push(texture);
+    const mesh = engine.sprite(engine.material(new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false })), floor.x + 2, floor.y + 4.5, 2, 9, 0.7);
+    this.items.push({ roomId: room.id, update: (state, isCurrent) => {
+      mesh.visible = isCurrent && encounterBarrier(engine.world, state, engine.difficulty.isExtraWave)?.endId === encounter.endId;
+    } });
   }
   addPuzzle(room, chestSpot) {
     const engine = this.engine, world = engine.world, puzzle = room.puzzle;

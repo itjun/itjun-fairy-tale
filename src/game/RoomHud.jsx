@@ -41,7 +41,12 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
         <span aria-label={`${layer.stars} 颗星`}>{[0, 1, 2].map(star => <Star key={star} size={13} weight={star < layer.stars ? 'fill' : 'regular'} />)}</span>
       </li>)}</ol>
       <p><strong>{rooms.name}</strong>{line && <span>{line}</span>}</p>
+      {isPlaying && stats.enemyGuide?.isNearBarrier && <small className="room-barrier-hint">打完这片小怪，栅栏就会打开</small>}
     </aside>
+    {isPlaying && stats.enemyGuide && <div className="room-enemy-guide" data-enemy-id={stats.enemyGuide.id} data-edge={stats.enemyGuide.isAtEdge} style={{ left: `${stats.enemyGuide.x}%`, top: `${stats.enemyGuide.y}%` }}>
+      <span><img src={`./assets/${stats.enemyGuide.image}.png`} alt={stats.enemyGuide.name} />{stats.enemyGuide.label}</span>
+      <ArrowRight size={30} weight="bold" aria-hidden="true" style={{ transform: `rotate(${stats.enemyGuide.angle}deg)` }} />
+    </div>}
     <aside className="room-hud-side" aria-label="碎片和积分">
       <span><img src="./assets/upgrade-recycle.png" alt="" />碎片 <b>{stats.adventure?.resources?.balance || 0}</b></span>
       <span>积分 <b key={stats.score} className="score-total">{stats.score}</b></span>

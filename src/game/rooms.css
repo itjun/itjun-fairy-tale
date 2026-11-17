@@ -25,6 +25,11 @@
 .room-hud-path li span { display:flex; color:#d39a1e; }
 .room-hud-path p { display:flex; justify-content:center; gap:14px; margin:4px 0 0; font-size:19px; white-space:nowrap; }
 .room-hud-path strong { font-weight:400; color:#a83e66; }
+.room-barrier-hint { display:block; margin-top:4px; font-size:17px; color:#8c4a67; }
+.room-enemy-guide { position:absolute; width:max-content; transform:translate(-50%,-100%); display:flex; flex-direction:column; align-items:center; gap:2px; color:#a83e66; pointer-events:none; }
+.room-enemy-guide>span { display:flex; align-items:center; gap:6px; padding:6px 12px; white-space:nowrap; font-size:18px; border:2px solid transparent; border-image:var(--paper-button) 128 fill / 12px / 0 stretch; }
+.room-enemy-guide img { width:28px; height:28px; object-fit:contain; flex-shrink:0; }
+.room-enemy-guide>svg { filter:drop-shadow(0 1px #fffdf6); }
 
 .room-hud-side { right:24px; top:20px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
 .room-hud-side>span { display:flex; align-items:center; gap:6px; padding:6px 14px; font-size:19px; }

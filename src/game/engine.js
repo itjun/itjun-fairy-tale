@@ -2,7 +2,8 @@ import { saveProjectiles, restoreProjectiles } from './projectile-state.js';
 import { stepMagic, consumeMagicShield, shieldCounter, newMagic } from './magic.js';
 import { CHARACTERS, newSurvival, migrateSurvival, reviveSurvival, recordAttack, bloomAtHit } from './characters.js';
 import { resourcesFor, damageWithBuild, recordDefeat, completeEncounter, tickResources, useRecovery, heal } from './expedition.js';
-import { newRoomState, currentRoom, stepRoom, recordCombo, recordHurt, doorAt, enterDoor, stallAt, isStallSold, isRoomCleared, roomProgress, starTotal } from './rooms.js';
+import { newRoomState, currentRoom, stepRoom, recordCombo, recordHurt, doorAt, enterDoor, stallAt, isStallSold, isRoomCleared, roomProgress, starTotal, encounterBarrier } from './rooms.js';
+import { roomEnemyGuide } from './room-guide.js';
 import { openRoomReward, rerollReward, buyStall, SHOP_ITEMS } from './room-rewards.js';
 import { DOOR_REWARDS, ROOM_KINDS, PUZZLES, createRoomWorld } from '../../shared/room-world.js';
 import { LAYER } from '../../shared/room-terrain.js';
@@ -350,8 +351,9 @@ export class GardenEngine {
   }
   roomBounds() {
     const room = currentRoom(this.world, this.roomState);
+    const barrier = encounterBarrier(this.world, this.roomState, this.difficulty.isExtraWave);
     // 每间房有自己的掉落线：最低的平台再往下 6。
-    return { minX: room.left + 0.3, maxX: room.right - 0.3, minY: room.fallY };
+    return { minX: room.left + 0.3, maxX: barrier ? barrier.x - 1 : room.right - 0.3, minY: room.fallY };
   }
   canInteract() {
     const player = this.players[0];
@@ -747,6 +749,7 @@ export class GardenEngine {
       adventure: structuredClone(this.adventure), pendingReward: this.journey.pending ? structuredClone(this.journey.pending) : null,
       pendingLifeLoot:this.combatLoot?.pendingId??null,
       rooms: this.roomSnapshot(),
+      enemyGuide: roomEnemyGuide(this.world, this.roomState, this.players[0], project, this.difficulty.isExtraWave, { width: this.host.clientWidth, height: this.host.clientHeight }),
       guide: treasure ? { ...project(treasure.x, treasure.y), direction: treasure.x < this.players[0].x ? '左边有宝物' : '右边有宝物' } : null,
       requiredFlowers:this.world.requiredFlowers,totalProgress:this.world.zones.length,defeatedIds:[...this.defeatedIds], flowers: this.collected, collectedIds: [...this.collectedIds], pickups, collection: score.collection, distance: this.distance,
       gardens: this.furthestPlatform, platform: this.furthestPlatform, seconds: Math.floor(this.elapsed),
