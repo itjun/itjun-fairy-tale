@@ -11,7 +11,9 @@ test('新冒险只带一把弯刀，其他武器基础也只发一枚，分别�
   assert.deepEqual(first.map(s=>s.kind),['moonblade']);assert.equal(first[0].damage,48);
   const interval=WEAPONS.moonblade.interval;
   assert.deepEqual(fireLoadout(player,interval-.01,bounds,adventure),[]);
-  assert.deepEqual(fireLoadout(player,interval,bounds,adventure).map(s=>s.kind),['moonblade']);
+  assert.deepEqual(fireLoadout(player,interval,bounds,adventure),[]);
+  stepAdventureWave(first[0],[],[],2,2);
+  assert.deepEqual(fireLoadout(player,2,bounds,adventure).map(s=>s.kind),['moonblade']);
   for(const weapon of ['blade','moonblade','stars','bubble','boomerang','seed','firefly'])assert.equal(fireAdventureWeapon({x:0,y:0,facing:1},0,bounds,weapon).length,1,weapon);
   adventure.weapons.push('blade');adventure.loadouts[0].weapons.push('blade');
   assert.deepEqual(fireLoadout(player,interval+.05,bounds,adventure).map(s=>s.kind),['blade']);
@@ -26,8 +28,8 @@ test('没有敌人也能持续发射弯刀，朝左右前方直飞并在射程�
       peakActive=Math.max(peakActive,waves.filter(wave=>wave.isActive).length);
       if(i===0) { assert.equal(waves[0].isActive,true);assert.ok(waves[0].x*facing>.6); }
     }
-    const expected=Math.floor((359/120)/WEAPONS.moonblade.interval)+1;
-    assert.equal(waves.length,expected);assert.ok(peakActive>=2&&peakActive<=6);
+    const expected=3;
+    assert.equal(waves.length,expected);assert.equal(peakActive,1);
     assert.equal(waves[0].isActive,false);
     assert.ok(waves.some(wave=>wave.isActive));
     for(const wave of waves) {

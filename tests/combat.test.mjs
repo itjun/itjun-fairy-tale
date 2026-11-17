@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {fireWave,fireSkill,stepWave} from '../src/game/combat.js';
 import {touchEnemy} from '../src/game/enemies.js';
 const monster=(x=4,y=0)=>({id:1,x,y,width:1,height:1.5,hp:1,elapsed:0,isDefeated:false});
-test('光刃左右与空中贯穿当前屏幕、平台和多个目标，屏幕外不误伤',()=>{
+test('光刃左右与空中穿过平台，只击中最近目标，屏幕外不误伤',()=>{
  for(const facing of [-1,1]) for(const halfWidth of [12,24,80]) {
  const player={x:0,y:3,facing};
  const enemies=[4,halfWidth-1,halfWidth+6].map((x,i)=>({...monster(facing*x,3),id:i+1}));
  const wave=fireWave(player,1,{left:-halfWidth,right:halfWidth});
  const hits=stepWave(wave,enemies,[{x:facing*3,y:4.5,width:1}],2,3);
- assert.deepEqual(hits.map(h=>h.enemy.id),[1,2]);
+ assert.deepEqual(hits.map(h=>h.enemy.id),[1]);
  assert.equal(enemies[2].isDefeated,false);assert.equal(wave.isActive,false);
  }
  const strong={...monster(4),hp:2,width:5};

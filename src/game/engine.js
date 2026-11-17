@@ -575,9 +575,9 @@ export class GardenEngine {
         for (const hit of areaAttack(player.x, player.y + 0.8, 2.5 + powers.landing, enemies, this.elapsed, powers)) this.recordHit(hit);
         this.skillEffects.burst(player.x, player.y + 0.5, this.elapsed);
       }
-      if (powers.companion && this.elapsed > (player.nextCompanion || 0)) {
+      if (powers.companion && this.elapsed > (player.nextCompanion || 0) && !this.waves.some(w => w.isActive && w.firingWeapon === 'companion')) {
         player.nextCompanion = this.elapsed + 3 / powers.companion;
-        this.waves.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right }, 'firefly', powers));
+        this.waves.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right }, 'firefly', powers).map(w => ({...w, firingWeapon:'companion'})));
       }
       while (this.visited.has(this.furthestPlatform+1)) this.furthestPlatform++;
       const isFiring = index === 0 ? this.keys.has('KeyJ') || this.hasControl('attack') : this.keys.has('Enter');
@@ -590,14 +590,15 @@ export class GardenEngine {
       this.callbacks.onSound(isFiring&&activeWeapons(this.adventure).includes('flame')?'flame:loop':'flame:stop');
       if (isFiring) {
         const bounds = { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right };
-        const shots = fireLoadout(player, this.elapsed, bounds, this.adventure, index);
+        bounds.bottom = this.cameraY - (this.camera.top || 18); bounds.top = this.cameraY + (this.camera.top || 18);
+        const shots = fireLoadout(player, this.elapsed, bounds, this.adventure, index, this.waves);
         if (shots.length) {
           const resources = resourcesFor(this.adventure);
           if (powers.bind && !resources.bindCooldown) { resources.bindCooldown = 5; const charge = { isUsed: false }; shots.forEach(shot => { shot.bindingCharge = charge; }); }
           if (powers.lure && !resources.lureCooldown) { resources.lureCooldown = 8; this.lure = { x:player.x-player.facing*2, y:player.y, until:this.elapsed+3 }; this.talentEffect = { ...this.lure, at:this.elapsed }; }
           if (recordAttack(this.survival)) {
             if (this.survival.character === 'mom') { const floralCharge = { isUsed:false }; shots.forEach(shot => { shot.floralCharge = floralCharge; }); }
-            if (this.survival.character === 'sister') shots.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, bounds, 'stars', powers));
+            if (this.survival.character === 'sister' && !this.waves.some(w => w.isActive && w.firingWeapon === 'talent')) shots.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, bounds, 'stars', powers).map(w => ({...w, firingWeapon:'talent'})));
           }
           this.waves.push(...shots); for(const id of new Set(shots.map(shot=>shot.kind)))this.callbacks.onSound(`${id}:fire`);
         }

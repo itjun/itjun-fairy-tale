@@ -74,11 +74,11 @@ test('新怪物确实执行不同动作，召唤有限，屏外和过量攻击�
   assert.equal(parent.childIds.length,2);assert.ok(parent.childIds.every(id=>!w.enemies[id-1].isDormant));
 });
 
-test('束缚仅首次命中触发，叶盾减伤不会破坏光刃贯穿', () => {
+test('束缚仅首次命中触发，碰到叶盾后光刃消失', () => {
   const targets=[1,2].map(id=>({id,x:id*5,y:0,width:1.5,height:2,hp:4,isDefeated:false,isGuarding:id===1,direction:-1}));
   const [wave]=fireAdventureWeapon({x:0,y:0,facing:1},0,{left:-10,right:20},'blade');wave.bindingCharge={isUsed:false};
   for(let i=1;i<200;i++)stepAdventureWave(wave,targets,[],1/120,i/120);
-  assert.equal(targets[0].hp,4);assert.equal(targets[1].hp,3);assert.ok(targets[0].boundUntil>0);assert.equal(targets[1].boundUntil,undefined);
+  assert.equal(targets[0].hp,4);assert.equal(targets[1].hp,4);assert.ok(targets[0].boundUntil>0);assert.equal(targets[1].boundUntil,undefined);
 });
 
 test('存档与计分服务一致，碎片和没选完的奖励往返不变，非法资源拒绝', () => {

@@ -19,7 +19,7 @@ test('武器专属强化只在装上对应武器时生效',()=>{
  assert.equal(upgradePower(a).linger,1);assert.equal(a.upgrades.linger,1);
 });
 
-test('各种武器确实命中，光刃贯穿、星镖往返、花种范围、追踪与组合有效',()=>{
+test('各种武器确实命中，光刃与星镖命中消失、花种范围、追踪与组合有效',()=>{
  for(const weapon of Object.keys(WEAPONS)) {
   const enemies=[monster(1,6),monster(2,13)],player={x:0,y:0,facing:1};
   let waves=fireAdventureWeapon(player,0,{left:-20,right:20},weapon,{frost:1,area:1});let hits=0;
@@ -37,7 +37,7 @@ test('各种武器确实命中，光刃贯穿、星镖往返、花种范围、�
  assert.equal(targets[0].hp,19);
  const [returning]=fireAdventureWeapon({...p,nextShot:0},0,{left:0,right:20},'boomerang');const enemy=monster(1,6);
  for(let i=1;i<250;i++)stepAdventureWave(returning,[enemy],[],1/120,i/120);
- assert.equal(enemy.hp,18,'去程返程各命中一次');
+ assert.equal(enemy.hp,19,'星镖命中后消失，不再返回重复命中');
 });
 
 test('怪物预告、攻击和糖果分裂有界',()=>{

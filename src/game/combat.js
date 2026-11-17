@@ -62,7 +62,18 @@ const contactScratch = [];
 export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   if (!wave.isActive) return [];
   const source = { x: wave.x, damage: wave.damage };
-  const distance = Math.min(wave.remaining, wave.speed * dt);
+  let distance = Math.min(wave.remaining, wave.speed * dt);
+  let isLeavingScreen = false;
+  if (wave.flightBounds) {
+    const b = wave.flightBounds;
+    const headingX = wave.kind === 'moonblade' ? wave.headingX : wave.direction;
+    const headingY = wave.kind === 'moonblade' ? wave.headingY : wave.slope;
+    for (const [position, heading, low, high] of [[wave.x, headingX, b.left - 2, b.right + 2], [wave.y, headingY, (b.bottom ?? -Infinity) - 2, (b.top ?? Infinity) + 2]]) {
+      if (!heading) continue;
+      const toEdge = Math.max(0, ((heading > 0 ? high : low) - position) / heading);
+      if (toEdge <= distance) { distance = toEdge; isLeavingScreen = true; }
+    }
+  }
   const dx = (wave.kind==='moonblade'?wave.headingX:wave.direction) * distance, dy = (wave.kind==='moonblade'?wave.headingY:wave.slope) * distance;
   const radius = wave.kind === 'bubble' ? 0.65 : (wave.radius ?? 0.25);
   const minX = Math.min(wave.x, wave.x + dx) - radius, maxX = Math.max(wave.x, wave.x + dx) + radius;
@@ -76,11 +87,11 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   }
   if (contactScratch.length > 1) contactScratch.sort((a, b) => a.time - b.time);
   const contacts = contactScratch;
-  const fraction = ['bubble','stars'].includes(wave.kind) && contacts.length ? contacts[0].time : 1;
+  const fraction = contacts.length ? contacts[0].time : 1;
   wave.x += dx * fraction; wave.y += dy * fraction; wave.remaining -= distance; wave.age += dt;
-  if (wave.remaining <= 0) wave.isActive = false;
-  let targets = contacts.map(hit => hit.enemy);
-  if (wave.kind === 'stars' && targets.length) { targets = targets.slice(0,1); wave.isActive = false; }
+  if (wave.remaining <= 0 || isLeavingScreen) wave.isActive = false;
+  let targets = contacts.slice(0, 1).map(hit => hit.enemy);
+  if (targets.length) wave.isActive = false;
   if (wave.kind === 'bubble' && (contacts.length || !wave.isActive)) {
     wave.isActive = false;
     wave.burst = { x: wave.x, y: wave.y, radius: wave.burstRadius ?? 3.8 };

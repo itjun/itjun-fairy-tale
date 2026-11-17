@@ -38,7 +38,9 @@ test('同一次发射各武器伤害不同，命中扣真实血量，往返与�
   assert.equal(enemy.hp,64);assert.equal(result.hits[0].damage,36);
   assert.equal(stepAdventureWave(blade,[enemy],[],.01,.21).hits.length,0);
   assert.equal(fireLoadout(p,.29,{left:-25,right:25},a).length,0);
-  assert.deepEqual(fireLoadout(p,.31,{left:-25,right:25},a).map(s=>s.kind),['firefly']);
+  assert.deepEqual(fireLoadout(p,.31,{left:-25,right:25},a),[], '飞行中的萤火不能继续连发');
+  stepAdventureWave(shots.find(s=>s.kind==='firefly'),[enemy],[],.2,.35);
+  assert.deepEqual(fireLoadout(p,.36,{left:-25,right:25},a).map(s=>s.kind),['firefly']);
 });
 
 test('收集四份材料增长血量上限和全部武器攻击，命数不变',()=>{

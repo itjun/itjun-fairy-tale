@@ -42,11 +42,11 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
       if (isTrying && character === 'little' && elapsed >= nextDemoJump) { jump = true; nextDemoJump = player.isGrounded ? elapsed+0.48 : elapsed+2; }
       stepPlayer(player,{ direction:pad.direction || Number(keys.has('KeyD')||keys.has('ArrowRight'))-Number(keys.has('KeyA')||keys.has('ArrowLeft')), jump },[floor],dt,{minX:3,maxX:22,minY:-10}); jump=false;
       if (keys.has('KeyJ') || pad.actions.has('attack') || isTrying) {
-        const shots = fireLoadout(player,elapsed,{left:0,right:28},adventure);
+        const shots = fireLoadout(player,elapsed,{left:0,right:28},adventure,0,waves);
         if (shots.length) {
           if (recordAttack(survival)) {
             if (character === 'mom') { const floralCharge={isUsed:false}; shots.forEach(shot=>{shot.floralCharge=floralCharge;}); }
-            if (character === 'sister') shots.push(...fireAdventureWeapon({...player,nextShot:0},elapsed,{left:0,right:28},'stars'));
+            if (character === 'sister' && !waves.some(w => w.isActive && w.firingWeapon === 'talent')) shots.push(...fireAdventureWeapon({...player,nextShot:0},elapsed,{left:0,right:28},'stars').map(w => ({...w, firingWeapon:'talent'})));
           }
           for(const kind of new Set(shots.map(s=>s.kind)))mixer.play(`${kind}:fire`);
           waves.push(...shots); onProgress({...survival});

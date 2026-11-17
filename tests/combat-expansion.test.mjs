@@ -98,9 +98,14 @@ test('新怪物动作、破壳与同屏预算真实生效',()=>{
  const penguin=make('penguin');assert.equal(damageEnemy(penguin,0,{damage:30}),false);assert.equal(penguin.hp,10000);assert.equal(penguin.hasShell,false);damageEnemy(penguin,1,{damage:30});assert.equal(penguin.hp,9970);
  const octopus=make('octopus'),shots=[];stepAdventureEnemies([octopus],[player()],.1,3,shots);assert.equal(shots[0].kind,'inklob');for(let i=0;i<30;i++)stepAdventureEnemies([],[player()],.1,3+i*.1,shots);assert.equal(shots[0].kind,'ink');
 });
-test('飞行弹道与已命中记录保存恢复，继续不会重伤同一目标',()=>{
- const a=newAdventure(1),p=player(),e=target(1,2);a.weapons=['blade'];a.loadouts[0].weapons=['blade'];const waves=fireLoadout(p,0,bounds,a);stepAdventureWave(waves[0],[e],[],.1,.1);
- const state=saveProjectiles(waves,[]);assert.ok(isValidProjectiles(state,{enemies:[e]}));const restored=restoreProjectiles(JSON.parse(JSON.stringify(state)));const hp=e.hp;stepAdventureWave(restored.waves[0],[e],[],.1,.2);assert.equal(e.hp,hp);
+test('飞行弹道保存恢复，命中后消失且不再进入存档',()=>{
+ const a=newAdventure(1),p=player(),e=target(1,8);a.weapons=['blade'];a.loadouts[0].weapons=['blade'];
+ const waves=fireLoadout(p,0,bounds,a);stepAdventureWave(waves[0],[e],[],.01,.01);
+ const state=saveProjectiles(waves,[]);assert.ok(isValidProjectiles(state,{enemies:[e]}));
+ const restored=restoreProjectiles(JSON.parse(JSON.stringify(state)));
+ stepAdventureWave(restored.waves[0],[e],[],.3,.31);const hp=e.hp;
+ assert.equal(restored.waves[0].isActive,false);stepAdventureWave(restored.waves[0],[e],[],.3,.61);assert.equal(e.hp,hp);
+ assert.equal(saveProjectiles(restored.waves,[]).waves.length,0);
  state.waves[0].hitIds=[999];assert.equal(isValidProjectiles(state,{enemies:[e]}),false);
 });
 test('127 份原创音效离线打包，混音最多 12 声部，同批发射合并且预警优先',()=>{
@@ -143,11 +148,11 @@ test('飞行存档保留同轮共享命中特效，血条耗尽等着选的状�
  assert.ok(loaded);assert.equal(loaded.state.survival.lives,2);assert.equal(loaded.state.survival.hp,0);assert.equal(loaded.state.survival.phase,'fallen');
  assert.equal(loaded.state.projectiles.waves.length,waves.length);
 });
-test('星雨命中后消失，贯穿光刃连续命中；传奇雷链为回响保留第二击',()=>{
+test('星雨和光刃命中后都消失；传奇雷链为回响保留第二击',()=>{
  for(const kind of ['stars','blade']){
   const a=newAdventure(1);a.weapons=[kind];a.loadouts[0].weapons=[kind];const enemies=[target(1,3),target(2,7)],[wave]=fireLoadout(player(),0,bounds,a);
   for(let i=0;i<120;i++)stepAdventureWave(wave,enemies,[],1/120,i/120);
-  assert.ok(enemies[0].hp<10000);assert.equal(enemies[1].hp<10000,kind==='blade');
+  assert.ok(enemies[0].hp<10000);assert.equal(enemies[1].hp<10000,false);
  }
  const a=newAdventure(2),s=newSurvival();for(let i=0;i<3;i++)grant(a,'spell','thunder','epic');grant(a,'spell','thunder','legendary');assert.equal(a.magic.ranks.thunder,3);
  a.magic.charges.thunder=20;a.magic.ready=['thunder'];const times=[],e=target();

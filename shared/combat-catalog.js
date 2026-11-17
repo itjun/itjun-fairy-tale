@@ -14,8 +14,8 @@ export const SPELLS = Object.freeze({
 export const LEGENDARY_EFFECTS = Object.freeze({
   blade:'前后光刃：追加一把较弱的后向光刃', bubble:'花漾泡泡：爆开后留下减速花田',
   moonblade:'月牙接力：首次命中分出一把小月牙寻找其他敌人', stars:'繁星齐放：每四轮追加一组扇形星弹',
-  flame:'小龙同行：喷火时小龙短暂加入攻击', boomerang:'回旋余辉：回程留下两颗星弹',
-  seed:'花开两次：落地后再开一朵花', firefly:'萤光接力：额外一只萤火帮忙追敌',
+  flame:'小龙同行：喷火时小龙短暂加入攻击', boomerang:'回旋余辉：命中后向后散出两颗星弹',
+  seed:'花开两次：命中后再开一朵花', firefly:'萤光接力：额外一只萤火帮忙追敌',
   fire:'花环守护：火环挡伤后散出花瓣反击', snow:'雪落回响：结束时追加冰晶伤害，不再次冻结',
   thunder:'彩虹回声：结束时回击第一个仍存活的目标', rain:'雨后彩虹：雨停后获得一次护罩',
 });

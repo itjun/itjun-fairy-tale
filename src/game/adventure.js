@@ -26,8 +26,7 @@ export function weaponPressure(adventure, index = 0) {
     const damage = weaponDamage(id, powers.attackGrowth || 0, powers.weaponRank || 1);
     const shots = weaponShotCount(id, powers);
     const interval = weapon.interval / (1 + 0.18 * (powers.rapid || 0));
-    const passes = id === 'boomerang' ? 1.5 : 1;
-    dps += damage * shots * passes / interval;
+    dps += damage * shots / interval;
   }
   // 厚度仍以原来「一把基础弯刀、每 0.18 秒」为 1。弯刀放慢后不再把首领血量跟着抬高。
   const reference = 48 / 0.18;
