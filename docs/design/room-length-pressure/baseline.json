@@ -1,0 +1,205 @@
+{
+  "date": "2026-11-16",
+  "worlds": 8,
+  "seedsPerWorld": 40,
+  "totalGeneratedRooms": 2560,
+  "notes": "Horizontal seconds is displacement / base speed; it excludes jumping, combat, waiting and player decisions. Counts exclude dormant challenge-only wave, summoned children and bosses. Working tree includes existing uncommitted changes.",
+  "rooms": {
+    "intro": {
+      "samples": 320,
+      "width": {
+        "min": 63.3,
+        "avg": 94.4,
+        "max": 142.7
+      },
+      "horizontalSeconds": {
+        "min": 8.9,
+        "avg": 14.1,
+        "max": 22.1
+      },
+      "monsters": {
+        "min": 3,
+        "avg": 3,
+        "max": 3
+      },
+      "platforms": {
+        "min": 12,
+        "avg": 14.7,
+        "max": 21
+      },
+      "hazards": {
+        "min": 1,
+        "avg": 1,
+        "max": 1
+      }
+    },
+    "mechanism": {
+      "samples": 585,
+      "width": {
+        "min": 63.3,
+        "avg": 93.5,
+        "max": 142.7
+      },
+      "horizontalSeconds": {
+        "min": 8.9,
+        "avg": 13.9,
+        "max": 22.1
+      },
+      "monsters": {
+        "min": 4,
+        "avg": 4.9,
+        "max": 6
+      },
+      "platforms": {
+        "min": 10,
+        "avg": 14,
+        "max": 21
+      },
+      "hazards": {
+        "min": 2,
+        "avg": 2.4,
+        "max": 3
+      }
+    },
+    "puzzle": {
+      "samples": 305,
+      "width": {
+        "min": 52.5,
+        "avg": 52.5,
+        "max": 52.5
+      },
+      "horizontalSeconds": {
+        "min": 7.1,
+        "avg": 7.1,
+        "max": 7.1
+      },
+      "monsters": {
+        "min": 0,
+        "avg": 0,
+        "max": 0
+      },
+      "platforms": {
+        "min": 4,
+        "avg": 7.8,
+        "max": 10
+      },
+      "hazards": {
+        "min": 0,
+        "avg": 0,
+        "max": 0
+      }
+    },
+    "battle": {
+      "samples": 568,
+      "width": {
+        "min": 44.2,
+        "avg": 45,
+        "max": 46.2
+      },
+      "horizontalSeconds": {
+        "min": 5.7,
+        "avg": 5.8,
+        "max": 6
+      },
+      "monsters": {
+        "min": 4,
+        "avg": 7.7,
+        "max": 12
+      },
+      "platforms": {
+        "min": 6,
+        "avg": 7.3,
+        "max": 8
+      },
+      "hazards": {
+        "min": 0,
+        "avg": 0.6,
+        "max": 1
+      }
+    },
+    "boss": {
+      "samples": 320,
+      "width": {
+        "min": 54.2,
+        "avg": 54.2,
+        "max": 54.2
+      },
+      "horizontalSeconds": {
+        "min": 7.4,
+        "avg": 7.4,
+        "max": 7.4
+      },
+      "monsters": {
+        "min": 0,
+        "avg": 0,
+        "max": 0
+      },
+      "platforms": {
+        "min": 11,
+        "avg": 11,
+        "max": 11
+      },
+      "hazards": {
+        "min": 0,
+        "avg": 0,
+        "max": 0
+      }
+    },
+    "shop": {
+      "samples": 203,
+      "width": {
+        "min": 57.7,
+        "avg": 57.7,
+        "max": 57.7
+      },
+      "horizontalSeconds": {
+        "min": 7.9,
+        "avg": 8,
+        "max": 8
+      },
+      "monsters": {
+        "min": 0,
+        "avg": 0,
+        "max": 0
+      },
+      "platforms": {
+        "min": 5,
+        "avg": 6.6,
+        "max": 7
+      },
+      "hazards": {
+        "min": 0,
+        "avg": 0,
+        "max": 0
+      }
+    },
+    "elite": {
+      "samples": 259,
+      "width": {
+        "min": 44.2,
+        "avg": 45,
+        "max": 46.2
+      },
+      "horizontalSeconds": {
+        "min": 5.7,
+        "avg": 5.8,
+        "max": 6
+      },
+      "monsters": {
+        "min": 2,
+        "avg": 4.2,
+        "max": 6
+      },
+      "platforms": {
+        "min": 6,
+        "avg": 7.2,
+        "max": 8
+      },
+      "hazards": {
+        "min": 1,
+        "avg": 1,
+        "max": 1
+      }
+    }
+  }
+}

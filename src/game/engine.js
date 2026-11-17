@@ -527,7 +527,7 @@ export class GardenEngine {
     // 同屏主动出手的怪最多 3 只。
     stepAdventureEnemies(enemies, this.players, STEP, this.elapsed, this.enemyShots, {
       bounds: { left: this.cameraX-this.camera.right, right: this.cameraX+this.camera.right }, maxAttackers: 3,
-      allEnemies: this.world.enemies, lure: this.lure, attackGate: this.attackGate,
+      allEnemies: this.world.enemies, lure: this.lure, attackGate: this.attackGate, warningBonus: this.world.warningBonus,
     });
     const previousBoss=currentBoss(this.world),previousStage=previousBoss?.attackStage;
     stepBosses(this.world,this.players[0],STEP,this.elapsed,this.enemyShots,this.adventure);

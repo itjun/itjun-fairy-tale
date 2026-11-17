@@ -146,7 +146,7 @@ function addElite(world, stage, room, platform, kind, trait, random, wave, x) {
   const hp = Math.round(spec.hp * bonus.hp);
   Object.assign(enemy, {
     isElite: true, trait, hp, maxHp: hp, showBar: true, points: enemy.points * 2, touchDamage: spec.touchDamage + 4,
-    height: 1.55 * bonus.size, width: 1.3 * bonus.size, speed: 0.7 * bonus.speed, period: spec.period * bonus.period,
+    height: 1.55 * bonus.size, width: 1.3 * bonus.size, speed: 0.84 * bonus.speed, period: spec.period * bonus.period,
     ...(trait === 'shield' ? { hasShell: true } : {}),
   });
   return enemy;

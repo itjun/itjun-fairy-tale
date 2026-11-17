@@ -1,4 +1,13 @@
-// 先预告再行动；弹道只在附近更新，碰撞仍使用游戏原有的温柔击退与保护。
+// 空档缩短，预告单独计时，避免加快攻击时也把孩子的反应时间一起缩掉。
+export function enemyTiming(enemy, warningBonus = 0) {
+  const scale = (enemy.period || 3.6) / 3.6;
+  const rest = 1.9 * scale * 0.5;
+  const warning = Math.max(0.7, 0.6 * scale) + (warningBonus ? 0.2 : 0);
+  const action = 1.1 * scale;
+  return { rest, warning, action, period: rest + warning + action };
+}
+
+// 先预告再行动；弹道只在附近更新，碰撞沿用击退与受伤保护。
 export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles, options = {}) {
   const active = options.bounds ? enemies.filter(e => !e.isDefeated && !e.isDormant && !e.isBoss && Math.abs(e.y-players[0].y)<12 && e.x > options.bounds.left && e.x < options.bounds.right)
     .sort((a,b) => Math.abs(a.x-players[0].x)-Math.abs(b.x-players[0].x)).slice(0, options.maxAttackers || 4) : enemies;
@@ -7,16 +16,18 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
     enemy.isWaiting = !active.includes(enemy);
     if (enemy.isWaiting || enemy.boundUntil > elapsed || enemy.frozenUntil > elapsed) { enemy.isWarning = false; continue; }
     enemy.elapsed += dt * (enemy.slowUntil > elapsed ? 0.35 : 1);
-    // 没写周期时沿用 3.6 秒，旧关卡节奏不变；新关卡按角色拉开预告和出手。
-    const period = enemy.period || 3.6, scale = period / 3.6, actAt = 2.5 * scale, warnAt = 1.9 * scale, actWindow = 1.1 * scale;
-    const cycle = (enemy.elapsed + enemy.phase) % period;
+    // 各行动角色分别计算空档、预告和出手，轻松档额外保留反应时间。
+    const timing = enemyTiming(enemy, options.warningBonus), period = timing.period;
+    const scale = (enemy.period || 3.6) / 3.6, warnAt = timing.rest, actAt = warnAt + timing.warning, actWindow = timing.action;
+    const phase = Math.min(enemy.phase || 0, warnAt * 0.8);
+    const cycle = (enemy.elapsed + phase) % period;
     const slow = enemy.slowUntil > elapsed ? 0.35 : 1;
     enemy.isWarning = cycle > warnAt && cycle < actAt;
     let speed = enemy.speed;
     const target = options.lure && options.lure.until > elapsed && Math.abs(enemy.x-options.lure.x) < 9 ? options.lure : players.reduce((a,b) => Math.abs(a.x-enemy.x) < Math.abs(b.x-enemy.x) ? a : b);
-    const beat = Math.floor((enemy.elapsed + enemy.phase) / period);
+    const beat = Math.floor((enemy.elapsed + phase) / period);
     const isActing = cycle >= actAt;
-    const emit = (kind, vx, vy, y = enemy.baseY + 0.8, life = 4) => projectiles.push({ x: enemy.x, y, vx, vy, gravity: 0, age: 0, kind, life, id: `${enemy.id}:${beat}:${projectiles.length}`, isActive: true });
+    const emit = (kind, vx, vy, y = enemy.baseY + 0.8, life = 4) => projectiles.push({ x: enemy.x, y, vx, vy, gravity: 0, age: 0, kind, life, damage: 20, id: `${enemy.id}:${beat}:${projectiles.length}`, isActive: true });
     enemy.y = enemy.baseY;
     enemy.isHidden = false; enemy.isGuarding = false;
     if(enemy.behavior==='swoop'){enemy.y+=isActing?3-Math.sin((cycle-actAt)/actWindow*Math.PI)*3:3;speed*=isActing?3.5:.08;}
@@ -35,10 +46,11 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
     if (enemy.behavior === 'burrow') { enemy.isHidden = cycle < 1.4 * scale; speed = 0; if (enemy.isHidden) enemy.x = beat % 2 ? enemy.minX : enemy.maxX; }
     if (['vine','alarm','stomp','build','summon','obstacle'].includes(enemy.behavior)) speed = 0;
     const canAct = () => !options.attackGate || elapsed >= options.attackGate.next;
-    const claimAction = () => { if (options.attackGate) options.attackGate.next = elapsed + 0.7; };
-    if (isActing && enemy.lastActionBeat !== beat && (!['vine','stomp','alarm','summon','build'].includes(enemy.behavior) || canAct())) {
+    const claimAction = () => { if (options.attackGate) options.attackGate.next = elapsed + 0.5; };
+    const isShooter = ['bubble', 'fan', 'lob', 'inklob', 'twins'].includes(enemy.behavior);
+    if (isActing && !isShooter && enemy.lastActionBeat !== beat && canAct()) {
       enemy.lastActionBeat = beat;
-      if (['vine','stomp','alarm','summon','build'].includes(enemy.behavior)) claimAction();
+      claimAction();
       enemy.direction = Math.sign(target.x-enemy.x) || enemy.direction;
       if (enemy.behavior === 'vine') emit('vine', enemy.direction*2.2, 0, enemy.baseY+0.2, 1.2);
       if (enemy.behavior === 'inkhop') emit('ink', 0, 0, enemy.baseY+0.12, 2.5);
@@ -46,6 +58,12 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
       if (['alarm','summon','build'].includes(enemy.behavior) && !enemy.isSummoned) {
         enemy.isSummoned = true;
         releaseCandyChildren(enemy, options.allEnemies || enemies);
+      }
+      // 巡逻、飞行、护甲和辅助怪也有主动攻击，能瞄准高低台上的玩家。
+      if (!['vine','inkhop','stomp'].includes(enemy.behavior)) {
+        const dx = target.x - enemy.x, dy = (target.y ?? enemy.baseY) + 0.9 - (enemy.y + 0.8);
+        const distance = Math.max(0.1, Math.hypot(dx, dy));
+        emit('bubble', dx / distance * 5, dy / distance * 5, enemy.y + 0.8, 4);
       }
     }
     if (options.lure && target === options.lure) enemy.direction = Math.sign(target.x-enemy.x) || 1;
@@ -62,8 +80,9 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
       if (cycle >= actAt && enemy.lastShotBeat !== beat && canAct()) {
         enemy.lastShotBeat = beat; claimAction();
         enemy.direction = Math.sign(target.x - enemy.x) || 1;
-        const slopes = enemy.behavior === 'fan' ? [-0.35, 0, 0.35] : [['lob','inklob'].includes(enemy.behavior) ? 1.1 : 0];
-        for (const slope of slopes) projectiles.push({ x: enemy.x, y: enemy.y + 1, vx: enemy.direction * 4, vy: slope * 4, floorY:enemy.behavior==='inklob'?enemy.baseY+.1:undefined,gravity: ['lob','inklob'].includes(enemy.behavior) ? 6 : 0, age: 0, kind: enemy.behavior, id: `${enemy.id}:${beat}:${slope}`, isActive: true });
+        const aim = Math.max(-1.5, Math.min(1.5, ((target.y ?? enemy.y) - enemy.y) / Math.max(1, Math.abs(target.x - enemy.x))));
+        const slopes = enemy.behavior === 'fan' ? [aim-0.35, aim, aim+0.35] : [['lob','inklob'].includes(enemy.behavior) ? 1.1 + aim : aim];
+        for (const slope of slopes) projectiles.push({ x: enemy.x, y: enemy.y + 1, vx: enemy.direction * 4, vy: slope * 4, damage: 20, floorY:enemy.behavior==='inklob'?enemy.baseY+.1:undefined,gravity: ['lob','inklob'].includes(enemy.behavior) ? 6 : 0, age: 0, kind: enemy.behavior, id: `${enemy.id}:${beat}:${slope}`, isActive: true });
       }
     }
     if (enemy.isWarning && enemy.behavior !== 'float') speed = 0;

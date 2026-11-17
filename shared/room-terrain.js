@@ -239,7 +239,7 @@ export function placeEnemy(world, stage, platform, kind, random) {
   const enemy = {
     id: world.enemies.length + 1, platformId: platform.id, zone: platform.zone, kind, ...definition,
     x: platform.x, y: platform.y, baseY: platform.y, minX: platform.x - platform.width / 2 + 1, maxX: platform.x + platform.width / 2 - 1,
-    direction: random() < 0.5 ? -1 : 1, speed: 0.7, width: 1.3, height: 1.55, phase: random() * 3, elapsed: 0,
+    direction: random() < 0.5 ? -1 : 1, speed: 0.84, width: 1.3, height: 1.55, phase: random() * 3, elapsed: 0,
     hp: spec.hp, maxHp: spec.hp, touchDamage: spec.touchDamage, period: spec.period, showBar: spec.showBar, role: spec.role,
     isElite: false, isDefeated: false, drop: null, combatVersion: 2,
     // 硬壳怪先挡一下，壳掉了才打得动。

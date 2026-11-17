@@ -3,14 +3,14 @@ import { MONSTERS } from './adventure-catalog.js';
 // 三十个名字原先共用一个 3.6 秒节拍和接近的血量。这里按行动方式分成八种角色，
 // 让血条只出现在需要多打一下的对象上，周期也不再齐步走。
 export const MONSTER_ROLES = Object.freeze({
-  scout: { hp: 16, touch: 8, period: 2.6, bar: false },
-  hopper: { hp: 16, touch: 8, period: 2.0, bar: false },
-  flyer: { hp: 16, touch: 8, period: 2.9, bar: false },
-  charger: { hp: 20, touch: 15, period: 4.4, bar: false },
-  shooter: { hp: 16, touch: 8, period: 3.4, bar: false },
-  armored: { hp: 64, touch: 12, period: 3.8, bar: true },
-  shell: { hp: 16, touch: 10, period: 4.6, bar: true },
-  summoner: { hp: 56, touch: 8, period: 5.0, bar: true },
+  scout: { hp: 16, touch: 18, period: 2.6, bar: false },
+  hopper: { hp: 16, touch: 18, period: 2.0, bar: false },
+  flyer: { hp: 16, touch: 18, period: 2.9, bar: false },
+  charger: { hp: 20, touch: 28, period: 4.4, bar: false },
+  shooter: { hp: 16, touch: 18, period: 3.4, bar: false },
+  armored: { hp: 64, touch: 24, period: 3.8, bar: true },
+  shell: { hp: 16, touch: 22, period: 4.6, bar: true },
+  summoner: { hp: 56, touch: 18, period: 5.0, bar: true },
 });
 
 const BEHAVIOR_ROLE = Object.freeze({

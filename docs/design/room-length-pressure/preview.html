@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>让每间房成为一段冒险 · 花园王国</title>
+<style>
+@font-face{font-family:wenkai;src:url('../../../public/fonts/LXGWWenKai-Regular.woff2')}*{box-sizing:border-box}body{margin:0;color:#353a45;background:#faf7ef;font-family:wenkai,'PingFang SC',sans-serif;font-size:18px;background-image:radial-gradient(#d9c9aa55 .7px,transparent .7px);background-size:7px 7px}main{max-width:1260px;margin:auto;padding:32px 28px 60px}.eyebrow{font-size:15px;letter-spacing:.12em;color:#6d755c}h1{font-size:42px;margin:12px 0 10px;letter-spacing:-.03em}p{line-height:1.65;margin:8px 0}.lead{color:#6d706e;max-width:950px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:24px 0 16px}button{font:inherit;color:inherit;background:transparent;border:2px solid #bfc6bd;border-radius:9px 13px 7px 12px;padding:9px 22px;cursor:pointer}button[aria-pressed=true]{background:#ffda78;border-color:#846b35;color:#433d2c}button:focus-visible{outline:3px solid #416bbb;outline-offset:3px}.controls{display:flex;gap:10px}.status{font-size:16px;color:#7c6b47}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:20px}.stat{border-top:4px solid var(--ink);padding:14px 18px;background:#fffdf9}.stat strong{display:block;font-size:30px;margin:8px 0}.stat small{color:#707773;font-size:15px}.board{background:#fffef9;border:2px solid #b6c2b6;border-radius:13px 7px 16px 9px;overflow:hidden}.board-head{padding:16px 22px 0;display:flex;justify-content:space-between;gap:20px;align-items:center}.board-head strong{font-size:23px}.legend{display:flex;gap:20px;color:#70766c;font-size:14px}.legend span:before{content:'';display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:var(--color)}.map-scroll{overflow-x:auto}svg{display:block;width:100%;min-width:860px;height:auto}.route{stroke:#cb9782;stroke-width:3;stroke-dasharray:8 9;fill:none}.ground{fill:#cfdeb4;stroke:#6c825b;stroke-width:3;stroke-linejoin:round}.upper{fill:#fae5a8;stroke:#bb9a5b;stroke-width:3}.trap{fill:#d89798;stroke:#a76b75;stroke-width:2}.label{font-size:17px;fill:#4a5a54}.note{font-size:14px;fill:#82867d}.stage-label{font-size:21px;fill:#50745d}.door{fill:#e1cff6;stroke:#82649f;stroke-width:4}.board-foot{display:flex;gap:24px;padding:12px 22px 18px;color:#72796d;font-size:15px;border-top:1px solid #e5e8db}.lower{display:grid;grid-template-columns:1.15fr 1fr;gap:28px;margin-top:30px}h2{font-size:25px;margin:0 0 16px}.damage{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}.damage button{font-size:15px;padding:6px 12px}table{width:100%;border-collapse:collapse;font-size:17px}th{text-align:left;font-weight:normal;color:#788072;font-size:15px}th,td{border-bottom:1px solid #dddccb;padding:11px 8px}td:last-child{font-weight:bold;color:#9d654d}.details{padding-left:18px;margin:0}.details li{padding:5px 0;line-height:1.6}.footer{margin-top:30px;padding:18px 22px;background:#ecefe2;font-size:16px;line-height:1.7}.footer a{color:#426b50}.fine{color:#868676;font-size:14px;margin-top:16px}.pill{background:#e8eddf;padding:4px 10px;border-radius:20px;font-size:14px;white-space:nowrap}@media(max-width:760px){main{padding:22px 16px}h1{font-size:31px}.stats{gap:8px}.stat{padding:10px}.stat strong{font-size:23px}.lower{grid-template-columns:1fr}.board-head{align-items:start;flex-direction:column;gap:8px}.board-foot{flex-direction:column;gap:8px}.legend{gap:12px}.toolbar{align-items:start}.controls button{padding:9px 16px}}
+</style>
+<main>
+<div class="eyebrow">花园王国 / 关卡调整 / 2026.11.16</div>
+<h1>让每间房，成为一段完整冒险</h1>
+<p class="lead">把爬升、分路、机关与战斗串成三段连续旅程。怪物分组守住路线，命中后也更有分量。</p>
+<div class="toolbar"><div class="controls"><button id="current" aria-pressed="false">现在的机关房</button><button id="proposal" aria-pressed="true">推荐改法</button></div><span class="status">已确认的流程示意 · 第 11 版开发依据</span></div>
+<div class="stats" aria-live="polite">
+<div class="stat" style="--ink:#96b977"><span>房间内容</span><strong id="length">三段连续路线</strong><small id="length-note">机关房目标 90～150 秒，需试玩校准</small></div>
+<div class="stat" style="--ink:#d69883"><span>机关房小怪</span><strong id="monsters">12～18 只</strong><small id="monsters-note">按路段分组，同屏主动出手最多 3 只</small></div>
+<div class="stat" style="--ink:#a496bc"><span>普通碰撞 · 轻松档</span><strong id="hurt">一次扣 9 血</strong><small id="hurt-note">现为 4 血；100 血约能承受 12 次命中</small></div>
+</div>
+<section class="board" aria-label="关卡流程示意">
+<div class="board-head"><strong id="map-title">先爬高 → 选路线 → 边走边打</strong><div class="legend"><span style="--color:#a4bd84">可站平台</span><span style="--color:#d89798">陷阱</span><span style="--color:#cb9782">前进路线</span></div></div>
+<div class="map-scroll"><svg id="map" viewBox="0 0 1200 385" role="img" aria-label="推荐机关房三段路线"><defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#cb9782" stroke-width="1.5"/></marker></defs><g id="scene"></g></svg></div>
+<div class="board-foot"><span>实机继续使用女儿的彩笔素材</span><span>普通怪仍可一击打倒，靠摆位和组合产生挑战</span><span>出口高低门仍在前进尽头</span></div>
+</section>
+<section class="lower">
+<div><div class="damage"><h2>每种房间都有更长的内容</h2><span class="pill">建议规模</span></div><table><thead><tr><th>房间</th><th>现在的怪数</th><th>建议怪数</th><th>目标时长</th></tr></thead><tbody><tr><td>开场</td><td>3</td><td>8～10</td><td>60～90 秒</td></tr><tr><td>机关</td><td>4～6</td><td>12～18</td><td>90～150 秒</td></tr><tr><td>战斗</td><td>4～12</td><td>18～24</td><td>90～150 秒</td></tr><tr><td>精英</td><td>2～6</td><td>12～18</td><td>90～150 秒</td></tr></tbody></table><p class="fine">前期取下限，后期取上限。现状来自 320 张世界地图的生成抽样，未计挑战附加波和召唤子怪。小店仍是休息点，宝箱房靠解谜增加内容。</p></div>
+<div><div class="damage"><h2>小怪打中更疼</h2><div class="controls"><button id="easy" aria-pressed="true">轻松</button><button id="normal" aria-pressed="false">标准</button></div></div><table><thead><tr><th>命中方式</th><th>现在扣血</th><th>建议扣血</th></tr></thead><tbody id="damage-rows"></tbody></table><p class="fine">无护盾或减伤时。继续保留 3 条命、受伤保护、清楚的蓄力预告。小怪出招后的空档缩短约 20%～30%，追击更积极。</p></div>
+</section>
+<div class="footer"><strong>实施范围：</strong>先扩房间内容，再校准数量与伤害；八个世界各用自己的机关。一章仍为四间房加首领，选卡频率保持现有规则。<br><strong>旧局建议：</strong>按用户确认清除第 10 版旧局，新冒险采用第 11 版地图和数值，历史成绩与画册保留。<br><a href="README.md">完整设计与验收要求</a>　·　<a href="baseline.json">当前地图抽样数据</a></div>
+<p class="fine">这是基于当前代码的设计提案，时长不是实测结果；图中的路线按流程示意，不按地图单位等比绘制。</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);const art='../../../public/assets/';
+const image=(name,x,y,w,h=w)=>`<image href="${art}${name}.png" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+const platform=(x,y,w,upper=false)=>`<rect class="${upper?'upper':'ground'}" x="${x}" y="${y}" width="${w}" height="14" rx="4"/>`;
+const text=(x,y,t,c='label')=>`<text x="${x}" y="${y}" class="${c}">${t}</text>`;
+const path=d=>`<path class="route" d="${d}" marker-end="url(#arrow)"/>`;
+const trap=(x,y)=>`<path class="trap" d="M${x} ${y}l7 -17 7 17 7 -17 7 17 7 -17 7 17z"/>`;
+const door=(x,y)=>`<path class="door" d="M${x} ${y+42}v-27a16 16 0 0 1 32 0v27z"/><circle cx="${x+23}" cy="${y+26}" r="2" fill="#82649f"/>`;
+const proposal=()=>[
+text(42,42,'01  爬升与接敌','stage-label'),text(410,42,'02  上下分路，重新汇合','stage-label'),text(818,42,'03  组合遭遇与出口','stage-label'),
+`<path d="M385 65V340 M790 65V340" stroke="#e5e8dd" stroke-dasharray="5 7"/>`,
+platform(22,309,107),platform(145,264,70),platform(230,217,68),platform(312,170,65,true),platform(410,170,102,true),platform(548,170,70,true),platform(646,215,70),platform(405,309,240),platform(678,309,81),platform(817,309,94),platform(935,266,72),platform(1026,309,151),platform(1068,221,68,true),
+image('girl-player',35,240,47,69),image('enemy-mushroom',236,178,42),image('enemy-leaf',438,121,42),image('enemy-crab',468,268,41),image('monster-balloon',707,233,41,55),image('monster-umbrella',947,217,49),image('enemy-toy',1031,265,43),trap(572,309),trap(853,309),door(1137,267),door(1086,179),
+path('M88 275 Q165 170 190 234 Q239 135 260 186 Q312 112 350 138'),path('M376 136 Q420 100 459 139 L580 139 Q660 142 692 183'),path('M379 187 Q430 258 465 274 Q545 219 622 270 L728 274'),path('M756 273 Q801 204 839 270 Q935 174 975 232 Q1020 232 1060 276'),path('M1085 281 L1130 281'),path('M1039 244 Q1060 160 1093 158'),
+text(44,354,'3～4 只：台阶巡逻 + 跳跃怪','note'),text(423,354,'4～6 只：高路射手 / 低路障碍','note'),text(824,354,'5～8 只：飞行 + 冲锋分组接续','note'),text(518,115,'移动台','note'),`<path d="M540 135h75" stroke="#bb9a5b" stroke-dasharray="4 4"/>`,text(564,332,'钟摆 / 刺丛','note')].join('');
+const current=()=>[
+text(42,42,'一种房型 + 一段主题机关','stage-label'),platform(25,309,120),platform(164,264,75),platform(258,217,80),platform(357,264,80),platform(456,309,130),platform(610,309,105),platform(736,264,85),platform(847,309,325),platform(1070,221,68,true),
+image('girl-player',42,240,47,69),image('enemy-mushroom',275,176,42),image('enemy-leaf',473,263,42),image('enemy-crab',644,268,41),image('monster-umbrella',756,215,49),image('enemy-toy',942,265,43),trap(865,309),door(1137,267),door(1086,179),
+path('M90 278 Q200 139 297 183 Q413 255 499 277 L691 277 Q760 202 792 230 Q873 233 925 275 L1118 275'),
+text(44,354,'机关房抽样：4～6 只怪，2～3 处陷阱','note'),text(600,354,'起点到出口水平路程约 14 秒；不含跳跃与战斗','note'),text(430,90,'示意展开显示，实际平均宽度仅约 94 地图单位','note')].join('');
+function setMode(mode){const isNew=mode==='proposal';$('current').setAttribute('aria-pressed',!isNew);$('proposal').setAttribute('aria-pressed',isNew);$('length').textContent=isNew?'三段连续路线':'单房型 + 单机关';$('length-note').textContent=isNew?'机关房目标 90～150 秒，需试玩校准':'平均宽约 94，水平位移用时约 14 秒';$('monsters').textContent=isNew?'12～18 只':'4～6 只';$('monsters-note').textContent=isNew?'按路段分组，同屏主动出手最多 3 只':'320 张地图中，机关房平均只有 4.9 只';$('hurt').textContent=isNew?'一次扣 9 血':'一次扣 4 血';$('hurt-note').textContent=isNew?'现为 4 血；100 血约能承受 12 次命中':'100 血、无护盾恢复时，25 次才耗尽';$('map-title').textContent=isNew?'先爬高 → 选路线 → 边走边打':'走过一种房型，很快进入下一间';$('scene').innerHTML=isNew?proposal():current();$('map').setAttribute('aria-label',isNew?'推荐机关房三段路线':'当前机关房结构示意');}
+function setDamage(d){const f=d==='easy'?.5:1;$('easy').setAttribute('aria-pressed',d==='easy');$('normal').setAttribute('aria-pressed',d==='normal');$('damage-rows').innerHTML=[['普通碰撞',8,18],['冲锋撞击',15,28],['远程弹道',10,20],['护甲怪碰撞',12,24]].map(([name,a,b])=>`<tr><td>${name}</td><td>${Math.round(a*f)}</td><td>${Math.round(b*f)}</td></tr>`).join('');}
+$('current').onclick=()=>setMode('current');$('proposal').onclick=()=>setMode('proposal');$('easy').onclick=()=>setDamage('easy');$('normal').onclick=()=>setDamage('normal');setMode('proposal');setDamage('easy');
+</script>
+</html>
