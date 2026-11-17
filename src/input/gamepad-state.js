@@ -39,11 +39,6 @@ export class GamepadGate {
   }
 }
 
-// 选关卡片已经停着光标时，按一次 A 就进入。奖励和死亡仍要先对准，再按一次，避免把跳跃带进去。
-export function confirmMenu(isArmed, isLevelCard) {
-  return isArmed || isLevelCard ? 'activate' : 'arm';
-}
-
 export function nearestControl(current, candidates, direction) {
   const isHorizontal = direction === 'left' || direction === 'right';
   const sign = direction === 'left' || direction === 'up' ? -1 : 1;

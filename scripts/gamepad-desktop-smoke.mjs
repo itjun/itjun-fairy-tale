@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { roomFixture } from '../tests/helpers/adventure-fixtures.mjs';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
+import { completeMiniGame } from './helpers/gamepad-mini-games.mjs';
+import { createRoomWorld, spotPosition } from '../shared/room-world.js';
+import { resourcesFor } from '../src/game/expedition.js';
 if (!process.env.GARDEN_DESKTOP_PROFILE) throw new Error('手柄测试必须指定隔离目录');
 await import('../desktop/main.mjs');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -16,46 +19,81 @@ async function run() {
 try {
   await app.whenReady();
   await until(() => { win = BrowserWindow.getAllWindows()[0]; return win && !win.webContents.isLoading(); }, '主窗口');
-  win.webContents.setBackgroundThrottling(false); win.show(); win.focus();
+  win.webContents.setBackgroundThrottling(false);
   const evaluate = code => win.webContents.executeJavaScript(code);
+  const saveKey = ['garden','active','adventure','v1'].join('-');
+  const status = name => () => evaluate(`document.querySelector(".platform-game")?.dataset.gameStatus === "${name}"`);
+  async function focusWindow() {
+    app.focus({ steal: true }); win.show(); win.focus(); win.webContents.focus();
+    await until(() => evaluate('document.hasFocus() && !document.hidden'), '测试窗口获得焦点');
+  }
+  await focusWindow();
   await until(() => evaluate('!!document.querySelector(".home-play")'), '首页');
   const actualPads = await evaluate('[...navigator.getGamepads()].filter(Boolean).map(p=>({name:p.id,mapping:p.mapping}))');
   async function setupPad() {
     await evaluate(`
       window.testPad = { id: 'Xbox Wireless Controller (simulated)', index: 0, connected: true, mapping: 'standard', axes: [0,0,0,0], buttons: Array.from({length:17},()=>({pressed:false,value:0})) };
       window.testPads = [testPad];
-      Object.defineProperty(navigator, 'getGamepads', {configurable:true,value:()=>testPads});
+      window.padSamples = []; window.padFocusEvents = []; window.padFrames = 0;
+      for (const name of ['focus','blur','visibilitychange']) window.addEventListener(name,()=>padFocusEvents.push({name,at:performance.now(),focus:document.hasFocus(),hidden:document.hidden}));
+      Object.defineProperty(navigator, 'getGamepads', {configurable:true,value:()=>{padFrames++;padSamples.push({at:performance.now(),keys:testPad.buttons.flatMap((b,i)=>b.pressed?[i]:[]),focus:document.hasFocus(),hidden:document.hidden});if(padSamples.length>60)padSamples.shift();return testPads;}});
       window.testWait = ms=>new Promise(resolve=>setTimeout(resolve,ms));
-      window.tap = async index=>{testPad.buttons[index]={pressed:true,value:1};await testWait(65);testPad.buttons[index]={pressed:false,value:0};await testWait(85);};
-      const isShown = node=>node.getClientRects().length>0;
+      window.waitPadFrames = async ()=>{
+        const start=padFrames,deadline=performance.now()+3000;
+        while(padFrames<start+3){if(performance.now()>deadline)throw Error('手柄没有被轮询');await testWait(10);}
+        if(!document.hasFocus())throw Error('测试窗口失去焦点');
+      };
+      window.tap = async index=>{
+        await waitPadFrames();
+        testPad.buttons[index]={pressed:true,value:1};
+        try{await waitPadFrames();}finally{testPad.buttons[index]={pressed:false,value:0};}
+        await waitPadFrames();
+      };
+      const isShown = node=>!node.closest('[inert],[hidden],[aria-hidden="true"]')&&node.getClientRects().length>0&&getComputedStyle(node).visibility!=='hidden';
       const center = node=>{const rect=node.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};};
-      // 页面上有 LB、RB 换分类时，肩键不再逐项走，改用方向键一格一格走过去。
+      const selectable='button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled):not([type=hidden]):not([type=file]),[data-gamepad-canvas]';
+      // 根据布局找一条方向键路线，只发送真实手柄按键，不直接 focus/click。
+      // 每步重算，因为滚动、选中样式和动态按钮会改变位置。
       window.reach = async selector=>{
-        const target=[...document.querySelectorAll(selector)].find(isShown);
-        if(!target)throw Error('页面上没有 '+selector);
-        for(let i=0;i<40;i++){
+        for(let i=0;i<60;i++){
+          const scope=[...document.querySelectorAll('[role=dialog],dialog[open]')].filter(isShown).at(-1)||[...document.querySelectorAll('.app-shell,.home-page,.home-menu,.mini-game,.score-screen')].filter(isShown).at(-1);
+          const items=[...scope.querySelectorAll(selectable)].filter(isShown),target=items.find(node=>node.matches(selector));
+          if(!target)throw Error('页面上没有可用的 '+selector);
           const active=document.activeElement;
-          if(active.matches(selector)){if(!active.hasAttribute('data-gamepad-canvas'))await tap(0);return;}
-          if(active===document.body){await tap(13);continue;}
-          const from=center(active),to=center(target),dx=to.x-from.x,dy=to.y-from.y;
-          const vertical=dy>0?13:12,horizontal=dx>0?15:14;
-          const order=Math.abs(dy)>8?[vertical,horizontal]:[horizontal,vertical];
-          await tap(order[0]);
-          if(document.activeElement===active)await tap(order[1]);
-          if(document.activeElement===active)throw Error('方向键走不到 '+selector+'，停在 '+active.textContent.trim().slice(0,20));
+          if(active===target)return;
+          if(active.hasAttribute('data-gamepad-canvas')){await tap(1);continue;}
+          if(!items.includes(active)){await tap(13);continue;}
+          const queue=[{node:active,path:[]}],seen=new Set([active]);let path;
+          for(let n=0;n<queue.length&&!path;n++){
+            const {node,path:steps}=queue[n],from=center(node);
+            for(const [key,horizontal,sign] of [[12,false,-1],[13,false,1],[14,true,-1],[15,true,1]]){
+              if(horizontal&&node.matches('input,select'))continue;
+              let next,score=Infinity;
+              for(const candidate of items){
+                const point=center(candidate),dx=point.x-from.x,dy=point.y-from.y,forward=(horizontal?dx:dy)*sign,sideways=Math.abs(horizontal?dy:dx);
+                const value=forward+sideways*2.5;
+                if(forward>2&&value<score){next=candidate;score=value;}
+              }
+              if(!next||seen.has(next))continue;
+              const route=[...steps,key];if(next===target){path=route;break;}
+              seen.add(next);if(!next.hasAttribute('data-gamepad-canvas'))queue.push({node:next,path:route});
+            }
+          }
+          if(!path)throw Error('方向键无法到达 '+selector+'，当前 '+active.textContent.trim().slice(0,20));
+          await tap(path[0]);
         }
         throw Error('方向键走不到 '+selector);
       };
       window.choose = async selector=>{
-        if([...document.querySelectorAll('[data-gamepad-tabs]')].some(isShown))return reach(selector);
-        for(let i=0;i<90;i++){await tap(5);if(document.activeElement.matches(selector)){if(!document.activeElement.hasAttribute('data-gamepad-canvas'))await tap(0);return;}}
-        throw Error('不能用手柄到达 '+selector);
+        await reach(selector);
+        if(!document.activeElement.matches('input,select,[data-gamepad-canvas]'))await tap(0);
       };
-      window.dispatchEvent(new Event('focus'));
+      void 0;
     `);
-    await wait(150);
+    await evaluate('waitPadFrames()');
   }
   await setupPad();
+  if (process.env.GARDEN_GAMEPAD_CASE === 'completion') { await checkCompletion(); console.log('手柄通关衔接通过'); app.exit(0); return; }
   await evaluate('choose(".home-play")');
   await until(() => evaluate('!!document.querySelector(".level-choices")'), '选关');
   const difficulty = 'document.querySelector(".difficulty-row [aria-pressed=true]").textContent';
@@ -65,12 +103,23 @@ try {
   await evaluate('tap(4)');
   assert.equal(await evaluate(difficulty), '轻松', 'LB 换回来');
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-play-settings-v1")).difficulty'), 'easy');
+  await evaluate('reach(".level-choices button:last-child")');
+  assert.equal(await evaluate('document.activeElement.textContent.includes("第 8 个世界")'), true, '方向键能滚到最后一个世界');
+  await evaluate('reach(".level-choices button:first-child")');
   await evaluate('choose(".adventure-menu-actions .primary-button")');
   await until(() => evaluate('!!document.querySelector(".character-depart")'), '角色营地');
   await evaluate('choose(".starter-actions button:last-child")');
   await until(() => evaluate('!!document.querySelector(".starter-picker")'), '装备选择');
   await evaluate('tap(1)');
   await until(() => evaluate('!document.querySelector(".starter-picker")'), 'B 返回营地');
+  await evaluate('tap(0)');
+  await until(() => evaluate('!!document.querySelector(".starter-picker")'), '回到已高亮的自己选择后，一次 A 再打开');
+  await evaluate('choose(".starter-options button:nth-child(2)")');
+  await evaluate('choose(".starter-picker footer button:last-child")');
+  await until(() => evaluate('!document.querySelector(".starter-picker")'), '确认出发装备');
+  await evaluate('choose("[data-gamepad-practice]")');
+  await evaluate('tap(2)'); await evaluate('tap(0)'); await evaluate('tap(1)');
+  assert.equal(await evaluate('document.activeElement.matches(".character-try-row button")'), true, 'B 退出角色试用');
   await evaluate('choose(".character-depart")');
   await until(() => evaluate('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"'), '开始探险');
   const before = await evaluate('JSON.parse(document.querySelector(".platform-game").dataset.playerPositions)[0]');
@@ -80,7 +129,6 @@ try {
   assert.ok(after.x > before.x, '左摇杆实际移动角色'); assert.ok(after.y > before.y, 'A 实际跳跃');
   await evaluate('testPad.axes[0]=0;testPad.buttons[0]={pressed:false,value:0};testPad.buttons[7]={pressed:false,value:0}');
   await wait(100);
-  const status = name => () => evaluate(`document.querySelector(".platform-game")?.dataset.gameStatus === "${name}"`);
   assert.equal(await evaluate('document.documentElement.dataset.inputMode'), 'gamepad');
   assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".room-hud-keys .pad-key"), key => key.textContent)'), ['A', 'X'], '按键提示跟着手柄走，没有大招时不显示 Y');
   await evaluate('tap(1)'); await wait(200);
@@ -91,6 +139,11 @@ try {
   await until(status('playing'), 'B 从本领一览回到游戏');
   await evaluate('tap(9)');
   await until(status('paused'), 'Menu 暂停');
+  assert.equal(await evaluate('document.activeElement.matches("[data-gamepad-resume]")'), true, '暂停时光标已在继续上');
+  await evaluate('tap(0)');
+  await until(status('playing'), '已高亮的继续按钮按一次 A 就继续');
+  await evaluate('tap(9)');
+  await until(status('paused'), '再次暂停');
   await evaluate('choose(".adventure-menu-actions .quiet-button")');
   await until(status('overview'), '暂停里打开本领一览');
   await evaluate('tap(1)');
@@ -141,6 +194,42 @@ try {
   await until(() => evaluate('document.querySelector(".garden-backup-note").textContent.startsWith("恢复好了")'), '手柄恢复备份');
   await evaluate('tap(1)');
   await until(() => evaluate('!!document.querySelector(".home-play")'), '从存档返回首页');
+  await evaluate('choose(".home-navigation button:last-child")');
+  await evaluate('choose(".home-options-categories button:nth-child(4)")');
+  await evaluate('choose(".home-options-grid > button:first-child")');
+  await until(() => evaluate('!!document.querySelector(".score-summary")'), '成绩本加载');
+  await evaluate('choose(".score-presets button:last-child")');
+  await until(() => evaluate('!!document.querySelector(".score-summary")'), '全部成绩');
+  await evaluate('choose(".score-date-range select")'); await evaluate('tap(15)');
+  assert.equal(await evaluate('document.querySelector(".score-date-range select").selectedIndex'), 1, '手柄切换关卡筛选');
+  await evaluate('tap(14)');
+  await until(() => evaluate('!!document.querySelector(".score-stepper")'), '成绩曲线');
+  await evaluate('tap(5)');
+  assert.equal(await evaluate('document.querySelector(".score-stepper [role=status]").textContent.includes("第 1 /")'), true, 'RB 查看成绩曲线点');
+  await evaluate('choose("select[aria-label=曲线查看方式]")'); await evaluate('tap(15)');
+  assert.equal(await evaluate('document.querySelector("select[aria-label=曲线查看方式]").value'), 'daily', '手柄切换每日平均');
+  await evaluate('tap(1)');
+  await until(() => evaluate('!!document.querySelector(".home-options")'), '成绩本返回选项');
+  await evaluate('choose(".home-options-grid > button:nth-child(2)")');
+  await until(() => evaluate('!!document.querySelector(".home-gallery")'), '画展');
+  const galleryPage = await evaluate('parseInt(document.querySelector(".gallery-controls span").textContent)');
+  await evaluate('tap(5)');
+  assert.equal(await evaluate('parseInt(document.querySelector(".gallery-controls span").textContent)'), galleryPage % 11 + 1, 'RB 翻原画');
+  await evaluate('tap(4)');
+  assert.equal(await evaluate('parseInt(document.querySelector(".gallery-controls span").textContent)'), galleryPage, 'LB 回到上一幅');
+  await evaluate('tap(1)');
+  await evaluate('choose(".home-options-grid > button:nth-child(3)")');
+  await until(() => evaluate('!!document.querySelector(".home-collection")'), '小成就');
+  await evaluate('tap(1)');
+  await evaluate('choose(".home-options-categories button:nth-child(3)")');
+  await evaluate('choose(".desktop-actions button:first-child")');
+  await until(() => win.isFullScreen(), '手柄进入全屏');
+  await wait(700);
+  await evaluate('choose(".desktop-actions button:first-child")');
+  await until(() => !win.isFullScreen(), '手柄退出全屏');
+  await wait(700);
+  await evaluate('tap(1)');
+  await until(() => evaluate('!!document.querySelector(".home-play")'), '窗口设置返回首页');
   await evaluate('choose(".home-navigation button:nth-last-child(3)")');
   await until(() => evaluate('!!document.querySelector(".home-album")'), '画册');
   const albumPage = 'document.querySelector(".album-pages [aria-pressed=true]").getAttribute("aria-label")';
@@ -175,6 +264,7 @@ try {
       await evaluate('choose(".mini-assistance-actions button")');
       assert.ok(await evaluate('document.querySelector(".mini-assistance-actions button").disabled'), '手柄撤回成功');
     }
+    await completeMiniGame(['rainbow', 'garden', 'treat'][i - 1], evaluate, until);
     await evaluate('tap(1)');
     await until(() => evaluate('!!document.querySelector(".home-games")'), '小游戏 B 返回');
   }
@@ -187,14 +277,13 @@ try {
   await evaluate('tap(1)');
   assert.equal(await evaluate('document.activeElement.className'), 'decorate-toggle active', 'B 退出画布');
   await writeFile(join(process.env.GARDEN_DESKTOP_PROFILE, 'gamepad.png'), (await win.webContents.capturePage()).toPNG());
-  const saveKey = ['garden','active','adventure','v1'].join('-');
   async function loadFixture(fixture) {
     await win.loadURL('garden://app/');
     await until(() => evaluate('!!document.querySelector(".home-play")'), '测试首页');
     await evaluate(`localStorage.setItem(${JSON.stringify(saveKey)}, ${JSON.stringify(JSON.stringify(fixture))})`);
     await win.loadURL('garden://app/');
     await until(() => evaluate('!!document.querySelector(".home-play")'), '测试存档');
-    win.focus(); await setupPad();
+    await focusWindow(); await setupPad();
     await evaluate('choose(".home-play")');
   }
   await loadFixture(roomFixture('reward'));
@@ -221,6 +310,9 @@ try {
   assert.equal(await evaluate('document.querySelector(".death-menu .primary-button").disabled'), true);
   await evaluate('(async()=>{await tap(1);await tap(9)})()'); await wait(150);
   assert.equal(await evaluate('document.querySelector(".platform-game").dataset.gameStatus'), 'ended');
+  await evaluate('choose(".death-menu .text-button")');
+  await until(status('playing'), '零命后用手柄重来');
+  assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.survival.lives`), 3, '重来恢复三条命');
   await loadFixture(roomFixture('loot-pending'));
   await until(() => evaluate('document.querySelector(".platform-game")?.dataset.gameStatus === "life-loot"'), '补给待选择');
   // 补给是点一下就领走，没有第二步确认；按住的键不算数。
@@ -232,6 +324,8 @@ try {
   const doorSave = roomFixture();
   await loadFixture(doorSave);
   await until(status('paused'), '门前存档恢复');
+  // 新房间画面恢复后先让手柄保持松开，跨页防误触才会接受下一次 Menu。
+  await evaluate('testWait(150)');
   await evaluate('tap(9)');
   await until(status('playing'), 'Menu 继续');
   assert.equal(await evaluate('document.body.textContent.includes("进门")'), false, '画面上不写进门');
@@ -239,9 +333,53 @@ try {
   await evaluate('testPad.buttons[0]={pressed:true,value:1};testPad.buttons[2]={pressed:true,value:1}'); await wait(500);
   await evaluate('testPad.buttons[0]={pressed:false,value:0};testPad.buttons[2]={pressed:false,value:0}'); await wait(900);
   assert.equal(await evaluate(depth), 0, '没跳到发光的门上，连按跳和攻击不会进门');
-  console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['选难度、本领一览、暂停里的选项', '没跳到发光的门上不会进门', '画册翻页、应用内备份和恢复', '菜单、选关、角色、装备', '移动、跳跃、暂停', '断连、重连、防误触、失焦', '设置持久化', '三个小游戏操作、放置与撤回', '花园贴纸', '奖励、补给、死亡、零命存档防误触'], before, after }));
+  await evaluate('testPad.axes[0]=1');
+  await until(() => evaluate(`${depth} === 1`), '摇杆走到低门进入下一间');
+  await evaluate('testPad.axes[0]=0');
+  await evaluate('tap(9)');
+  await until(status('paused'), '进入下一间后暂停');
+  // 只用存档把人放到小店摊位前，买东西仍必须实际按方向键上。
+  let shopWorld, shop;
+  for (let seed = 1; seed <= 40 && !shop; seed++) {
+    shopWorld = createRoomWorld(seed, doorSave.state.levelId);
+    shop = shopWorld.rooms.find(room => room.kind === 'shop');
+  }
+  assert.ok(shop, '测试种子里有小店');
+  const shopSave = roomFixture('room', doorSave.state.levelId, { seed: shopWorld.seed, roomId: shop.id });
+  const stall = shop.stalls.find(item => item.id === 'heal');
+  assert.ok(stall);
+  Object.assign(shopSave.state.players[0], { safeId: stall.platformId, safeX: spotPosition(shopWorld, stall).x });
+  shopSave.state.survival.hp = 40; resourcesFor(shopSave.state.adventure).balance = 20;
+  await loadFixture(shopSave); await until(status('paused'), '小店存档');
+  await evaluate('tap(9)'); await until(status('playing'), '继续逛小店');
+  await evaluate('tap(12)');
+  await until(() => evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.rooms.bought.includes(${JSON.stringify(`${shop.id}:heal`)})`), '手柄按上购买');
+  assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.survival.hp`), 90, '购买恢复血量');
+  async function checkCompletion() {
+    await loadFixture(roomFixture('finish'));
+    await until(status('paused'), '首领打赢后存档');
+    await evaluate('tap(9)');
+    await until(status('reward'), '通关奖励');
+    await evaluate('choose(".reward-choice")'); await evaluate('choose(".reward-confirm")');
+    await until(status('completed'), '通关结算');
+    await until(() => evaluate('!!document.querySelector(".result-saved")'), '结算保存完成');
+    assert.equal(await evaluate('document.activeElement.matches(".adventure-menu-actions .primary-button")'), true, '结算保存后焦点仍在去下一关');
+    const finishedCharacter = await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.survival.character`);
+    await evaluate('tap(0)');
+    await until(status('playing'), '结算已高亮的下一关按一次 A 直接出发');
+    assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.survival.character`), finishedCharacter, '下一关保留角色');
+  }
+  await checkCompletion();
+  console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['方向键走遍菜单、选关、角色、装备和试用', '已高亮菜单一次 A 生效', '移动、跳跃、暂停、本领一览、选项', '断连、重连、防误触、失焦', '设置、全屏、成绩筛选、画展、成就、画册', '应用内备份和恢复', '三个小游戏全部题目、完成和重玩', '花园贴纸', '奖励、补给、死亡、零命重来', '进门、小店购买、通关领奖、结算、直接下一关'], before, after }));
   app.exit(0);
-} catch (error) { console.error(error); app.exit(1); }
+} catch (error) {
+  console.error(error);
+  if (win && !win.isDestroyed()) {
+    console.error('手柄失败现场', await win.webContents.executeJavaScript('JSON.stringify({focus:document.hasFocus(),hidden:document.hidden,active:document.activeElement?.outerHTML.slice(0,300),page:document.body.innerText.slice(0,700),events:window.padFocusEvents,samples:window.padSamples?.slice(-15)})'));
+    await writeFile(join(process.env.GARDEN_DESKTOP_PROFILE,'failure.png'),(await win.webContents.capturePage()).toPNG());
+  }
+  app.exit(1);
+}
 
 }
 run();

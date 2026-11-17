@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readXboxPad, GamepadGate, nearestControl, confirmMenu } from '../src/input/gamepad-state.js';
+import { readXboxPad, GamepadGate, nearestControl } from '../src/input/gamepad-state.js';
 import { GardenEngine } from '../src/game/engine.js';
 
 function pad(pressed = [], axes = [0, 0, 0, 0], mapping = 'standard') {
@@ -36,10 +36,13 @@ test('长按方向先停顿再连发，松开和反向立即响应', () => {
   assert.equal(gate.step(readXboxPad(pad([12])), 420).navigation, 'up');
   assert.equal(gate.step(readXboxPad(pad([12])), 500).navigation, '');
 });
-test('选关卡片按一次就进入，奖励和死亡要先对准再确认', () => {
-  assert.equal(confirmMenu(true, false), 'activate');
-  assert.equal(confirmMenu(false, true), 'activate');
-  assert.equal(confirmMenu(false, false), 'arm');
+test('跨页松开后第一次 A 就产生确认，持续按住不会重复确认', () => {
+  const gate = new GamepadGate();
+  gate.step(readXboxPad(pad()), 0);
+  gate.reset();
+  gate.step(readXboxPad(pad()), 100);
+  assert.equal(gate.step(readXboxPad(pad([0])), 120).pressed.has('confirm'), true);
+  assert.equal(gate.step(readXboxPad(pad([0])), 600).pressed.has('confirm'), false);
 });
 test('方向导航沿同一行或同一列选择，不跳到身后', () => {
   const rects = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 100 }, { x: 20, y: 140 }];

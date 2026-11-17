@@ -142,7 +142,8 @@ export function PlatformGame({ onExit, initialSound = true }) {
   }, [seed, count, levelIndex]);
   useEffect(() => {
     if (!['playing','fallen','ended','reward','life-loot'].includes(status)) {
-      const target = menu.current?.querySelector(status === 'ready' ? '.level-choices button[aria-pressed=true]' : 'button:not(:disabled)');
+      // 保存提示里的重试按钮会消失，初始光标只落在稳定的菜单动作上。
+      const target = menu.current?.querySelector(status === 'ready' ? '.level-choices button[aria-pressed=true]' : '.adventure-menu-actions button:not(:disabled)');
       target?.focus({ preventScroll: true });
       if (status === 'ready') target?.scrollIntoView({ block: 'nearest' });
     }

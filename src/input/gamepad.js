@@ -1,4 +1,4 @@
-import { GamepadGate, confirmMenu, readXboxPad, nearestControl } from './gamepad-state.js';
+import { GamepadGate, readXboxPad, nearestControl } from './gamepad-state.js';
 
 const listeners = new Set();
 let state = { mode: 'keyboard', context: 'menu', connected: false, name: '', notice: '', vibration: true, deadzone: 0.22, hasBack: false, backLabel: '', shoulder: '' };
@@ -97,7 +97,7 @@ function scroll(scope, delta) {
 
 export function startGamepad() {
   const gate = new GamepadGate(), abort = new AbortController();
-  let frame, identity = '', context = null, contextKey = '', lastTime = 0, focused = null, isFocused = document.hasFocus(), stickUntil = 0, describedAt = 0;
+  let frame, identity = '', context = null, contextKey = '', lastTime = 0, isFocused = document.hasFocus(), stickUntil = 0, describedAt = 0;
   function release() { gameplay?.release(); document.activeElement?.dispatchEvent(new CustomEvent('garden:practice-input', { detail: null })); gate.reset(); }
   function keyboard() { if (performance.now() < stickUntil) return; publish({ mode: 'keyboard' }); }
   window.addEventListener('keydown', keyboard, { signal: abort.signal });
@@ -129,7 +129,7 @@ export function startGamepad() {
     const isStamp = !isPlaying && document.activeElement?.hasAttribute('data-gamepad-stamps');
     const key = isPlaying ? 'playing' : isPractice ? 'practice' : isStamp ? 'stamps' : `${document.querySelector('.platform-game')?.dataset.gameStatus || ''}:${scope.dataset.gamepadPage || ''}:${scope.querySelector('h1,h2')?.textContent || ''}`;
     if (context !== scope || contextKey !== key) {
-      release(); context = scope; contextKey = key; focused = null;
+      release(); context = scope; contextKey = key;
       publish({ context: isPlaying ? 'playing' : isPractice ? 'practice' : isStamp ? 'stamps' : 'menu' });
       describedAt = 0;
     }
@@ -146,7 +146,7 @@ export function startGamepad() {
     }
     if ((isPractice || isStamp) && (step.pressed.has('previous') || step.pressed.has('next'))) {
       document.activeElement.dispatchEvent(new CustomEvent('garden:practice-input', { detail: null }));
-      navigate(scope, step.pressed.has('next') ? 'next' : 'previous'); focused = document.activeElement; gate.reset(); return;
+      navigate(scope, step.pressed.has('next') ? 'next' : 'previous'); gate.reset(); return;
     }
     if (isStamp) {
       const node = document.activeElement;
@@ -162,19 +162,17 @@ export function startGamepad() {
       }
       return;
     }
-    if (['previous', 'next'].includes(step.navigation) && shoulder(scope, step.navigation)) { focused = document.activeElement; return; }
-    if (step.navigation) { navigate(scope, step.navigation); focused = document.activeElement; }
+    if (['previous', 'next'].includes(step.navigation) && shoulder(scope, step.navigation)) return;
+    if (step.navigation) navigate(scope, step.navigation);
     if (input.scroll) scroll(scope, input.scroll * dt * 0.65);
     if (step.pressed.has('back')) { back(scope); return; }
     if (step.pressed.has('pause')) { controls(scope).find(node => node.hasAttribute('data-gamepad-resume'))?.click(); return; }
     if (step.pressed.has('confirm')) {
-      // 光标不在选项上时，第一次 A 只定位。选关卡片已经有色块时，按一次就进入。
+      // 高亮项就是当前选项，一次 A 即可确认。跨页先松键由 gate 负责；
+      // 奖励、补给和死亡弹窗不默认聚焦按钮，第一次 A 仍只定位。
       const target = document.activeElement;
       const items = controls(scope);
-      if (!items.includes(target)) { focus(items[0]); focused = document.activeElement; return; }
-      const action = confirmMenu(focused === target, !!target.closest('.level-choices'));
-      focused = target;
-      if (action === 'arm') return;
+      if (!items.includes(target)) { focus(items[0]); return; }
       if (target.hasAttribute('data-gamepad-canvas')) target.dispatchEvent(new CustomEvent('garden:canvas-confirm'));
       else if (!['SELECT', 'INPUT'].includes(target.tagName)) target.click();
     }
