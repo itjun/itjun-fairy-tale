@@ -2,6 +2,11 @@ import { fireSkill, stepWave, damageEnemy } from './combat.js';
 import { activeWeapons, upgradePower, weaponShotCount } from './adventure.js';
 import { WEAPONS } from '../../shared/adventure-catalog.js';
 import { weaponDamage } from './growth.js';
+import { placeLightblade, stepLightblade } from './melee.js';
+
+export function attackSource(wave) {
+  return WEAPONS[wave.firingWeapon] ? wave.firingWeapon : wave.source || wave.kind;
+}
 
 export function fireLoadout(player, elapsed, bounds, adventure, index = 0, activeWaves = player.weaponWaves || []) {
   player.weaponShots ||= {}; player.weaponCycles ||= {};
@@ -15,7 +20,7 @@ export function fireLoadout(player, elapsed, bounds, adventure, index = 0, activ
     const waves = fireAdventureWeapon(emitter, elapsed, bounds, weapon, upgradePower(adventure,index,weapon));
     player.weaponShots[weapon] = emitter.nextShot;
     if(waves.length){
-      player.attackUntil=emitter.attackUntil;player.weaponCycles[weapon]=((player.weaponCycles[weapon] || 0)+1)%60;
+      player.attackUntil=Math.max(player.attackUntil || 0,emitter.attackUntil);player.weaponCycles[weapon]=((player.weaponCycles[weapon] || 0)+1)%60;
       if(adventure.qualities?.[`weapon:${weapon}`]==='legendary'){
         const root=waves[0];
         if(weapon==='blade')waves.push({...root,direction:-root.direction,remaining:Math.max(2,(root.x-(root.direction>0?bounds.left:bounds.right))*root.direction),damage:Math.round(root.damage*.5),powers:{},hitIds:new Set()});
@@ -34,6 +39,19 @@ export function fireAdventureWeapon(player, elapsed, bounds, weapon, powers = {}
   const base = fireSkill(player, elapsed, bounds, weapon === 'bubble' ? weapon : 'blade');
   if (!base.length) return [];
   const root = base[0];
+  if (weapon === 'lightblade') {
+    const rate = 1 + .18 * (powers.rapid || 0), duration = .18 / rate;
+    const count = weaponShotCount(weapon,powers);
+    player.nextShot = elapsed + WEAPONS[weapon].interval / rate;
+    player.attackUntil = elapsed + duration + (count - 1) * .08 / rate;
+    return Array.from({length:count},(_,i) => {
+      const wave = {...root,kind:weapon,speed:0,remaining:0,flightBounds:{...bounds},delay:i*.08/rate,duration,
+        reach:5.6+(powers.area || 0)*.25+(powers.legendary ? .6 : 0),halfHeight:1.05+(powers.area || 0)*.08,
+        damage:weaponDamage(weapon,powers.attackGrowth || 0,powers.weaponRank || 1),powers:{...powers},hitIds:new Set()};
+      placeLightblade(wave,player);
+      return wave;
+    });
+  }
   let shots = base;
   if (weapon === 'boomerang') shots = [{ ...root, kind: weapon, speed: 22 }];
   if (weapon === 'moonblade') shots = [{ ...root, kind:weapon, speed:20, remaining:Math.max(40, root.remaining * 2), targetId:null, headingX:root.direction, headingY:0 }];
@@ -58,7 +76,7 @@ export function areaAttack(x, y, radius, enemies, elapsed, powers = {}) {
     return { enemy, isDefeated, damage:enemy.lastDamage, blocked:enemy.lastBlocked };
   });
 }
-export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
+export function stepAdventureWave(wave, enemies, platforms, dt, elapsed, owner, hostileShots = []) {
   if (!wave.isActive) return { hits: [], spawned: [] };
   const powers = wave.powers || {}, spawned = [];
   const active = enemies;
@@ -107,8 +125,8 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
     }
     if (target) wave.slope = Math.max(wave.kind==='firefly'?-1:-.55, Math.min(wave.kind==='firefly'?1:.55, (target.y + target.height / 2 - wave.y) / Math.max(1, Math.abs(target.x - wave.x))));
   }
-  let hits = stepWave(wave, active, platforms, dt, elapsed);
-  if (wave.flightBounds && (wave.x < wave.flightBounds.left - 2 || wave.x > wave.flightBounds.right + 2 || wave.y < (wave.flightBounds.bottom ?? -Infinity) - 2 || wave.y > (wave.flightBounds.top ?? Infinity) + 2)) wave.isActive = false;
+  const hits = wave.kind === 'lightblade' ? stepLightblade(wave, active, dt, elapsed, owner, hostileShots) : stepWave(wave, active, platforms, dt, elapsed);
+  if (wave.kind !== 'lightblade' && wave.flightBounds && (wave.x < wave.flightBounds.left - 2 || wave.x > wave.flightBounds.right + 2 || wave.y < (wave.flightBounds.bottom ?? -Infinity) - 2 || wave.y > (wave.flightBounds.top ?? Infinity) + 2)) wave.isActive = false;
   if (wave.kind === 'seed' && (hits.length || !wave.isActive)) {
     wave.isActive = false;
     const radius = 2.8 + (powers.area || 0) * 0.5;
@@ -137,7 +155,7 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed) {
       const targets = active.filter(e => !e.isDormant && !e.isHidden && !e.isDefeated && !wave.hitIds.has(e.id) && Math.hypot(e.x - hit.enemy.x, e.y - hit.enemy.y) < 4 + powers.chain).slice(0, powers.chain);
       for (const enemy of targets) { wave.hitIds.add(enemy.id); const isDefeated=damageEnemy(enemy, elapsed, {x:wave.x,damage:Math.round(wave.damage*0.5)}); hits.push({ enemy, isDefeated, damage:enemy.lastDamage, blocked:enemy.lastBlocked }); }
     }
-    if (powers.split && !wave.isSplit) for (const slope of [-0.25, 0.25]) spawned.push({ ...wave, kind: 'stars', damage:Math.max(1,Math.round(wave.damage*0.4)), x: hit.enemy.x, y: hit.enemy.y + 1, slope, remaining: 8, age: 0, isActive: true, isSplit: true, powers: {}, hitIds: new Set([hit.enemy.id]) });
+    if (powers.split && !wave.isSplit) for (const slope of [-0.25, 0.25]) spawned.push({ ...wave, kind: 'stars', speed:wave.speed || 28*(1+.18*(powers.rapid || 0)), damage:Math.max(1,Math.round(wave.damage*0.4)), x: hit.enemy.x, y: hit.enemy.y + 1, slope, remaining: 8, age: 0, isActive: true, isSplit: true, powers: {}, hitIds: new Set([hit.enemy.id]) });
   }
   for (const child of spawned) { child.firingWeapon = wave.firingWeapon || wave.kind; child.ownerIndex = wave.ownerIndex ?? 0; }
   return { hits, spawned };

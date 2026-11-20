@@ -91,6 +91,7 @@ export function stepAdventureEnemies(enemies, players, dt, elapsed, projectiles,
     if (enemy.x <= enemy.minX) { enemy.x = enemy.minX; enemy.direction = 1; }
   }
   for (const shot of projectiles) {
+    shot.previousX = shot.x; shot.previousY = shot.y;
     if (shot.turnAt !== undefined && !shot.isReturning && shot.age >= shot.turnAt) { shot.vx *= -1; shot.vy *= -1; shot.isReturning=true; }
     shot.age += dt; shot.vy -= shot.gravity * dt; shot.x += shot.vx * dt; shot.y += shot.vy * dt;
     if(shot.kind==='inklob' && shot.y<=shot.floorY){shot.kind='ink';shot.y=shot.floorY;shot.vx=0;shot.vy=0;shot.gravity=0;shot.age=0;shot.life=2.5;}

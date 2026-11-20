@@ -12,6 +12,7 @@ export const SPELLS = Object.freeze({
   rain: {name:'星云甘霖',image:'platform-cloud',family:'nature',charge:26,duration:4,damage:28,hint:'战斗充能 26 秒，雨幕清普通敌弹，回血 10'},
 });
 export const LEGENDARY_EFFECTS = Object.freeze({
+  lightblade:'明亮刀锋：身前挥斩范围延长，仍是近身攻击',
   blade:'前后光刃：追加一把较弱的后向光刃', bubble:'花漾泡泡：爆开后留下减速花田',
   moonblade:'月牙接力：首次命中分出一把小月牙寻找其他敌人', stars:'繁星齐放：每四轮追加一组扇形星弹',
   flame:'小龙同行：喷火时小龙短暂加入攻击', boomerang:'回旋余辉：命中后向后散出两颗星弹',

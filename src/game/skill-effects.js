@@ -17,6 +17,8 @@ export class SkillEffects {
     if (wave.kind === 'pulse' && wave.source==='flame') {
       this.add(group,'dragon',2.8,2.3);
       this.add(group,'flame',3.2,1.2).position.x=2;
+    } else if (wave.kind === 'lightblade') {
+      this.add(group, 'lightblade', wave.reach-.25, wave.halfHeight*2);
     } else if (wave.kind === 'blade') {
       this.add(group, 'blade', 3.8, 1.5);
       this.add(group, 'blade', 2.6, 0.95).position.x = -1.6;
@@ -60,7 +62,7 @@ export class SkillEffects {
   update(waves, players, elapsed, cameraX, halfWidth, playerKinds) {
     // 高叠加只简化绘制，全部弹道仍由战斗层结算。已经画出来的继续用，避免每帧拆掉重建。
     const budget = 120, reach = halfWidth + 5, wanted = [];
-    for (const wave of waves) if (wave.isActive && (wave.kind !== 'pulse' || wave.source==='flame' && wave.delay>.8) && Math.abs(wave.x-cameraX)<=reach) wanted.push(wave);
+    for (const wave of waves) if (wave.isActive && (wave.kind !== 'lightblade' || wave.age>=wave.delay) && (wave.kind !== 'pulse' || wave.source==='flame' && wave.delay>.8) && Math.abs(wave.x-cameraX)<=reach) wanted.push(wave);
     const wantedSet = new Set(wanted);
     for (const [wave, group] of this.shots) if (!wantedSet.has(wave)) { this.scene.remove(group); this.shots.delete(wave); }
     let created = 0;
@@ -94,7 +96,7 @@ export class SkillEffects {
         this.halos[i] = group;
       }
       const playerKind = playerKinds[i];
-      const halo = this.halos[i]; halo.visible = playerKind !== 'blade';
+      const halo = this.halos[i]; halo.visible = playerKind !== 'blade' && playerKind !== 'lightblade';
       halo.position.set(player.x, player.y + 1.1, 0.4);
       halo.rotation.z = this.isReducedMotion ? 0 : Math.sin(elapsed * 2) * 0.12;
       halo.children[1].visible = playerKind === 'stars';

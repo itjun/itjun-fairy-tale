@@ -16,7 +16,7 @@ function build(kind, upgrades = {}) {
 }
 
 test('八种武器空放只留一轮，碰平台不消失，出屏后才能再发', () => {
-  for (const kind of Object.keys(WEAPONS)) for (const facing of [-1, 1]) {
+  for (const kind of Object.keys(WEAPONS).filter(id => !WEAPONS[id].isMelee)) for (const facing of [-1, 1]) {
     const p = {...player(), facing}, a = build(kind), waves = [];
     let emissions = 0;
     for (let frame = 0; frame < 720; frame++) {
@@ -31,7 +31,7 @@ test('八种武器空放只留一轮，碰平台不消失，出屏后才能再�
 });
 
 test('命中最近的敌人或护盾立即消失，后排不会被贯穿', () => {
-  for (const kind of Object.keys(WEAPONS)) for (const hasShell of [false, true]) {
+  for (const kind of Object.keys(WEAPONS).filter(id => !WEAPONS[id].isMelee)) for (const hasShell of [false, true]) {
     const p = player(), a = build(kind), first = enemy(1, 4, {hasShell}), behind = enemy(2, 15);
     const [wave] = fireLoadout(p, 0, bounds, a);
     let hits = [];

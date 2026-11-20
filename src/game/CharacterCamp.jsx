@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Heart, Star } from '@phosphor-icons/react';
 import { INITIAL_LIVES, CHARACTERS, newSurvival, takeDamage, recordAttack, bloomAtHit } from './characters.js';
 import { createPlayer, stepPlayer } from './physics.js';
-import { fireLoadout, fireAdventureWeapon, stepAdventureWave } from './adventure-combat.js';
+import { fireLoadout, fireAdventureWeapon, stepAdventureWave, attackSource } from './adventure-combat.js';
 import { WEAPONS, UPGRADES } from './adventure.js';
 import { starterAdventure, recommendedStarter } from './starter-build.js';
 import { StarterPicker } from './StarterPicker.jsx';
@@ -18,7 +18,7 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
     const node = canvas.current, context = node.getContext('2d'), images = {}, keys = new Set();
     const person = CHARACTERS[character], survival = newSurvival(character), adventure=starterAdventure(0,build);
     const floor = { id:0, x:14, y:0, width:28 }, player = createPlayer(floor), enemy = { id:1, combatVersion:2, x:14, y:0, width:1.5, height:2.5, hp:999, isDefeated:false };
-    player.x = 8.5;
+    player.x = build.weapons.includes('lightblade') ? 11.5 : 8.5;
     let isDisposed = false, frame, previous = 0, elapsed = 0, waves = [], jump = false, effect, nextDemoJump = 0, nextContact = 2;
     const names = [...new Set([person.image, person.attack, 'enemy-leaf', 'flame-stream', ...Object.values(WEAPONS).map(w=>w.image), 'flower', 'collectible-rainbow', 'enemy-burst'])];
     onProgress({ attacks:0, shieldRemaining:0 });
@@ -48,7 +48,7 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
             if (character === 'mom') { const floralCharge={isUsed:false}; shots.forEach(shot=>{shot.floralCharge=floralCharge;}); }
             if (character === 'sister' && !waves.some(w => w.isActive && w.firingWeapon === 'talent')) shots.push(...fireAdventureWeapon({...player,nextShot:0},elapsed,{left:0,right:28},'stars').map(w => ({...w, firingWeapon:'talent'})));
           }
-          for(const kind of new Set(shots.map(s=>s.kind)))mixer.play(`${kind}:fire`);
+          for(const kind of new Set(shots.map(attackSource)))mixer.play(`${kind}:fire`);
           waves.push(...shots); onProgress({...survival});
         }
       }
@@ -56,17 +56,23 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
         takeDamage(survival); effect={x:player.x,y:player.y+1,at:elapsed,isShield:true}; nextContact=elapsed+20; onProgress({...survival});
       }
       const spawned=[];
-      for (const wave of waves) { const result=stepAdventureWave(wave,[enemy],[floor],dt,elapsed); spawned.push(...result.spawned); for(const hit of result.hits)if(hit.damage || hit.blocked)mixer.play(hit.blocked?'block':`${wave.kind}:hit`); const bloom=bloomAtHit(wave,result.hits,[enemy],elapsed); if(bloom) effect=bloom; }
+      for (const wave of waves) { const result=stepAdventureWave(wave,[enemy],[floor],dt,elapsed,player); spawned.push(...result.spawned); for(const hit of result.hits){mixer.play(`${attackSource(wave)}:hit`);if(hit.blocked)mixer.play('block');} const bloom=bloomAtHit(wave,result.hits,[enemy],elapsed); if(bloom) effect=bloom; }
       waves=[...waves.filter(w=>w.isActive),...spawned].slice(-80); enemy.hp=999;enemy.isDefeated=false;
       context.clearRect(0,0,node.width,node.height);
-      const scale=node.width/28, ground=node.height*0.86;
-      function picture(name,x,y,w,h){ const im=images[name]; if(im)context.drawImage(im,(x-w/2)*scale,ground-(y+h)*scale,w*scale,h*scale); }
-      const size=person.height*2.8;
+      // 近战练习按正式关卡的相对比例放大，刀光才能对齐手部和练习靶。
+      const isMelee=build.weapons.includes('lightblade'), zoom=isMelee?2.8:1;
+      const scale=node.width/28*zoom, ground=node.height*0.86, origin=isMelee?player.x-8.5/zoom:0;
+      function picture(name,x,y,w,h){ const im=images[name]; if(im)context.drawImage(im,(x-origin-w/2)*scale,ground-(y+h)*scale,w*scale,h*scale); }
+      const size=person.height*(isMelee?1:2.8);
       picture(elapsed < (player.attackUntil||0) ? person.attack : person.image,player.x,player.y,size,size);
-      picture('enemy-leaf',enemy.x,0,4,4);
+      picture('enemy-leaf',enemy.x,0,isMelee?enemy.height:4,isMelee?enemy.height:4);
       for(const wave of waves) {
-        if(wave.kind==='moonblade') {
-          context.save();context.translate(wave.x*scale,ground-wave.y*scale);context.rotate(-wave.age*10);context.drawImage(images['weapon-moonblade'],-.8*scale,-.8*scale,1.6*scale,1.6*scale);context.restore();
+        if(wave.kind==='lightblade') {
+          if(wave.age < wave.delay) continue;
+          context.save();context.translate((wave.x-origin)*scale,ground-wave.y*scale);context.scale(wave.direction,1);
+          context.drawImage(images['weapon-lightblade'],-(wave.reach-.25)/2*scale,-wave.halfHeight*scale,(wave.reach-.25)*scale,wave.halfHeight*2*scale);context.restore();
+        } else if(wave.kind==='moonblade') {
+          context.save();context.translate((wave.x-origin)*scale,ground-wave.y*scale);context.rotate(-wave.age*10);context.drawImage(images['weapon-moonblade'],-.8*scale,-.8*scale,1.6*scale,1.6*scale);context.restore();
         } else picture(wave.kind==='flame'?'flame-stream':WEAPONS[wave.kind]?.image||'collectible-star',wave.x,wave.y,1.8,1.8);
       }
       if(effect && elapsed-effect.at<1.7) {

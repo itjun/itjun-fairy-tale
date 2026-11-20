@@ -18,7 +18,7 @@ import { starterAdventure } from './starter-build.js';
 import { newCombatLoot, rollCombatLoot, lootPosition, nearbyLoot, chooseLifeLoot, LIFE_CHOICES } from './combat-loot.js';
 import { MONSTERS, WEAPONS } from '../../shared/adventure-catalog.js';
 import { newAdventure, newJourney, upgradePower, activeWeapons, weaponRank, weaponShotCount, migrateAdventure, tickEffects, chooseReward, recycleReward } from './adventure.js';
-import { fireAdventureWeapon, fireLoadout, stepAdventureWave, areaAttack } from './adventure-combat.js';
+import { fireAdventureWeapon, fireLoadout, stepAdventureWave, areaAttack, attackSource } from './adventure-combat.js';
 import { stepAdventureEnemies, releaseCandyChildren } from './adventure-enemies.js';
 import { createPlayer, stepPlayer, rescue, revivalPoint } from './physics.js';
 import { campaignScore } from '../../shared/campaign.js';
@@ -124,7 +124,7 @@ export class GardenEngine {
       this.waveMaterial = spriteMaterial('light-wave'); this.burstMaterial = spriteMaterial('enemy-burst');
       this.starMaterial = spriteMaterial('collectible-star'); this.treeMaterial = spriteMaterial('treehouse-tall');
       this.skillEffects = new SkillEffects(this.scene, this.planeGeometry,
-        { blade: this.waveMaterial, bubble: spriteMaterial('magic-bubble'), stars: this.starMaterial, flame: spriteMaterial('flame-stream'), dragon:spriteMaterial('weapon-flame'), snow:spriteMaterial('collectible-snowflake'), thunder:this.waveMaterial, fire:spriteMaterial('flame-stream'), rain:spriteMaterial('magic-bubble'), cloud:spriteMaterial('platform-cloud'), moonblade: spriteMaterial('weapon-moonblade'), boomerang: spriteMaterial('weapon-boomerang'), seed: spriteMaterial('weapon-seed'), firefly: spriteMaterial('weapon-firefly'), pulse: this.starMaterial }, this.isReducedMotion);
+        { lightblade:spriteMaterial('weapon-lightblade'), blade: this.waveMaterial, bubble: spriteMaterial('magic-bubble'), stars: this.starMaterial, flame: spriteMaterial('flame-stream'), dragon:spriteMaterial('weapon-flame'), snow:spriteMaterial('collectible-snowflake'), thunder:this.waveMaterial, fire:spriteMaterial('flame-stream'), rain:spriteMaterial('magic-bubble'), cloud:spriteMaterial('platform-cloud'), moonblade: spriteMaterial('weapon-moonblade'), boomerang: spriteMaterial('weapon-boomerang'), seed: spriteMaterial('weapon-seed'), firefly: spriteMaterial('weapon-firefly'), pulse: this.starMaterial }, this.isReducedMotion);
       this.houseMaterial=spriteMaterial('street-house');this.houseMaterial.opacity=0.6;
       this.windmillMaterial=spriteMaterial('windmill-tall');this.windmillMaterial.opacity=0.65;
       this.awningMaterial=spriteMaterial('platform-awning');
@@ -535,11 +535,15 @@ export class GardenEngine {
     const spawned = [];
     for (const wave of this.waves) {
       // 宽屏光刃可能越过玩家周围的物理更新范围，命中不能只检查 nearby。
-      const result = stepAdventureWave(wave, this.world.enemies, platforms, STEP, this.elapsed);
+      const result = stepAdventureWave(wave, this.world.enemies, platforms, STEP, this.elapsed, this.players[wave.ownerIndex ?? 0], this.enemyShots);
+      if (wave.clash) {
+        this.skillEffects.burst(wave.clash.x,wave.clash.y,this.elapsed,false,true);
+        this.callbacks.onSound(`${attackSource(wave)}:hit`); this.callbacks.onSound('block');
+      }
       const hits = result.hits;
       const bloom = bloomAtHit(wave, hits, this.world.enemies, this.elapsed); if (bloom) this.talentEffect = bloom;
       spawned.push(...result.spawned);
-      for (const hit of hits) this.recordHit({...hit,source:wave.source || wave.kind});
+      for (const hit of hits) this.recordHit({...hit,source:attackSource(wave)});
       if (wave.burst) this.skillEffects.burst(wave.burst.x, wave.burst.y, this.elapsed, false, !!currentBoss(this.world));
     }
     this.waves = [...this.waves.filter(w => w.isActive), ...spawned];
@@ -600,7 +604,7 @@ export class GardenEngine {
             if (this.survival.character === 'mom') { const floralCharge = { isUsed:false }; shots.forEach(shot => { shot.floralCharge = floralCharge; }); }
             if (this.survival.character === 'sister' && !this.waves.some(w => w.isActive && w.firingWeapon === 'talent')) shots.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, bounds, 'stars', powers).map(w => ({...w, firingWeapon:'talent'})));
           }
-          this.waves.push(...shots); for(const id of new Set(shots.map(shot=>shot.kind)))this.callbacks.onSound(`${id}:fire`);
+          this.waves.push(...shots); for(const id of new Set(shots.map(attackSource)))this.callbacks.onSound(`${id}:fire`);
         }
       }
       for (const hazard of this.world.hazards) if (touchingHazard(player,hazard,this.elapsed)) { player.protection=1; this.hurt(false,15); if(this.survival.phase!=='alive')return; }

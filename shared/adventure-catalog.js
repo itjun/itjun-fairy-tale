@@ -44,6 +44,7 @@ export const EXPANDED_THEME_MONSTERS = Object.freeze({
   cartoon: ['toy', 'candy', 'fish', 'firefly', 'paint', 'bell', 'ink', 'moth', 'twins', 'plane', 'octopus'],
 });
 export const WEAPONS = Object.freeze({
+  lightblade: { name:'近战光刀', shortName:'光刀', image:'weapon-lightblade', hint:'伤害 96，挥出大型刀光，每刀可砍碎一发敌方攻击', damage:96, interval:0.4, family:'power', isMelee:true },
   flame: { name:'彩笔火龙', shortName:'火龙', image:'weapon-flame', hint:'伤害 18，火焰追随目标高度，命中或出屏后再发', damage:18, interval:0.2, family:'power' },
   blade: { name: '贯穿光刃', shortName: '光刃', image: 'light-wave', hint: '伤害 30，穿过平台，命中或出屏后再发', damage:30, interval:0.4, family: 'power' },
   moonblade: { name: '圆月弯刀', shortName: '弯刀', image: 'weapon-moonblade', hint: '伤害 48，月牙自动追敌，命中或出屏后再发', damage:48, interval:0.4, family: 'flight' },

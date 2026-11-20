@@ -20,7 +20,7 @@ test('武器专属强化只在装上对应武器时生效',()=>{
 });
 
 test('各种武器确实命中，光刃与星镖命中消失、花种范围、追踪与组合有效',()=>{
- for(const weapon of Object.keys(WEAPONS)) {
+ for(const weapon of Object.keys(WEAPONS).filter(id => !WEAPONS[id].isMelee)) {
   const enemies=[monster(1,6),monster(2,13)],player={x:0,y:0,facing:1};
   let waves=fireAdventureWeapon(player,0,{left:-20,right:20},weapon,{frost:1,area:1});let hits=0;
   assert.ok(waves.length);

@@ -34,7 +34,8 @@ export function isValidProjectiles(state,world) {
     return true;
   };
   return !!state && Array.isArray(state.waves)&&state.waves.length<=15000&&Array.isArray(state.shots)&&state.shots.length<=128&&numbersAreFinite(state)
-    && state.waves.every(w => w && (w.firingWeapon === undefined || WEAPONS[w.firingWeapon] || ['companion','talent'].includes(w.firingWeapon))
+    && state.waves.every(w => w && (w.kind !== 'lightblade' || [w.reach,w.halfHeight,w.duration,w.delay].every(Number.isFinite) && w.reach>=.25 && w.reach<=10 && w.halfHeight>0 && w.halfHeight<=5 && w.duration>0 && w.duration<=1 && w.delay>=0 && w.delay<=20)
+      && (w.firingWeapon === undefined || WEAPONS[w.firingWeapon] || ['companion','talent'].includes(w.firingWeapon))
       && (w.ownerIndex === undefined || w.ownerIndex === 0)
       && (w.isCoasting === undefined || typeof w.isCoasting === 'boolean')
       && (w.flightBounds === undefined || w.flightBounds && [w.flightBounds.left,w.flightBounds.right].every(Number.isFinite) && w.flightBounds.left < w.flightBounds.right
