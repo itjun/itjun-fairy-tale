@@ -55,10 +55,10 @@ function releaseBossSkill(boss, arena, skill, shots) {
   // 远处或高台上的玩家也要躲开冲锋时甩出的主题弹道。
   if(skill.kind==='charge') aim(0,{size:1.4});
 }
-export function applyBossToughness(boss, stage, pressure) {
+export function applyBossToughness(boss, stage, pressure, cycle = 1) {
   if (!boss?.isBoss || boss.isDefeated || boss.isDormant) return;
-  const baseline = bossBaseline(stage);
-  const target = bossTargetHp(stage, pressure);
+  const baseline = bossBaseline(stage, cycle);
+  const target = bossTargetHp(stage, pressure, cycle);
   if (boss.maxHp !== baseline || target === baseline) return;
   const ratio = baseline > 0 ? Math.min(1, boss.hp / boss.maxHp) : 1;
   boss.maxHp = target;
@@ -75,7 +75,7 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
       if (previous && !world.enemies[previous.bossId-1].isDefeated || player.x < arena.left || player.x > arena.right || Math.abs(player.y-arena.y)>9) continue;
       boss.isDormant=false;boss.attackTime=0;
     }
-    if (stage) applyBossToughness(boss, stage, pressure);
+    if (stage) applyBossToughness(boss, stage, pressure, world.cycle);
     boss.elapsed+=dt;
     // 已经预告的招式先放完，换阶段不取消蓄力，也不重新开始休息。
     if (boss.isWorldBoss && !boss.isEnraged && boss.hp <= boss.maxHp/2 && boss.attackStage === 'rest') boss.isEnraged=true;

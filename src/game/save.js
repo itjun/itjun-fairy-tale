@@ -30,7 +30,9 @@ export function readAdventure(storage=localStorage) {
     if(run.scoringVersion!==3 || !['playing','paused','completed','ended'].includes(run.status) || run.players!==1 || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.seed!==run.seed || state.levelId!==run.levelId) return null;
     const stage=findStage(run.levelId);
     if (!isValidSurvival(state.survival) || state.isCompleted && state.survival.phase !== 'alive' || run.status === 'ended' && state.survival.phase !== 'over') return null;
-    const world=createRoomWorld(run.seed,stage);
+    if (!isValidAdventure(state.adventure, 1) || !isValidJourney(state.journey, 1)) return null;
+    const cycle = state.adventure.cycle || 1;
+    const world=createRoomWorld(run.seed,stage,cycle);
     // 第 11 版只在尾部追加守卫；原编号和已清房间保持原样，不重抽本局。
     const originalCount = world.enemies.findIndex(e => e.isReinforcement);
     if (originalCount >= 0 && Array.isArray(state.enemies) && state.enemies.length === originalCount && isValidRoomState(state.rooms, world)) {
@@ -39,7 +41,6 @@ export function readAdventure(storage=localStorage) {
         state.enemies.push(saveEnemy({ ...enemy, isDormant:!isCurrent || enemy.wave !== state.rooms.wave }));
       }
     }
-    if (!isValidAdventure(state.adventure, 1) || !isValidJourney(state.journey, 1)) return null;
     if(!Array.isArray(state.players)||state.players.length!==1||state.players.some(p=>!world.platforms[p.safeId]||world.platforms[p.safeId].isMoving))return null;
     if (state.players.some(p => p.safeX !== undefined && (!Number.isFinite(p.safeX) || Math.abs(p.safeX-world.platforms[p.safeId].x) > world.platforms[p.safeId].width/2))) return null;
     if (state.revival !== undefined) {
@@ -50,11 +51,11 @@ export function readAdventure(storage=localStorage) {
     if(!isIds(state.collectedIds,world.treasures.length)||!isIds(state.defeatedIds,world.enemies.length)||!isIds(state.visited,world.zones.length)||!isIds(state.switches,world.switches.length-1,0))return null;
     if(!Array.isArray(state.enemies)||state.enemies.length!==world.enemies.length||state.enemies.some((e,i)=>e.id!==i+1||![e.x,e.y,e.hp,e.elapsed,e.direction].every(Number.isFinite)))return null;
     // 首领开战时按当时的武器加厚过，存下来的血量上限只能在单武器血量和最多加厚之间。
-    const thickest=bossTargetHp(stage,100);
+    const thickest=bossTargetHp(stage,100,cycle);
     for(const enemy of state.enemies) {
       if(!world.enemies[enemy.id-1].isBoss)continue;
-      enemy.maxHp ??= bossBaseline(stage);
-      if(!Number.isInteger(enemy.maxHp)||enemy.maxHp<bossBaseline(stage)||enemy.maxHp>thickest||enemy.hp>enemy.maxHp)return null;
+      enemy.maxHp ??= bossBaseline(stage,cycle);
+      if(!Number.isInteger(enemy.maxHp)||enemy.maxHp<bossBaseline(stage,cycle)||enemy.maxHp>thickest||enemy.hp>enemy.maxHp)return null;
     }
     if (state.enemies.some((e,i) => e.hp < 0 || e.hp > (world.enemies[i].isBoss ? e.maxHp : world.enemies[i].hp) || e.elapsed < 0 || ![-1,1].includes(e.direction) || typeof e.isDefeated !== 'boolean' || e.isDefeated !== state.defeatedIds.includes(e.id))) return null;
     const isOptionalNumber = (value, max) => value === undefined || Number.isFinite(value) && value >= 0 && value <= max;

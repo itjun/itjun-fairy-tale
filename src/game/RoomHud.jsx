@@ -4,6 +4,7 @@ import { PadKey } from '../input/PadKey.jsx';
 import { WEAPONS, UPGRADES } from '../../shared/adventure-catalog.js';
 import { SPELLS, RARITIES } from '../../shared/combat-catalog.js';
 import { ROOM_KINDS } from '../../shared/room-world.js';
+import { WORLD_ACTS } from '../../shared/levels.js';
 import { DIFFICULTIES } from './difficulty.js';
 import { SETS, SET_STEPS } from './sets.js';
 import './rooms.css';
@@ -41,7 +42,7 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
         <b>{KIND_MARKS[layer.kind] || '？'}</b>
         <span aria-label={`${layer.stars} 颗星`}>{[0, 1, 2].map(star => <Star key={star} size={13} weight={star < layer.stars ? 'fill' : 'regular'} />)}</span>
       </li>)}</ol>
-      <p><strong>{rooms.name}</strong>{line && <span>{line}</span>}</p>
+      <p><strong>第 {stats.adventure?.cycle || 1} 轮　{rooms.name}</strong>{line && line !== stats.message && <span>{line}</span>}</p>
       {isPlaying && stats.enemyGuide?.isNearBarrier && <small className="room-barrier-hint">打完这片小怪，栅栏就会打开</small>}
     </aside>
     {isPlaying && stats.enemyGuide && <div className="room-enemy-guide" data-enemy-id={stats.enemyGuide.id} data-edge={stats.enemyGuide.isAtEdge} style={{ left: `${stats.enemyGuide.x}%`, top: `${stats.enemyGuide.y}%` }}>
@@ -96,7 +97,8 @@ export function RunOverview({ stats, onBack }) {
       <h2>这一章的门</h2>
       <ol className="overview-path">{rooms.layers.map((layer, index) => <li key={index} aria-current={index === rooms.depth || undefined}><b>{KIND_MARKS[layer.kind] || '？'}</b>{layer.kind ? ROOM_KINDS[layer.kind].name : '还没选'}{layer.stars > 0 && <small>{layer.stars} 颗星</small>}</li>)}</ol>
       {rooms.doors.length > 0 && <p className="option-note">{rooms.isCleared ? '门亮着' : '清完这间房，门才会亮'}。前面有{rooms.doors.length === 2 ? '两扇门，一扇在高处，一扇在低处，跳到哪扇就进哪扇' : '一扇门，跳上去就能进'}。</p>}
-      <p className="option-note">难度：{DIFFICULTIES[rooms.difficulty].name}。一共拿到 {rooms.stars} 颗星。重抽券 {rooms.rerolls} 张{rooms.tierUp > 0 && '，下一次奖励高一档'}。</p>
+      <p className="option-note">第 {adventure.cycle || 1} 轮，难度：{DIFFICULTIES[rooms.difficulty].name}。一共拿到 {rooms.stars} 颗星。重抽券 {rooms.rerolls} 张{rooms.tierUp > 0 && '，下一次奖励高一档'}。</p>
+      <p className="option-note">走完 {WORLD_ACTS.length} 个世界进入下一轮，保留本领和生命。每轮首领、护甲、召唤和精英的血量增加 20%，敌人伤害增加 12%。</p>
     </section>}
   </HomePage>;
 }

@@ -18,6 +18,7 @@ import { COLLECTIBLES, LEVEL_COLLECTIBLES } from './collectibles.js';
 import { RewardPanel } from './AdventurePanels.jsx';
 import './adventure.css';
 import { WORLD_ACTS } from '../../shared/levels.js';
+import { carryToNextWorld } from '../../shared/adventure-cycle.js';
 import { queueRun, flushScores, saveOnLeave } from '../scores/client.js';
 import './game.css';
 import './boss.css';
@@ -179,8 +180,8 @@ export function PlatformGame({ onExit, initialSound = true }) {
   function restart(index = levelIndex, isImmediate = false) {
     enterCamp.current = false;
     if (statusRef.current === 'loading') return;
-    const isContinuing = isImmediate && statusRef.current === 'completed' && index !== 0;
-    carriedAdventure.current = isContinuing ? engine.current?.exportAdventure() : null;
+    const isContinuing = isImmediate && statusRef.current === 'completed';
+    carriedAdventure.current = isContinuing ? carryToNextWorld(engine.current.exportAdventure(), levelIndex, WORLD_ACTS.length) : null;
     carriedSurvival.current = isContinuing ? structuredClone(engine.current.survival) : null;
     saved.current = null;
     isAutoStart.current = isImmediate;
@@ -275,7 +276,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
         {status === 'paused' && stats.adventure && <button className="quiet-button" onClick={() => openOverview('paused')}><ListBullets size={20}/>本领一览</button>}
         {status === 'paused' && <button className="quiet-button" onClick={() => { setOptionsCategory('game'); changeStatus('options'); }}><GearSix size={20}/>选项</button>}
         {status === 'fallen' && <button className="primary-button" onClick={() => { if (engine.current.revive()) start(); }}>从这里继续</button>}
-        {isResult&&<><button className="primary-button" onClick={()=>restart(status==='completed'?(levelIndex+1)%WORLD_ACTS.length:0, status==='completed')}>{status==='completed'?(levelIndex===WORLD_ACTS.length-1?'再从彩虹花园出发':'去下一关'):'新冒险'}<ArrowRight size={20}/></button></>}
+        {isResult&&<><button className="primary-button" onClick={()=>restart(status==='completed'?(levelIndex+1)%WORLD_ACTS.length:0, status==='completed')}>{status==='completed'?(levelIndex===WORLD_ACTS.length-1?`进入第 ${(stats.adventure?.cycle || 1) + 1} 轮`:'去下一关'):'新冒险'}<ArrowRight size={20}/></button></>}
         {status==='error'&&<button className="primary-button" onClick={()=>restart()}>重新打开</button>}
         <button className="text-button" data-gamepad-back={!['playing', 'paused'].includes(status) || undefined} onClick={exit}><House size={18}/>回到我的花园</button>
       </div>

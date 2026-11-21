@@ -1,4 +1,5 @@
 import { saveProjectiles, restoreProjectiles } from './projectile-state.js';
+import { applyCycleHealth, cycleModifiers } from '../../shared/adventure-cycle.js';
 import { stepMagic, consumeMagicShield, shieldCounter, newMagic } from './magic.js';
 import { CHARACTERS, newSurvival, migrateSurvival, reviveSurvival, recordAttack, bloomAtHit } from './characters.js';
 import { resourcesFor, damageWithBuild, recordDefeat, completeEncounter, tickResources, useRecovery, heal } from './expedition.js';
@@ -43,8 +44,8 @@ export class GardenEngine {
     this.callbacks = { onUpdate, onPause, onReady, onError, onSound, onComplete, onReward, onLifeLoot, onLifeChange, onAlbum };
     this.survival = migrateSurvival(survival || newSurvival(character));
     this.stage = level; this.level = themeFor(level);
-    this.world = createRoomWorld(seed, level);
     this.adventure = migrateAdventure(structuredClone(adventure || newAdventure(seed, 1)));
+    this.world = createRoomWorld(seed, level, this.adventure.cycle);
     // 选门闯房间：房间进度单独记，难度和画册里还没解锁的东西跟着这次冒险走。
     this.roomState = newRoomState(this.world);
     this.spellHits = 0; this.isInteracting = false; this.isCasting = false; this.rewardAt = 0;
@@ -360,6 +361,7 @@ export class GardenEngine {
     this.adventure.difficulty ||= DIFFICULTIES[difficulty] ? difficulty : DEFAULT_DIFFICULTY;
     if (locked) this.adventure.locked = [...locked];
     this.difficulty = difficultyOf(this.adventure.difficulty);
+    applyCycleHealth(this.world, this.adventure.cycle);
     this.world.warningBonus = this.difficulty.warning;
     // 轻松档小怪的节拍放慢一成半，出手前的预告跟着变长。
     for (const enemy of this.world.enemies) if (!enemy.isBoss) { enemy.basePeriod ??= enemy.period; enemy.period = enemy.basePeriod * (this.difficulty.warning ? 1.15 : 1); }
@@ -699,7 +701,7 @@ export class GardenEngine {
       for (const enemy of enemies.filter(e => !e.isDormant)) {
         const contact = touchEnemy(player, enemy, previousY, this.elapsed);
         if (contact === 'stomp' || contact === 'hit') { this.recordHit({enemy,isDefeated:contact==='stomp',damage:enemy.lastDamage,blocked:enemy.lastBlocked});this.callbacks.onSound('hit'); }
-        if (contact === 'bump') { player.protection += (powers.shield || 0); this.hurt(false, enemy.isBoss?20:enemy.touchDamage || (enemy.behavior==='charge'?15:10)); if (this.survival.phase !== 'alive') return; }
+        if (contact === 'bump') { player.protection += (powers.shield || 0); this.hurt(false, (enemy.isBoss?20:enemy.touchDamage || (enemy.behavior==='charge'?15:10)) * cycleModifiers(this.adventure.cycle).damage); if (this.survival.phase !== 'alive') return; }
       }
       if (powers.cleanse && !resourcesFor(this.adventure).cleanseCooldown) {
         const nearbyShots = this.enemyShots.filter(shot => shot.isActive && Math.hypot(shot.x-player.x, shot.y-player.y-0.8) < 4).slice(0,3);
@@ -709,7 +711,7 @@ export class GardenEngine {
         if (shot.kind === 'ink') { player.inkUntil = this.elapsed+0.6; continue; }
         if (player.protection > 0) continue;
         shot.isActive = false; player.protection = 1 + (powers.shield || 0); player.knockTime = 0.2; player.knockVx = Math.sign(shot.vx) * 3;
-        this.hurt(false, shot.damage || 10); if (this.survival.phase !== 'alive') return;
+        this.hurt(false, (shot.damage || 10) * cycleModifiers(this.adventure.cycle).damage); if (this.survival.phase !== 'alive') return;
       }
       for (const treasure of this.world.treasures.filter(nearby)) {
         const view = this.treasureViews.get(treasure.id);

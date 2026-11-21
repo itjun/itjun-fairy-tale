@@ -9,7 +9,7 @@ import { newMagic, isValidMagic, CHARGE_PER_HIT } from './magic.js';
 export { WEAPONS, UPGRADES };
 
 export function newAdventure(seed, count = 1) {
-  return { version: 2, starterVersion:1, seed, resources: newResources(), growth:newGrowth(), effects: {}, weapons: ['moonblade'], weaponRanks:{}, qualities:{}, magic:newMagic(), revivalWaves:0, counterShield:0, upgrades: {}, loadouts: Array.from({ length: count }, () => ({ weapon: 'moonblade', weapons: ['moonblade'], upgrades: [] })), revision: 0 };
+  return { version: 2, cycle: 1, starterVersion:1, seed, resources: newResources(), growth:newGrowth(), effects: {}, weapons: ['moonblade'], weaponRanks:{}, qualities:{}, magic:newMagic(), revivalWaves:0, counterShield:0, upgrades: {}, loadouts: Array.from({ length: count }, () => ({ weapon: 'moonblade', weapons: ['moonblade'], upgrades: [] })), revision: 0 };
 }
 export function newJourney() { return { routes: {}, claimed: [], pending: null, queued: [], fragments: 0 }; }
 export function activeWeapons(adventure, index = 0) { return adventure.loadouts[index].weapons || [adventure.loadouts[index].weapon]; }
@@ -33,6 +33,7 @@ export function weaponPressure(adventure, index = 0) {
   return dps > 0 ? dps / reference : 1;
 }
 export function migrateAdventure(adventure) {
+  adventure.cycle ??= 1;
   adventure.growth ||= newGrowth();
   adventure.qualities ||= {}; adventure.magic ||= newMagic(); adventure.revivalWaves ||= 0; adventure.counterShield ||= 0;
   if (adventure.version !== 2) {
@@ -129,6 +130,7 @@ function finishReward(adventure, journey) {
 export function isValidAdventure(adventure, count) {
   const isUnique = (items, definitions) => Array.isArray(items) && new Set(items).size === items.length && items.every(id => Object.hasOwn(definitions, id));
   return [1,2].includes(adventure?.version) && isValidResources(adventure.resources) && isValidGrowth(adventure.growth) && Number.isInteger(adventure.seed) && adventure.seed >= 0 && adventure.seed <= 0xffffffff
+    && (adventure.cycle === undefined || Number.isSafeInteger(adventure.cycle) && adventure.cycle >= 1)
     && isValidMagic(adventure.magic)
     && [undefined, 9].includes(adventure.ruleset) && (adventure.difficulty === undefined || Object.hasOwn(DIFFICULTIES, adventure.difficulty))
     && (adventure.locked === undefined || Array.isArray(adventure.locked) && adventure.locked.length <= 60 && adventure.locked.every(key => /^(weapon|upgrade|spell):[a-zA-Z]+$/.test(key)))

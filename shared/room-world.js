@@ -1,4 +1,5 @@
 import { randomGenerator } from './random.js';
+import { applyCycleHealth } from './adventure-cycle.js';
 import { WORLD_ACTS, themeFor } from './levels.js';
 import { LEVEL_COLLECTIBLES } from './collectibles.js';
 import { ADVENTURE_GENERATION_VERSION, EXPANDED_THEME_MONSTERS, MONSTERS } from './adventure-catalog.js';
@@ -326,7 +327,7 @@ function buildBoss(world, builder, stage, room) {
 }
 
 // 一章是开场房、三层各两间候选房和首领房。门负责把人送到下一间，种子决定门后是什么。
-export function createRoomWorld(seed, selected) {
+export function createRoomWorld(seed, selected, cycle = 1) {
   const requestedId = typeof selected === 'string' ? selected : selected.id;
   const stage = WORLD_ACTS.find(item => item.id === requestedId);
   if (!stage) throw new Error('找不到这个世界关');
@@ -432,6 +433,7 @@ export function createRoomWorld(seed, selected) {
   // 支路沿用已有入口平台，额外编号放在尾部，旧存档仍按原拓扑和编号续关。
   finishTraversal(world, appendRoomPlatform);
   if (theme.id === 'desert') expandDesertExpedition(world, appendRoomPlatform);
+  applyCycleHealth(world, cycle);
   return world;
 }
 
