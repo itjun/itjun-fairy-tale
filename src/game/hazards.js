@@ -1,7 +1,10 @@
 import { heal, resourcesFor } from './expedition.js';
 import { addLife } from './characters.js';
 
+export const ICICLE_SIZE = { width: 2.4, height: 1.7 };
+
 export function hazardState(hazard, elapsed) {
+  if (hazard.isBroken) return { isWarning: false, isActive: false, angle: 0, x: hazard.x, y: hazard.y };
   // 刺丛、积木堆这类障碍一直在原地，没有节拍。
   if(hazard.kind==='block')return {isWarning:false,isActive:true,angle:0,x:hazard.x,y:hazard.y};
   const beat=(elapsed+hazard.phase)%hazard.period;
@@ -10,6 +13,26 @@ export function hazardState(hazard, elapsed) {
   const fallingY=hazard.y+5-Math.max(0,(beat-hazard.warning)/hazard.active)*5;
   return {isWarning,isActive,angle:swing,x:hazard.x+(hazard.kind==='pendulum'?Math.sin(swing)*hazard.length:0),y:hazard.kind==='icicle'?fallingY:hazard.y+(hazard.kind==='pendulum'?hazard.length-Math.cos(swing)*hazard.length+1:0)};
 }
+
+export function icicleTargets(world, roomId, elapsed) {
+  const targets = [];
+  for (const hazard of world.hazards) {
+    if (hazard.kind !== 'icicle' || hazard.isBroken || world.platforms[hazard.platformId].roomId !== roomId) continue;
+    const state = hazardState(hazard, elapsed);
+    if (state.isWarning || state.isActive) {
+      targets.push({ hazard, x: state.x, y: state.y + ICICLE_SIZE.height / 2, ...ICICLE_SIZE, isActive: true });
+    }
+  }
+  return targets;
+}
+
+export function breakIcicle(wave, target) {
+  target.hazard.isBroken = true;
+  target.isActive = false;
+  wave.isActive = false;
+  wave.clash = { x: target.x, y: target.y, isIcicle: true };
+}
+
 export function stepMechanisms(world, player, elapsed, dt) {
   for(const p of world.platforms){
     if(p.isCrumbling){

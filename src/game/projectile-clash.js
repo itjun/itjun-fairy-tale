@@ -4,11 +4,11 @@ export function findProjectileClash(wave, shots, halfWidth) {
   for (const shot of shots) {
     if (!shot.isActive) continue;
     const sx = shot.previousX ?? shot.x, sy = shot.previousY ?? shot.y;
-    const radius = (shot.size || .7) / 2;
+    const size = shot.size || .7;
     let enter = 0, leave = 1;
     for (const [position, delta, extent] of [
-      [sx - wave.x, shot.x - sx, halfWidth + radius],
-      [sy - wave.y, shot.y - sy, wave.halfHeight + radius],
+      [sx - wave.x, shot.x - sx, halfWidth + (shot.width ?? size) / 2],
+      [sy - wave.y, shot.y - sy, wave.halfHeight + (shot.height ?? size) / 2],
     ]) {
       if (Math.abs(delta) < 1e-9) { if (Math.abs(position) > extent) { enter = 2; break; } }
       else {

@@ -76,7 +76,7 @@ export function areaAttack(x, y, radius, enemies, elapsed, powers = {}) {
     return { enemy, isDefeated, damage:enemy.lastDamage, blocked:enemy.lastBlocked };
   });
 }
-export function stepAdventureWave(wave, enemies, platforms, dt, elapsed, owner, hostileShots = []) {
+export function stepAdventureWave(wave, enemies, platforms, dt, elapsed, owner, hostileShots = [], icicles = []) {
   if (!wave.isActive) return { hits: [], spawned: [] };
   const powers = wave.powers || {}, spawned = [];
   const active = enemies;
@@ -125,7 +125,9 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed, owner, 
     }
     if (target) wave.slope = Math.max(wave.kind==='firefly'?-1:-.55, Math.min(wave.kind==='firefly'?1:.55, (target.y + target.height / 2 - wave.y) / Math.max(1, Math.abs(target.x - wave.x))));
   }
-  const hits = wave.kind === 'lightblade' ? stepLightblade(wave, active, dt, elapsed, owner, hostileShots) : stepWave(wave, active, platforms, dt, elapsed);
+  const hits = wave.kind === 'lightblade'
+    ? stepLightblade(wave, active, dt, elapsed, owner, hostileShots, icicles)
+    : stepWave(wave, active, platforms, dt, elapsed, icicles);
   if (wave.kind !== 'lightblade' && wave.flightBounds && (wave.x < wave.flightBounds.left - 2 || wave.x > wave.flightBounds.right + 2 || wave.y < (wave.flightBounds.bottom ?? -Infinity) - 2 || wave.y > (wave.flightBounds.top ?? Infinity) + 2)) wave.isActive = false;
   if (wave.kind === 'seed' && (hits.length || !wave.isActive)) {
     wave.isActive = false;

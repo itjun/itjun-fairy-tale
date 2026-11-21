@@ -49,6 +49,7 @@ export function readAdventure(storage=localStorage) {
     }
     const isIds=(ids,limit,start=1)=>Array.isArray(ids)&&ids.every(id=>Number.isInteger(id)&&id>=start&&id<=limit)&&new Set(ids).size===ids.length;
     if(!isIds(state.collectedIds,world.treasures.length)||!isIds(state.defeatedIds,world.enemies.length)||!isIds(state.visited,world.zones.length)||!isIds(state.switches,world.switches.length-1,0))return null;
+    if (state.brokenIcicles !== undefined && (!isIds(state.brokenIcicles, world.hazards.length - 1, 0) || state.brokenIcicles.some(id => world.hazards[id].kind !== 'icicle'))) return null;
     if(!Array.isArray(state.enemies)||state.enemies.length!==world.enemies.length||state.enemies.some((e,i)=>e.id!==i+1||![e.x,e.y,e.hp,e.elapsed,e.direction].every(Number.isFinite)))return null;
     // 首领开战时按当时的武器加厚过，存下来的血量上限只能在单武器血量和最多加厚之间。
     const thickest=bossTargetHp(stage,100,cycle);

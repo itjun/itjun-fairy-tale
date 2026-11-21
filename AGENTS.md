@@ -237,6 +237,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 ## 玩家攻击对冲（2026-11-20）
 
 - 仅近战挥斩能砍碎小怪和 BOSS 发出的攻击，每刀一发。修改抵消范围、碰撞优先级或派生攻击时读取 `docs/design/melee-lightblade/projectile-clash.md`。
+- 雪地落冰机关在悬挂预警或下落时可被近战和远程武器击碎。本局和续关均保留破坏状态，房间清怪数和击败奖励仍只统计小怪。
 
 
 ## 沙漠地图、攀岩与洞窟（2026-11-20）

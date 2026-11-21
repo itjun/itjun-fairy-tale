@@ -1,4 +1,5 @@
-// 固定步长内用线段扫过目标，光波再快也不会穿过小怪。
+import { breakIcicle } from './hazards.js';
+
 export function damageEnemy(enemy, elapsed = enemy.elapsed, source) {
   enemy.lastDamage = 0; enemy.lastBlocked = 0;
   if (enemy.isDefeated || enemy.isHidden || enemy.isDormant) return false;
@@ -41,12 +42,12 @@ export function fireSkill(player, elapsed, bounds, kind = 'blade') {
   return [-0.32, -0.16, 0, 0.16, 0.32].map(slope => ({ ...wave, kind: 'stars', slope, hitIds: new Set() }));
 }
 
-// 线段与扩大的怪物矩形相交，适用于宽屏高速光刃与斜向星弹。
-function contactTime(x, y, dx, dy, enemy, radius) {
+// 固定步长内用线段扫过目标，避免高速弹道穿过小怪或冰锥。
+function contactTime(x, y, dx, dy, centerX, bottom, width, height, radius) {
   let entry = 0, exit = 1;
   for (const [start, delta, min, max] of [
-    [x, dx, enemy.x - enemy.width / 2 - radius, enemy.x + enemy.width / 2 + radius],
-    [y, dy, enemy.y - radius, enemy.y + enemy.height + radius],
+    [x, dx, centerX - width / 2 - radius, centerX + width / 2 + radius],
+    [y, dy, bottom - radius, bottom + height + radius],
   ]) {
     if (Math.abs(delta) < 1e-9) { if (start < min || start > max) return null; }
     else {
@@ -59,7 +60,7 @@ function contactTime(x, y, dx, dy, enemy, radius) {
 }
 
 const contactScratch = [];
-export function stepWave(wave, enemies, _platforms, dt, elapsed) {
+export function stepWave(wave, enemies, _platforms, dt, elapsed, icicles = []) {
   if (!wave.isActive) return [];
   const source = { x: wave.x, damage: wave.damage };
   let distance = Math.min(wave.remaining, wave.speed * dt);
@@ -82,13 +83,26 @@ export function stepWave(wave, enemies, _platforms, dt, elapsed) {
   for (const enemy of enemies) {
     if (enemy.isDefeated || enemy.isHidden || enemy.isDormant || wave.hitIds.has(enemy.id)) continue;
     if (enemy.x + enemy.width / 2 < minX || enemy.x - enemy.width / 2 > maxX || enemy.y + enemy.height < minY || enemy.y > maxY) continue;
-    const time = contactTime(wave.x, wave.y, dx, dy, enemy, radius);
+    const time = contactTime(wave.x, wave.y, dx, dy, enemy.x, enemy.y, enemy.width, enemy.height, radius);
     if (time !== null) contactScratch.push({ enemy, time });
   }
   if (contactScratch.length > 1) contactScratch.sort((a, b) => a.time - b.time);
   const contacts = contactScratch;
-  const fraction = contacts.length ? contacts[0].time : 1;
+  let iceHit, fraction = contacts[0]?.time ?? Infinity;
+  for (const target of icicles) {
+    if (!target.isActive) continue;
+    const time = contactTime(wave.x, wave.y, dx, dy, target.x, target.y - target.height / 2, target.width, target.height, radius);
+    if (time !== null && time < fraction) {
+      iceHit = target;
+      fraction = time;
+    }
+  }
+  fraction = Math.min(fraction, 1);
   wave.x += dx * fraction; wave.y += dy * fraction; wave.remaining -= distance; wave.age += dt;
+  if (iceHit) {
+    breakIcicle(wave, iceHit);
+    contacts.length = 0;
+  }
   if (wave.remaining <= 0 || isLeavingScreen) wave.isActive = false;
   let targets = contacts.slice(0, 1).map(hit => hit.enemy);
   if (targets.length) wave.isActive = false;

@@ -28,7 +28,7 @@ import { campaignScore } from '../../shared/campaign.js';
 import { moveCampaignPlatforms } from './combat.js';
 import { SkillEffects } from './skill-effects.js';
 import { touchEnemy, touchSpring, saveEnemy, restoreEnemy } from './enemies.js';
-import { hazardState, stepMechanisms, touchingHazard, takeLifeSupply, mechanismSave, restoreMechanisms } from './hazards.js';
+import { ICICLE_SIZE, hazardState, icicleTargets, stepMechanisms, touchingHazard, takeLifeSupply, mechanismSave, restoreMechanisms } from './hazards.js';
 import { LEVELS, themeFor } from '../../shared/levels.js';
 import { COLLECTIBLES, LEVEL_COLLECTIBLES } from './collectibles.js';
 
@@ -235,9 +235,10 @@ export class GardenEngine {
     }
     for (const h of this.world.hazards || []) {
       const group=new THREE.Group();group.position.set(h.x,h.y+(h.kind==='pendulum'?h.length+1:0),0.5);
-      const height=h.kind==='pendulum'?h.length+1:h.kind==='block'?1.3:h.kind==='thorns'?1.35:2.8;
+      const height=h.kind==='pendulum'?h.length+1:h.kind==='block'?1.3:h.kind==='thorns'?1.35:h.kind==='icicle'?ICICLE_SIZE.height:2.8;
+      const width=h.kind==='pendulum'?height/2:h.kind==='block'?1.9:h.kind==='icicle'?ICICLE_SIZE.width:2.4;
       const mesh=new THREE.Mesh(this.planeGeometry,this.material((h.kind==='block'?this.blockMaterials[h.skin]:this.trapMaterials[h.kind]).clone()));
-      mesh.scale.set(h.kind==='pendulum'?height/2:h.kind==='block'?1.9:2.4,height,1);mesh.position.y=h.kind==='pendulum'?-height*.45:height/2;
+      mesh.scale.set(width,height,1);mesh.position.y=h.kind==='pendulum'?-height*.45:height/2;
       group.add(mesh);this.scene.add(group);this.hazardViews.set(h.id,{group,mesh});
     }
     for (const supply of this.world.supplies || []) this.supplyViews.set(supply.id,this.sprite(supply.kind==='medkit'?this.medkitMaterial:this.lifeMaterial,supply.x,supply.y,.9,1.25));
@@ -593,12 +594,13 @@ export class GardenEngine {
     stepBosses(this.world,this.players[0],STEP,this.elapsed,this.enemyShots,this.adventure);
     const nextBoss=currentBoss(this.world);if(nextBoss?.attackStage==='warning'&&previousStage!=='warning')this.callbacks.onSound('boss-warning');
     const spawned = [];
+    const icicles = this.waves.length ? icicleTargets(this.world, this.roomState.roomId, this.elapsed) : [];
     for (const wave of this.waves) {
       // 宽屏光刃可能越过玩家周围的物理更新范围，命中不能只检查 nearby。
-      const result = stepAdventureWave(wave, this.world.enemies, platforms, STEP, this.elapsed, this.players[wave.ownerIndex ?? 0], this.enemyShots);
+      const result = stepAdventureWave(wave, this.world.enemies, platforms, STEP, this.elapsed, this.players[wave.ownerIndex ?? 0], this.enemyShots, icicles);
       if (wave.clash) {
         this.skillEffects.burst(wave.clash.x,wave.clash.y,this.elapsed,false,true);
-        this.callbacks.onSound('lightblade:clash');
+        this.callbacks.onSound(wave.clash.isIcicle ? `${attackSource(wave)}:hit` : 'lightblade:clash');
       }
       const hits = result.hits;
       const bloom = bloomAtHit(wave, hits, this.world.enemies, this.elapsed); if (bloom) this.talentEffect = bloom;
@@ -796,6 +798,7 @@ export class GardenEngine {
     return {projectiles:saveProjectiles(this.waves,this.enemyShots),combatLoot:structuredClone(this.combatLoot || newCombatLoot()),supplies:[...(this.claimedSupplies || [])],mechanisms:mechanismSave(this.world),survival:structuredClone(this.survival),checkpointId:this.checkpointId,revival:this.revival ? {...this.revival} : undefined,isCompleted:this.isCompleted,version:this.world.version,lure:this.lure,seed:this.seed,levelId:(this.stage || this.level).id,elapsed:this.elapsed,collectedIds:this.collectedIds,defeatedIds:this.defeatedIds,
       adventure: structuredClone(this.adventure), journey: structuredClone(this.journey), rooms: structuredClone(this.roomState),
       visited:[...this.visited],switches:this.world.switches.filter(s=>s.isOpen).map(s=>s.id),
+      brokenIcicles: this.world.hazards.filter(hazard => hazard.isBroken).map(hazard => hazard.id),
       enemies:this.world.enemies.map(saveEnemy),
       players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),weaponCycles:{...p.weaponCycles},weaponShots:Object.fromEntries(Object.entries(p.weaponShots || {}).map(([id,value])=>[id,Math.max(0,value-this.elapsed)]))}))};
   }
@@ -808,6 +811,10 @@ export class GardenEngine {
     this.isCompleted=!!state.isCompleted;
     this.combatLoot=structuredClone(state.combatLoot || newCombatLoot());
     this.claimedSupplies=[...(state.supplies || [])];restoreMechanisms(this.world,state.mechanisms,state.elapsed);
+    const brokenIcicles = new Set(state.brokenIcicles);
+    for (const hazard of this.world.hazards) {
+      if (hazard.kind === 'icicle') hazard.isBroken = brokenIcicles.has(hazard.id);
+    }
     for(const id of this.claimedSupplies)if(this.supplyViews?.has(id))this.supplyViews.get(id).visible=false;
     Object.assign(this,restoreProjectiles(state.projectiles));
     this.enemyShots=this.shots;delete this.shots;
@@ -876,7 +883,22 @@ export class GardenEngine {
       for (const mesh of this.backdrops) mesh.visible = !isInCave;
       for (const p of this.platforms) {const view=this.platformViews.get(p.id);view.position.set(p.x,p.y,0);view.rotation.z=Math.atan(p.slope || 0);if(p.collapseAt!==undefined&&this.elapsed<p.collapseAt)view.position.y+=Math.sin(this.elapsed*40)*.04;view.visible=!!p.isCave===isInCave && p.caveId===caveId && p.isEnabled!==false && Math.abs(p.x-this.cameraX)<this.camera.right+p.width/2+12 && Math.abs(p.y-this.cameraY)<this.camera.top+12;}
       this.traversalViews?.update(this.roomState.roomId, this.players[0], this.cameraX, this.cameraY, this.camera);
-      for(const h of this.world.hazards || []){const view=this.hazardViews.get(h.id),state=hazardState(h,this.elapsed);view.group.visible=Math.abs(h.x-this.cameraX)<this.camera.right+6;if(h.kind==='block')continue;if(h.kind==='pendulum')view.group.rotation.z=state.angle;else if(h.kind==='icicle'){view.group.visible&&=state.isWarning||state.isActive;view.group.position.y=state.y;view.mesh.scale.y=1.7;view.mesh.position.y=.85;}else{view.mesh.scale.y=(h.kind==='thorns'?1.35:2.8)*(state.isActive?1:state.isWarning?.45:.12);view.mesh.position.y=view.mesh.scale.y/2;view.mesh.material.opacity=state.isActive?1:.5;}view.mesh.material.color.set(state.isWarning?'#ffd367':'#ffffff');}
+      for (const hazard of this.world.hazards) {
+        const { group, mesh } = this.hazardViews.get(hazard.id);
+        group.visible = !hazard.isBroken && Math.abs(hazard.x - this.cameraX) < this.camera.right + 6;
+        if (!group.visible || hazard.kind === 'block') continue;
+        const state = hazardState(hazard, this.elapsed);
+        if (hazard.kind === 'pendulum') group.rotation.z = state.angle;
+        else if (hazard.kind === 'icicle') {
+          group.visible = state.isWarning || state.isActive;
+          group.position.y = state.y;
+        } else {
+          mesh.scale.y = (hazard.kind === 'thorns' ? 1.35 : 2.8) * (state.isActive ? 1 : state.isWarning ? .45 : .12);
+          mesh.position.y = mesh.scale.y / 2;
+          mesh.material.opacity = state.isActive ? 1 : .5;
+        }
+        mesh.material.color.set(state.isWarning ? '#ffd367' : '#ffffff');
+      }
       for (const sw of this.world.switches) this.switchViews.get(sw.id).material.color.set(sw.isOpen ? '#b6f4a2' : '#ffffff');
       this.skillEffects.update(this.waves,this.players,this.elapsed,this.cameraX,this.camera.right,this.adventure.loadouts.map(l => l.weapon));
       this.skillEffects.updateMagic(this.adventure.magic?.active || []);

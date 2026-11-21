@@ -1,4 +1,5 @@
 import { damageEnemy } from './combat.js';
+import { breakIcicle } from './hazards.js';
 import { findProjectileClash } from './projectile-clash.js';
 
 // 刀光跟随持刀人，方向在本刀出手时确定；不会作为弹丸向前飞。
@@ -7,7 +8,7 @@ export function placeLightblade(wave, owner) {
   wave.y = owner.y + 1.05;
 }
 
-export function stepLightblade(wave, enemies, dt, elapsed, owner, hostileShots) {
+export function stepLightblade(wave, enemies, dt, elapsed, owner, hostileShots, icicles) {
   if (owner) placeLightblade(wave, owner);
   const previous = wave.age;
   wave.age += dt;
@@ -20,6 +21,11 @@ export function stepLightblade(wave, enemies, dt, elapsed, owner, hostileShots) 
     wave.isActive = false;
     clash.shot.isActive = false;
     wave.clash = { x: clash.x, y: clash.y };
+    return [];
+  }
+  const ice = findProjectileClash(wave, icicles, halfWidth);
+  if (ice) {
+    breakIcicle(wave, ice.shot);
     return [];
   }
   const source = { x:wave.x - wave.direction * (wave.reach + .25) / 2, damage:wave.damage };
