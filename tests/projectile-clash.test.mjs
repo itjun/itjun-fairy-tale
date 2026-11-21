@@ -78,7 +78,7 @@ test('真实引擎先抵消再检查玩家受伤，暂停冻结，抵消不计�
  game.pause(true);game.tick();assert.equal(game.enemyShots[0].isActive,true);
  game.pause(false);run(game,1/120);
  assert.equal(game.enemyShots.length,0);assert.equal(game.waves.length,0);assert.equal(game.survival.hp,hp);
- assert.equal(game.defeatedIds.length,defeated);assert.equal(game.spellHits,energy);assert.ok(sounds.includes('block'));
+ assert.equal(game.defeatedIds.length,defeated);assert.equal(game.spellHits,energy);assert.ok(sounds.includes('lightblade:clash'));
 });
 
 test('真实引擎中与远程攻击重叠的敌弹仍可打伤玩家', () => {

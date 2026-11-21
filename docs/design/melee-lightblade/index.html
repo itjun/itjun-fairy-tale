@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>近战光刀与远程音效试听</title>
+<style>
+@font-face{font-family:GardenHand;src:url('../../../public/fonts/LXGWWenKai-Regular.woff2') format('woff2');font-display:swap}
+:root{color-scheme:light;--paper:#fffdf7;--canvas:#f7f3e9;--ink:#263b55;--blue:#285e91;--line:#d6d7cf;--soft:#eaf1f5;--muted:#63717a}
+*{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font-family:GardenHand,system-ui,sans-serif;font-size:17px;line-height:1.55}main{max-width:1120px;margin:auto;padding:34px 26px 48px}header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;border-bottom:2px solid var(--ink);padding-bottom:20px}h1{margin:0 0 8px;font-size:34px;line-height:1.25}h2{font-size:23px;margin:0}p{margin:0}.intro{max-width:710px}.muted{color:var(--muted)}.game-link{display:inline-block;flex-shrink:0;padding:11px 17px;color:var(--paper);background:var(--blue);border:2px solid var(--blue);border-radius:8px;text-decoration:none}.rules{display:flex;gap:8px 22px;flex-wrap:wrap;margin:18px 0;color:var(--blue)}.rules span{white-space:nowrap}.toolbar{display:flex;align-items:center;gap:18px;margin:0 0 22px;padding:12px 16px;background:var(--paper);border:1px solid var(--line);border-radius:10px}.toolbar p{flex:1;min-height:27px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}.card.featured{grid-column:1/-1;border:2px solid var(--blue);display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:20px}.identity{display:flex;gap:13px;align-items:center;min-height:72px}.identity img{width:68px;height:68px;object-fit:contain}.featured>img{width:110px;height:94px;object-fit:contain}.tag{font-size:14px;color:var(--blue)}.description{font-size:16px;min-height:49px;color:var(--muted)}.featured .description{min-height:0;margin-top:5px}.buttons{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto}button{font:inherit;font-size:16px;min-height:44px;padding:7px 12px;border:1.5px solid var(--blue);border-radius:7px;background:var(--paper);color:var(--blue);cursor:pointer}button:hover{background:var(--soft)}button:active,button[aria-pressed="true"]{background:var(--blue);color:var(--paper)}button:focus-visible,a:focus-visible{outline:3px solid #d79d35;outline-offset:4px}button:disabled{cursor:default;color:#87929a;border-color:#c7cdd0;background:transparent}.source{margin-top:24px;padding-top:17px;border-top:1px solid var(--line);font-size:15px;color:var(--muted)}.source p+p{margin-top:8px}.source strong{color:var(--ink)}.card-status{font-size:14px;min-height:22px;color:var(--blue)}.featured .actions{min-width:211px}.featured .card-status{margin-top:8px}.note{margin-top:12px;font-size:14px;color:var(--muted)}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card.featured{grid-template-columns:90px 1fr}.featured>img{width:90px}.featured .actions{grid-column:2}.featured .buttons{margin-top:0}header{flex-direction:column;gap:14px}h1{font-size:30px}}
+@media(max-width:540px){main{padding:22px 16px 32px}.grid{grid-template-columns:1fr}.card.featured{grid-template-columns:65px 1fr;gap:12px}.featured>img{width:65px;height:80px}.featured .actions{grid-column:1/-1}.toolbar{gap:12px;padding:11px}.toolbar p{font-size:15px}.rules{gap:5px 15px;font-size:16px}h1{font-size:27px}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="intro"><h1>近战光刀与远程音效</h1><p class="muted">身前挥斩，远处发射。点下面的按钮，听一听每种武器的声音。</p></div>
+    <a class="game-link" href="http://127.0.0.1:4197/" target="_blank" rel="noopener">打开游戏试用</a>
+  </header>
+  <div class="rules"><span>沿用同一个攻击键</span><span>近战与远程可同时攻击</span><span>光刀基础伤害 72</span><span>基础间隔 0.4 秒</span></div>
+  <div class="toolbar"><p id="playback" role="status" aria-live="polite">尚未播放。点击任意音效开始试听。</p><button id="stop" type="button" disabled>停止试听</button></div>
+  <section class="grid" id="weapons" aria-label="九种武器音效"></section>
+  <p class="note">每次只播放一段声音，点击其他按钮会立即停止上一段。页面不会自动播放，也不会读取或修改游戏存档。</p>
+  <footer class="source">
+    <p><strong>光刀声音来源：</strong>命中与击破直接使用已验证的《忍者龙剑传 III》原版敌人击破样本（Tecmo，1991，声音命令 0x2D）。出招声是同底样前 95 毫秒加淡出的衍生短音，<strong>不是原游戏挥刀声</strong>。</p>
+    <p><strong>八种远程武器：</strong>命中与击破是独立制作的红白机风格短音，以不同音高、节奏和噪声尾音区分；不是从原游戏提取的录音。发射声保留现有设计。</p>
+    <p>此页可离线试听本地资源；“打开游戏试用”需要本机游戏服务正在运行。</p>
+  </footer>
+</main>
+<script>
+const entries=[
+  {id:'lightblade',name:'近战光刀',image:'weapon-lightblade',tag:'新增近战',description:'只挥向身前短距离，光刀不飞出去。近处打击使用原版“砰”声，能与已获得的远程武器一起攻击。'},
+  {id:'blade',name:'贯穿光刃',image:'light-wave',tag:'远程光束',description:'亮斩下落，四阶脉冲短音。'},
+  {id:'moonblade',name:'圆月弯刀',image:'weapon-moonblade',tag:'追踪月牙',description:'窄脉冲先上挑，再折返落下。'},
+  {id:'bubble',name:'魔法泡泡',image:'magic-bubble',tag:'爆开攻击',description:'圆润降调，最后低音爆开。'},
+  {id:'stars',name:'彩虹星雨',image:'collectible-star',tag:'星星弹道',description:'高音五点星响，清脆而短促。'},
+  {id:'flame',name:'彩笔火龙',image:'weapon-flame',tag:'火焰攻击',description:'粗颗粒噪声，两段火焰噼啪。'},
+  {id:'boomerang',name:'回旋星镖',image:'weapon-boomerang',tag:'旋转星镖',description:'先低后高，双向回旋滑音。'},
+  {id:'seed',name:'花种弹',image:'weapon-seed',tag:'开花攻击',description:'低沉厚响，像花种落地爆开。'},
+  {id:'firefly',name:'萤火法杖',image:'weapon-firefly',tag:'萤光追踪',description:'轻亮上行，短短的电子铃音。'}
+];
+const labels={fire:'出招',hit:'命中',defeat:'击破'};
+const grid=document.getElementById('weapons'),status=document.getElementById('playback'),stopButton=document.getElementById('stop');
+for(const item of entries){
+  const card=document.createElement('article');card.className=`card${item.id==='lightblade'?' featured':''}`;
+  const image=`<img src="../../../public/assets/${item.image}.png" alt="${item.name}" width="68" height="68">`;
+  const title=`<div><p class="tag">${item.tag}</p><h2>${item.name}</h2></div>`;
+  const buttons=Object.entries(labels).map(([event,label])=>`<button type="button" data-weapon="${item.id}" data-event="${event}" aria-label="试听${item.name}${label}音效" aria-pressed="false">${label}</button>`).join('');
+  const actions=`<div class="actions"><div class="buttons">${buttons}</div><p class="card-status" id="status-${item.id}">等待试听</p></div>`;
+  card.innerHTML=item.id==='lightblade'?`${image}<div>${title}<p class="description">${item.description}</p></div>${actions}`:`<div class="identity">${image}${title}</div><p class="description">${item.description}</p>${actions}`;
+  grid.append(card);
+}
+let current=null,activeButton=null,activeStatus=null;
+function stopPlayback(message='已停止试听。'){
+  if(current){current.pause();current.onended=null;current.onerror=null;current.removeAttribute('src');current.load();current=null;}
+  if(activeButton)activeButton.setAttribute('aria-pressed','false');
+  if(activeStatus)activeStatus.textContent='已停止';
+  activeButton=null;activeStatus=null;stopButton.disabled=true;status.textContent=message;
+}
+grid.addEventListener('click',async event=>{
+  const button=event.target.closest('button[data-weapon]');if(!button)return;
+  stopPlayback();
+  const item=entries.find(entry=>entry.id===button.dataset.weapon),kind=button.dataset.event,label=`${item.name} ${labels[kind]}`;
+  const sound=new Audio(`../../../public/audio/combat/${item.id}-${kind}-0.wav`);sound.volume=.55;
+  current=sound;activeButton=button;activeStatus=document.getElementById(`status-${item.id}`);button.setAttribute('aria-pressed','true');stopButton.disabled=false;
+  status.textContent=`正在播放：${label}`;activeStatus.textContent=`正在播放${labels[kind]}音效`;
+  function finish(isError){
+    if(current!==sound)return;
+    status.textContent=isError?`无法播放：${label}。请确认本地音频文件可读取。`:`试听完成：${label}`;
+    activeStatus.textContent=isError?'音频读取失败，可重新点击':'试听完成';
+    button.setAttribute('aria-pressed','false');current=null;activeButton=null;activeStatus=null;stopButton.disabled=true;
+  }
+  sound.onended=()=>finish(false);sound.onerror=()=>finish(true);
+  try{await sound.play();}catch{finish(true);}
+});
+stopButton.addEventListener('click',()=>stopPlayback());
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&current)stopPlayback('已离开页面，试听暂停。');});
+window.addEventListener('pagehide',()=>stopPlayback());
+</script>
+</body>
+</html>

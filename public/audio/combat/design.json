@@ -1,0 +1,610 @@
+{
+  "ranged": {
+    "origin": "Original deterministic 8-bit synthesis; not recordings from Ninja Gaiden or other games.",
+    "profiles": {
+      "blade": {
+        "notes": [
+          1320,
+          880,
+          440,
+          220
+        ],
+        "step": 0.02,
+        "duty": 0.5,
+        "noise": 0.18,
+        "label": "亮斩下落，四阶脉冲"
+      },
+      "moonblade": {
+        "notes": [
+          540,
+          810,
+          1080,
+          720,
+          360
+        ],
+        "step": 0.017,
+        "duty": 0.125,
+        "noise": 0.1,
+        "label": "弧形上挑再落下，窄脉冲"
+      },
+      "bubble": {
+        "notes": [
+          720,
+          420,
+          220,
+          110,
+          70
+        ],
+        "step": 0.022,
+        "duty": 0.5,
+        "noise": 0.2,
+        "triangle": true,
+        "label": "圆润降调气泡，低音爆开"
+      },
+      "stars": {
+        "notes": [
+          1568,
+          2093,
+          1568,
+          1046,
+          784
+        ],
+        "step": 0.014,
+        "duty": 0.25,
+        "noise": 0.06,
+        "label": "高音五点星响"
+      },
+      "flame": {
+        "notes": [
+          170,
+          145,
+          120,
+          95,
+          75,
+          60
+        ],
+        "step": 0.018,
+        "duty": 0.25,
+        "noise": 0.82,
+        "label": "粗颗粒火焰噼啪"
+      },
+      "boomerang": {
+        "notes": [
+          660,
+          440,
+          330,
+          440,
+          660,
+          880
+        ],
+        "step": 0.015,
+        "duty": 0.125,
+        "noise": 0.12,
+        "label": "回旋双向滑音"
+      },
+      "seed": {
+        "notes": [
+          240,
+          120,
+          80,
+          60,
+          45
+        ],
+        "step": 0.028,
+        "duty": 0.5,
+        "noise": 0.48,
+        "triangle": true,
+        "label": "低沉落地爆种"
+      },
+      "firefly": {
+        "notes": [
+          1175,
+          1568,
+          2349,
+          1760
+        ],
+        "step": 0.018,
+        "duty": 0.125,
+        "noise": 0.03,
+        "label": "轻亮上行电子铃音"
+      }
+    }
+  },
+  "lightblade": {
+    "source": "source/ng3-enemy-break.wav",
+    "source_sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3",
+    "hit_and_defeat": "Unmodified verified Ninja Gaiden III enemy-break sample (sound command 0x2D). All variants intentionally identical.",
+    "fire": "First 95 ms of the same enemy-break sample with short fades and normalization. Derived cue, NOT original swing command 0x06.",
+    "source_page": "https://nesninja.com/game/nes/ninja-gaiden-iii-the-ancient-ship-of-doom/music",
+    "copyright_in_source": "1991 Tecmo, Ltd.",
+    "original_validation": "Game emulation linked enemy defeats and score increases to 0x2D; NSFE zero-based track 67 maps to 0x2D. See source/source.json."
+  },
+  "files": {
+    "blade-fire-0": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 3842,
+      "sha256": "ae1de321314a6ed4505d3891c00bbe2165d005ec149669a32b1e4f077d3ff81c"
+    },
+    "blade-fire-1": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 3760,
+      "sha256": "a919eef53a13a76034ccc2f8dc97d42a7d2c1809ee35e6c27ea1545568a13d0a"
+    },
+    "blade-fire-2": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 3897,
+      "sha256": "9afbf5722084c11abbe76d2f8c27fd709c317986fa5022636a1a06a8247841e9"
+    },
+    "blade-hit-0": {
+      "seconds": 0.0980045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "60d2955a9ac77af1e477778ca305f98e9ac6b99cd039af899f23569990b3eabd"
+    },
+    "blade-hit-1": {
+      "seconds": 0.0980045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "3e34793bb7ea95b99991a20235eaade4c72da91ef4446ae311e4040ec4c0d67e"
+    },
+    "blade-hit-2": {
+      "seconds": 0.0980045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "107498aa177283dd6e0db10e1fffad90f2a26fdc3c8fdc245a7cea9cf8acf524"
+    },
+    "blade-defeat-0": {
+      "seconds": 0.12997732426303854,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "dbaea6f8ea88d3fbf4fc5716713821e1185e520e26a6a4f5a052be5e626661ae"
+    },
+    "blade-defeat-1": {
+      "seconds": 0.12997732426303854,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "a3874d911a7c3fe47625c279835bc5bd0f1cc4377e243e84d9b25763bc0b4021"
+    },
+    "blade-defeat-2": {
+      "seconds": 0.12997732426303854,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "342f8f446649cad237872ebcc2454a1adcaaccb279b55f3c904cd8feaa950991"
+    },
+    "moonblade-fire-0": {
+      "seconds": 0.1,
+      "sample_rate": 22050,
+      "peak": 3777,
+      "sha256": "ead8a961d584d85a80ca3f8112db4e9a062476be814e96cf5ce0fd1ed4026cac"
+    },
+    "moonblade-fire-1": {
+      "seconds": 0.1,
+      "sample_rate": 22050,
+      "peak": 3535,
+      "sha256": "b269e7cec12833cb13bd069e52ba66d47bd8e769ac79a12df324f2a26f297def"
+    },
+    "moonblade-fire-2": {
+      "seconds": 0.1,
+      "sample_rate": 22050,
+      "peak": 3718,
+      "sha256": "4b46a0bdb1d87f4e002aea4f63d16d7cb4637383f02ca459678065cc5912eb67"
+    },
+    "moonblade-hit-0": {
+      "seconds": 0.10299319727891157,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "7f281fc0f9c3c7cfd0847fc27bea057cd41a4512298442ba884911b9cf83640f"
+    },
+    "moonblade-hit-1": {
+      "seconds": 0.10299319727891157,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "97420d70d69bbeb9b99abd19739a5e1559d347350d958db06f68f26982cd3fd7"
+    },
+    "moonblade-hit-2": {
+      "seconds": 0.10299319727891157,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "ced34cab417bea1b2319620c24b44711f4e795c5e52141c454ef8a721322eeb2"
+    },
+    "moonblade-defeat-0": {
+      "seconds": 0.1350113378684807,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "5db7774f732dc3238745b48288a760c918bac3602f177d60209364fb3b38806c"
+    },
+    "moonblade-defeat-1": {
+      "seconds": 0.1350113378684807,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "bde4d9d44e724f98e3be1e916153bf8bf7ab5ac7edf5e00ba1db38f320c40f3b"
+    },
+    "moonblade-defeat-2": {
+      "seconds": 0.1350113378684807,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "0671747fc652e181acdc569b4b4a238102477a5039fbd4194f880390815097ff"
+    },
+    "bubble-fire-0": {
+      "seconds": 0.14,
+      "sample_rate": 22050,
+      "peak": 8120,
+      "sha256": "96412ca5822b815e558811ab75a3f1f4be2c4d0b8d03b343c844435c7d0368e8"
+    },
+    "bubble-fire-1": {
+      "seconds": 0.14,
+      "sample_rate": 22050,
+      "peak": 8498,
+      "sha256": "f4952714ded3f771426413b29bd239e81323219fa6f082eb284afd97eed15365"
+    },
+    "bubble-fire-2": {
+      "seconds": 0.14,
+      "sample_rate": 22050,
+      "peak": 8245,
+      "sha256": "3083382b897881697cc3262280b01e087fb13ce5be2dd594abe0f8abd63da275"
+    },
+    "bubble-hit-0": {
+      "seconds": 0.12798185941043083,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "3ef3b2c1500986f8790493728249a3159ff124d0dc21107bb92da61fb7e9391b"
+    },
+    "bubble-hit-1": {
+      "seconds": 0.12798185941043083,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "991b6bacc5adde022d82b72f2e26e219e3b6f61594971eabe1e9a3105be64f38"
+    },
+    "bubble-hit-2": {
+      "seconds": 0.12798185941043083,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "4677df7681c4d102949b57ebc215c2949b324e9812fe81f5a4e05933a334a521"
+    },
+    "bubble-defeat-0": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "79f06cf5ca4082e888dc794991120ab2fb01e8ee0d62ec52dbf0c1fc0c914677"
+    },
+    "bubble-defeat-1": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "2024eb7ea3d0b3c94b0dc946143183b6183bb286485ae335c673bee88474b7f6"
+    },
+    "bubble-defeat-2": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "0d02ae6f279bb4f03390b8fdf632da06e506d7f104e6d8a40c4e1921b52c662a"
+    },
+    "stars-fire-0": {
+      "seconds": 0.08,
+      "sample_rate": 22050,
+      "peak": 7014,
+      "sha256": "6b3a98221706e1a68211cd47c46f8317f63544df8af021e98ff553427e9985a9"
+    },
+    "stars-fire-1": {
+      "seconds": 0.08,
+      "sample_rate": 22050,
+      "peak": 6936,
+      "sha256": "74da38cb7ac62392806aa0f1f1ec06308be1be6197f80ff2649269cae1eb42e2"
+    },
+    "stars-fire-2": {
+      "seconds": 0.08,
+      "sample_rate": 22050,
+      "peak": 6857,
+      "sha256": "3fb89755b23fe05d0c4b35e94f0ddd61db1fe27c5a3424182361454c920af573"
+    },
+    "stars-hit-0": {
+      "seconds": 0.08798185941043084,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "df5c74a1dbee24917c59ddc0b11cecd7288ea5c78703f70e4d6bcee5dbb2ab34"
+    },
+    "stars-hit-1": {
+      "seconds": 0.08798185941043084,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "737b612a2b6566800afa059063c2730c20e5ded73ff1a7a93615703dcba69774"
+    },
+    "stars-hit-2": {
+      "seconds": 0.08798185941043084,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "8698a66f5178732b86581cfe0dbe15d27b3b1e8c3d7b964ef63e9e6411b66822"
+    },
+    "stars-defeat-0": {
+      "seconds": 0.12,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "954cb90eb2f30d91c38fcf9d474b3afcef1e614ceacda4a674395237e0edff9e"
+    },
+    "stars-defeat-1": {
+      "seconds": 0.12,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "438c8c36293a44ed33c98210b60de78ab223211c4a7e21ed9e362c9b5e2342e4"
+    },
+    "stars-defeat-2": {
+      "seconds": 0.12,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "2a838d3a357c7c2517a4a7fdd953b3ba54f0ce0d29a7b58929f3ce1b365ea5dc"
+    },
+    "flame-fire-0": {
+      "seconds": 0.14997732426303856,
+      "sample_rate": 22050,
+      "peak": 8787,
+      "sha256": "0cb652ba471c60ff6a10f995f1a5f2da30c6d6056cb50c5c9650067d5a469eb5"
+    },
+    "flame-fire-1": {
+      "seconds": 0.14997732426303856,
+      "sample_rate": 22050,
+      "peak": 9483,
+      "sha256": "b77ab1dd842ce5d47d538a6a1ac9e39c94c1b5da9dcb215c728592695269ca2c"
+    },
+    "flame-fire-2": {
+      "seconds": 0.14997732426303856,
+      "sample_rate": 22050,
+      "peak": 7598,
+      "sha256": "7d1518d32d3e5ed59dfb69eb43b9d5790fc334fbd127b36de6a8d906740f6fb7"
+    },
+    "flame-hit-0": {
+      "seconds": 0.12598639455782312,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "d19fbe81b7c24a14a2d267b4b5fb73c3af45d88efb68a30d70e699dc7dd95709"
+    },
+    "flame-hit-1": {
+      "seconds": 0.12598639455782312,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "54e5b534d38a3c8e97f74d7f32d1094bbfbe50fbfc88ffbd519f5aa9e58e1227"
+    },
+    "flame-hit-2": {
+      "seconds": 0.12598639455782312,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "2dda951607c17ac296fbb5a0c4a20a9d0937d9f362960880b16e8b18f096c65e"
+    },
+    "flame-defeat-0": {
+      "seconds": 0.1580045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "fe1de702a515f6cb0268e626e50524c51988aa79efea3b2c06ef8019182ea6a7"
+    },
+    "flame-defeat-1": {
+      "seconds": 0.1580045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "cea84326d9bcbadd0c7f0e9f6a92a2a80e566ea5b9d1ca191fa33a08e9e7b69e"
+    },
+    "flame-defeat-2": {
+      "seconds": 0.1580045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "05a61e6bd7e5a0c5c6251e7cb25e2383bf86d8e4f7c54f87d729d280a6d2e42a"
+    },
+    "boomerang-fire-0": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 4061,
+      "sha256": "7756a97aef81fd6d5438b7cb341a4206f2213ec6b8df1b51bfe0cd120c74a044"
+    },
+    "boomerang-fire-1": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 3563,
+      "sha256": "37e9404f78e7de9c365b8cf593e8e1b728564d390bc886470959a0bbcacca7a7"
+    },
+    "boomerang-fire-2": {
+      "seconds": 0.16,
+      "sample_rate": 22050,
+      "peak": 3651,
+      "sha256": "aca7dc459973625a9d6335b7af389847b38243371dfb9300bbba5ecae377444f"
+    },
+    "boomerang-hit-0": {
+      "seconds": 0.10798185941043084,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "cd52da8c5ac087c4df862bdb2fdbfcb015b41b26987479d788b460b760d6d883"
+    },
+    "boomerang-hit-1": {
+      "seconds": 0.10798185941043084,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "f5f68a47f252e73e658ba977c7fd1e7ce6993d2dc37c9f59d64530ae03ac5db4"
+    },
+    "boomerang-hit-2": {
+      "seconds": 0.10798185941043084,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "dec53875d6ee38a1e1a3316a299a0befc3d6b69930ec42f19633388e7ff0d44e"
+    },
+    "boomerang-defeat-0": {
+      "seconds": 0.14,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "2e0cb80789a8b8310af9a8509858b68b855dededb6a40e8d39e9f337f9c60197"
+    },
+    "boomerang-defeat-1": {
+      "seconds": 0.14,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "2fc1216f40db7bb8006932dd826aa5c309c66c77ba197d4712bc1371f6e2b282"
+    },
+    "boomerang-defeat-2": {
+      "seconds": 0.14,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "d481a137155eb00d822915a6f8ef968d1d2bf578bd84d14f941652057e31241e"
+    },
+    "seed-fire-0": {
+      "seconds": 0.16997732426303855,
+      "sample_rate": 22050,
+      "peak": 8908,
+      "sha256": "d3432989bb92b9df70f6d05d2f74e0a2e1b3814e3d622e1460697e76203b6ba5"
+    },
+    "seed-fire-1": {
+      "seconds": 0.16997732426303855,
+      "sample_rate": 22050,
+      "peak": 8723,
+      "sha256": "05aeafa02faedcfbf8b3503246eca7dca7c679088c732653208e111caa261ccc"
+    },
+    "seed-fire-2": {
+      "seconds": 0.16997732426303855,
+      "sample_rate": 22050,
+      "peak": 8736,
+      "sha256": "e4a53a6ef9b9dd60ea344bf04204c7e93686f87fa232cdffc30f4cb547ab73cf"
+    },
+    "seed-hit-0": {
+      "seconds": 0.1580045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "78670da041fcc327a4b86018a99ff1802d6ef956b548bf99805ccd2c82c02f3a"
+    },
+    "seed-hit-1": {
+      "seconds": 0.1580045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "f2b29f5d1a6fe1bcb6990acfeecf174b0fdeb3e07bfb800b6008e9f2784c5786"
+    },
+    "seed-hit-2": {
+      "seconds": 0.1580045351473923,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "d8c4f232874f9864ce479904eeef8b395d9ec9949101cf287338def8fa1b8b1b"
+    },
+    "seed-defeat-0": {
+      "seconds": 0.19002267573696144,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "0b5768bec916867acb17f78544b3701cf5bd349b11701b8d6f4ae6f917251df6"
+    },
+    "seed-defeat-1": {
+      "seconds": 0.19002267573696144,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "d32e6d5e40a530149f9b1e85425615a972485f011dd983185aa9b53aba51ca62"
+    },
+    "seed-defeat-2": {
+      "seconds": 0.19002267573696144,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "049b6ab8fe5156bbd88a676fbecd3af93db00f8bfcb234a3db38ff5647eb3f28"
+    },
+    "firefly-fire-0": {
+      "seconds": 0.08,
+      "sample_rate": 22050,
+      "peak": 8070,
+      "sha256": "e5a3b46c13fbad8de16b8c2e09cdd437bf7874655552dc7a42c4397abdf731e0"
+    },
+    "firefly-fire-1": {
+      "seconds": 0.08,
+      "sample_rate": 22050,
+      "peak": 8060,
+      "sha256": "532ca30a2dda3f2c85448eec3048bc67fc20c7405634b263727f219cb6fc0609"
+    },
+    "firefly-fire-2": {
+      "seconds": 0.08,
+      "sample_rate": 22050,
+      "peak": 7930,
+      "sha256": "b98919d9814ff2a6ad85fa1cbd4f61954cec5b8f749dad8d6414467d5fe1c39c"
+    },
+    "firefly-hit-0": {
+      "seconds": 0.08997732426303855,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "6364240f4259b9e5d088d4f06f1209043fceee3068c85d2ab44fac5363b0b64b"
+    },
+    "firefly-hit-1": {
+      "seconds": 0.08997732426303855,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "adee9acc2977ccc91b7f8376d04ac1bc4d2fd8c92cc19e79b8c49351872b42d4"
+    },
+    "firefly-hit-2": {
+      "seconds": 0.08997732426303855,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "fac567db7f4f2358d758526d65c39e1911d7b2d69db158055232452c80886269"
+    },
+    "firefly-defeat-0": {
+      "seconds": 0.1219954648526077,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "a13af88a77a73401158831714b9c639d13b4c1b6c7e3eb1df17bea593c73d40f"
+    },
+    "firefly-defeat-1": {
+      "seconds": 0.1219954648526077,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "7762ac518b5cf68e5dc2a49401e824e93bfa3473bfd7ac70d4e94c1543777fc7"
+    },
+    "firefly-defeat-2": {
+      "seconds": 0.1219954648526077,
+      "sample_rate": 22050,
+      "peak": 21299,
+      "sha256": "ac25f702a675fe05e847d52149445b878010520702056f93dd756c0fa552f8ed"
+    },
+    "lightblade-fire-0": {
+      "seconds": 0.09501133786848072,
+      "sample_rate": 44100,
+      "peak": 15728,
+      "sha256": "e7459650fb4c60a98c470701d2f17f2b0c8da80dbba5afbceef2faff36e11905"
+    },
+    "lightblade-fire-1": {
+      "seconds": 0.09501133786848072,
+      "sample_rate": 44100,
+      "peak": 15728,
+      "sha256": "e7459650fb4c60a98c470701d2f17f2b0c8da80dbba5afbceef2faff36e11905"
+    },
+    "lightblade-fire-2": {
+      "seconds": 0.09501133786848072,
+      "sample_rate": 44100,
+      "peak": 15728,
+      "sha256": "e7459650fb4c60a98c470701d2f17f2b0c8da80dbba5afbceef2faff36e11905"
+    },
+    "lightblade-hit-0": {
+      "seconds": 0.43240362811791383,
+      "sample_rate": 44100,
+      "peak": 15930,
+      "sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3"
+    },
+    "lightblade-hit-1": {
+      "seconds": 0.43240362811791383,
+      "sample_rate": 44100,
+      "peak": 15930,
+      "sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3"
+    },
+    "lightblade-hit-2": {
+      "seconds": 0.43240362811791383,
+      "sample_rate": 44100,
+      "peak": 15930,
+      "sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3"
+    },
+    "lightblade-defeat-0": {
+      "seconds": 0.43240362811791383,
+      "sample_rate": 44100,
+      "peak": 15930,
+      "sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3"
+    },
+    "lightblade-defeat-1": {
+      "seconds": 0.43240362811791383,
+      "sample_rate": 44100,
+      "peak": 15930,
+      "sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3"
+    },
+    "lightblade-defeat-2": {
+      "seconds": 0.43240362811791383,
+      "sample_rate": 44100,
+      "peak": 15930,
+      "sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3"
+    }
+  }
+}

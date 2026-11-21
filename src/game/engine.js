@@ -598,7 +598,7 @@ export class GardenEngine {
       const result = stepAdventureWave(wave, this.world.enemies, platforms, STEP, this.elapsed, this.players[wave.ownerIndex ?? 0], this.enemyShots);
       if (wave.clash) {
         this.skillEffects.burst(wave.clash.x,wave.clash.y,this.elapsed,false,true);
-        this.callbacks.onSound(`${attackSource(wave)}:hit`); this.callbacks.onSound('block');
+        this.callbacks.onSound('lightblade:clash');
       }
       const hits = result.hits;
       const bloom = bloomAtHit(wave, hits, this.world.enemies, this.elapsed); if (bloom) this.talentEffect = bloom;
@@ -747,8 +747,8 @@ export class GardenEngine {
       const frost = setLevel(this.adventure, 'frost');
       if (frost && !hit.enemy.isBoss) hit.enemy.slowUntil = Math.max(hit.enemy.slowUntil || 0, this.elapsed + frost);
     }
-    if(hit.damage)this.callbacks.onSound(`${hit.source || 'blade'}:${hit.isDefeated?'defeat':'hit'}`);
-    else if(hit.blocked)this.callbacks.onSound('block');
+    if(hit.damage || WEAPONS[hit.source])this.callbacks.onSound(`${hit.source || 'blade'}:${hit.isDefeated?'defeat':'hit'}`);
+    if(hit.blocked)this.callbacks.onSound('block');
     if(hit.damage || hit.blocked) {
       const recent=this.damageNumbers.find(item=>item.enemyId===hit.enemy.id&&item.damage===hit.damage&&item.blocked===hit.blocked&&this.elapsed-item.at<.2);
       if(recent)recent.count++;
@@ -777,7 +777,8 @@ export class GardenEngine {
     this.players.forEach((p, index) => { if (upgradePower(this.adventure, index).haste) p.hasteUntil = this.elapsed + 2 + upgradePower(this.adventure,index).haste; });
     const points=enemy.points+(enemy.drop?COLLECTIBLES[enemy.drop].points:0);
     this.pickups.push({id:`enemy-${enemy.id}`,kind:enemy.drop,points,x:enemy.x,y:enemy.y+2,at:this.elapsed});
-    this.callbacks.onSound(enemy.isBoss?'boss-defeat':'flower'); this.publish(enemy.isBoss ? `${enemy.name}挑战成功！去出口领奖励。` : `打败小怪，+${points} 分！${this.comboNotice || this.recoveryNotice || ''}`); this.recoveryNotice = ''; this.comboNotice = '';
+    if(enemy.isBoss)this.callbacks.onSound('boss-defeat');
+    this.publish(enemy.isBoss ? `${enemy.name}挑战成功！去出口领奖励。` : `打败小怪，+${points} 分！${this.comboNotice || this.recoveryNotice || ''}`); this.recoveryNotice = ''; this.comboNotice = '';
   }
   selectReward(index, expectedId, expectedPlayer) {
     if (this.survival?.phase && this.survival.phase !== 'alive' || !this.isPaused || this.journey.pending?.id !== expectedId || this.journey.pending?.player !== expectedPlayer) return false;

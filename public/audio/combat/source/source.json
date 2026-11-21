@@ -1,0 +1,21 @@
+{
+  "source_page": "https://nesninja.com/game/nes/ninja-gaiden-iii-the-ancient-ship-of-doom/music",
+  "source_data_url": "https://nesninja.com/public/NSFe/Ninja%20Gaiden%20III%20-%20The%20Ancient%20Ship%20of%20Doom.nsfe",
+  "copyright_in_source": "1991 Tecmo, Ltd.",
+  "nsfe_sha256": "4b26d5005e225a3ac0e87aac23af4ce9cbac8e302a3007a88f0f77719b6f598e",
+  "nsfe_zero_based_track": 67,
+  "game_sound_command": "0x2D",
+  "game_sound_write_address": "0x0700",
+  "render_engine": "Game_Music_Emu 0.6.5, accurate mode, 44100 Hz",
+  "processing": "stereo averaged to mono; trim leading/trailing silence with 5ms/20ms padding; no pitch change or synthesized replacement",
+  "validation": "Original game emulation: attack alone writes 0x06; enemy defeats at frames 972 and 1098 write 0x2D and increase score 0→100→200. NSFE init lookup maps track 67 to sound command 0x2D, bank 2.",
+  "game_probe_sha256": "49846b57fee22ae0e3ad86db5b9220f5f78b94317316135cbd71f12de4fb6458",
+  "sample_sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3",
+  "format": {
+    "sample_rate": 44100,
+    "channels": 1,
+    "sample_width": 2,
+    "duration": 0.43240362811791383
+  },
+  "scope": "2026-11-17 user-authorized game integration: lightblade impact/defeat uses this exact sample; short fire cue is derived. Original game and NSFE files are not included."
+}
