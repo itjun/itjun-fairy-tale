@@ -12,10 +12,11 @@ import './rooms.css';
 const KIND_MARKS = { intro: '起', battle: '战', mechanism: '机', puzzle: '宝', shop: '店', elite: '精', boss: '王' };
 
 function roomLine(rooms) {
+  if (rooms.isClimbing || rooms.canDescend || rooms.isDroppingFromGrip || rooms.areaId) return rooms.traversalHint;
   if (rooms.isCleared) return rooms.kind === 'boss' ? '打赢了，往右走到终点' : rooms.kind === 'shop' ? '买完就跳到发光的门上' : '门亮了，跳过去';
   if (['battle', 'elite'].includes(rooms.kind)) return `第 ${rooms.wave} / ${rooms.waves} 波，还剩 ${rooms.left} 只`;
   if (rooms.puzzle) return rooms.puzzle.hint;
-  return ROOM_KINDS[rooms.kind].hint;
+  return rooms.traversalHint || ROOM_KINDS[rooms.kind].hint;
 }
 
 // 第 9 版游玩中的界面：左上命和血，中间这一章的房间，右上碎片和连击，右下三个键。
@@ -26,7 +27,7 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
   const talent = person.name === '爸爸' ? (survival.shieldRemaining > 0 ? `护盾 ${Math.ceil(survival.shieldRemaining)} 秒后好` : '护盾准备好了') : ['妈妈', '姐姐'].includes(person.name) ? `${person.talent} ${survival.attacks || 0}/4` : '';
   const line = roomLine(rooms);
   return <div className="room-hud" inert={!isPlaying}>
-    <div key={rooms.roomId} className="room-fade" aria-hidden="true" />
+    <div key={rooms.areaId || rooms.roomId} className="room-fade" aria-hidden="true" />
     <aside className="room-hud-life" aria-label="玩家血量与命数">
       <img src={`./assets/${person.image}.png`} alt={person.name} />
       <div>
@@ -61,7 +62,7 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
       {spells.length > 0 && <span className={isSpellReady ? 'is-ready' : ''}>{isGamepad ? <PadKey name="Y" /> : <kbd>K</kbd>}{spells.map(id => <i key={id}><img src={`./assets/${SPELLS[id].image}.png`} alt={SPELLS[id].name} /><progress aria-label={`${SPELLS[id].name}能量`} value={magic.active.some(effect => effect.id === id) ? 0 : magic.charges[id] || 0} max={SPELLS[id].charge} /></i>)}{isSpellReady && <em>可以放了</em>}</span>}
     </aside>
     {isPlaying && <div className="touch-controls room-touch" aria-label="触屏操作">
-      <div><button aria-label="向左走" {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label="向右走" {...touchProps('right')}><ArrowRight size={30} /></button><button aria-label="向下跳台" {...touchProps('drop')}><ArrowDown size={27} /></button></div>
+      <div><button aria-label="向左走" {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label="向右走" {...touchProps('right')}><ArrowRight size={30} /></button>{(rooms.isClimbing || rooms.isDroppingFromGrip) && <button aria-label={rooms.isClimbing ? '往上爬' : '抓住岩壁'} {...touchProps('up')}><ArrowUp size={27} /></button>}<button aria-label={rooms.isClimbing || rooms.canDescend ? '往下爬' : '向下跳台'} {...touchProps('drop')}><ArrowDown size={27} /></button></div>
       <div>{rooms.prompt && <button aria-label={rooms.prompt} {...touchProps('enter')}>进</button>}{spells.length > 0 && <button aria-label="放大招" className={isSpellReady ? 'is-ready' : ''} {...touchProps('spell')}>招</button>}<button aria-label="攻击" {...touchProps('attack')}>打</button><button className="touch-jump" aria-label="跳跃" {...touchProps('jump')}><ArrowUp size={29} /><span>跳</span></button></div>
     </div>}
   </div>;

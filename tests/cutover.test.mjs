@@ -43,8 +43,8 @@ test('成绩服务不再收旧版地图的新成绩，也不收旧的小关编�
     const { run } = roomFixture();
     for (const version of [1, 8, 9, 10]) assert.throws(() => store.save({ ...run, generationVersion: version }), /这一版地图已经停用/);
     assert.throws(() => store.save(retired), /这一版地图已经停用/);
-    assert.throws(() => store.save({ ...run, levelId: 'rainbow-1' }), /新地图只有八个世界关/);
-    assert.throws(() => store.save({ ...run, levelId: 'rainbow' }), /新地图只有八个世界关/);
+    assert.throws(() => store.save({ ...run, levelId: 'rainbow-1' }), /新地图需要选择世界关/);
+    assert.throws(() => store.save({ ...run, levelId: 'rainbow' }), /新地图需要选择世界关/);
     assert.equal(store.report(range).summary.sessions, 0);
     assert.equal(store.save(run).generationVersion, 11);
     assert.equal(store.report(range).summary.sessions, 1);

@@ -20,7 +20,9 @@ import { MONSTERS, WEAPONS } from '../../shared/adventure-catalog.js';
 import { newAdventure, newJourney, upgradePower, activeWeapons, weaponRank, weaponShotCount, migrateAdventure, tickEffects, chooseReward, recycleReward } from './adventure.js';
 import { fireAdventureWeapon, fireLoadout, stepAdventureWave, areaAttack, attackSource } from './adventure-combat.js';
 import { stepAdventureEnemies, releaseCandyChildren } from './adventure-enemies.js';
-import { createPlayer, stepPlayer, rescue, revivalPoint } from './physics.js';
+import { createPlayer, rescue, revivalPoint } from './physics.js';
+import { beginCrawl, caveForPlayer, caveMouthAt, climbEntryAt, stepTraversal } from './traversal.js';
+import { DESERT_IMAGES, TRAVERSAL_IMAGES, TraversalViews } from './traversal-view.js';
 import { campaignScore } from '../../shared/campaign.js';
 import { moveCampaignPlatforms } from './combat.js';
 import { SkillEffects } from './skill-effects.js';
@@ -100,9 +102,11 @@ export class GardenEngine {
     try {
       const loader = new THREE.TextureLoader();
       const surfaceImage = this.level.surface || 'grass-texture';
-      const landscape = ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet' }[this.level.id] || this.level.image;
+      const landscape = ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image;
+      const isDesert = this.level.id === 'desert';
+      const poseNames = Object.keys(CHARACTERS).flatMap(character => ['climb', 'crawl'].map(pose => `${character}-${pose}`));
       this.isNewLandscape = landscape === 'landscape-new-drawing';
-      const names = [...new Set([landscape, ...Object.values(CHARACTERS).flatMap(c => [c.image, c.attack]), 'flower', 'collectible-rainbow', 'light-wave', 'enemy-burst', 'treehouse-tall', 'platform-raft', 'platform-ice', 'platform-gear', 'platform-conveyor', 'island-lighthouse', 'castle-cutaway', 'street-house', 'windmill-tall', 'platform-awning', surfaceImage,
+      const names = [...new Set([landscape, ...Object.values(CHARACTERS).flatMap(c => [c.image, c.attack]), ...poseNames, ...TRAVERSAL_IMAGES, ...(isDesert ? DESERT_IMAGES : []), 'flower', 'collectible-rainbow', 'light-wave', 'enemy-burst', 'treehouse-tall', 'platform-raft', 'platform-ice', 'platform-gear', 'platform-conveyor', 'island-lighthouse', 'castle-cutaway', 'street-house', 'windmill-tall', 'platform-awning', surfaceImage,
         'lift-leaf', 'spring-flower', 'bridge-rope', 'checkpoint-flag', 'collectible-star', 'magic-bubble',
         ...LEVEL_COLLECTIBLES[this.level.id].map(id => COLLECTIBLES[id].image), 'new-drawing-tower', 'new-drawing-flowers', 'trap-pendulum', 'trap-thorns', 'trap-steam', 'terrain-blocks', 'platform-cloud', 'life-potion', 'supply-medkit', 'flame-stream', 'collectible-snowflake', 'upgrade-frost', 'upgrade-chain', 'boss-gate', 'boss-chest', 'terrain-bank', 'terrain-cookie', 'terrain-rock', ...ROOM_IMAGES, ...Object.values(MONSTERS).map(m => m.image), ...Object.values(WEAPONS).map(w => w.image), ...this.world.enemies.filter(e=>e.isBoss && e.image).map(e=>e.image), ...this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image))])];
       const textures = await Promise.all(names.map(async name => {
@@ -133,6 +137,7 @@ export class GardenEngine {
       this.platformMaterials=Object.fromEntries(['raft','ice','gear','conveyor'].map(kind=>[kind,spriteMaterial(`platform-${kind}`)]));
       for (const [kind,bounds] of Object.entries(PLATFORM_CROPS)) {const texture=this.platformMaterials[kind].map;texture.offset.y=1-bounds[1];texture.repeat.y=bounds[1]-bounds[0];}
       this.characterMaterials = Object.fromEntries(Object.entries(CHARACTERS).map(([id,c]) => [id, { standing: spriteMaterial(c.image), attack: spriteMaterial(c.attack) }]));
+      this.traversalMaterials = Object.fromEntries(poseNames.map(name => [name, spriteMaterial(name)]));
       this.flowerMaterial = spriteMaterial('flower'); this.rainbowMaterial = spriteMaterial('collectible-rainbow');
       this.liftMaterial = spriteMaterial('lift-leaf'); this.springMaterial = spriteMaterial('spring-flower');
       this.bridgeMaterial = spriteMaterial('bridge-rope'); this.flagMaterial = spriteMaterial('checkpoint-flag');
@@ -144,6 +149,8 @@ export class GardenEngine {
       this.trapMaterials = {pendulum:spriteMaterial('trap-pendulum'),thorns:spriteMaterial('trap-thorns'),steam:spriteMaterial('trap-steam'),geyser:spriteMaterial('trap-steam'),icicle:spriteMaterial('monster-icicle')};
       this.terrainMaterials = Object.fromEntries(['bank','cookie','rock','blocks'].map(kind=>[kind,spriteMaterial(`terrain-${kind}`)]));
       this.terrainMaterials.cloud = spriteMaterial('platform-cloud');
+      if (isDesert) this.terrainMaterials.sand = spriteMaterial('terrain-sand');
+      if (isDesert) this.terrainMaterials['cave-stone'] = spriteMaterial('desert-cave-ledge');
       for (const [kind,bounds] of Object.entries(TERRAIN_CROPS)) {
         const texture=this.terrainMaterials[kind].map,w=texture.image.width,h=texture.image.height;
         texture.offset.set(bounds[0]/w,1-bounds[3]/h);texture.repeat.set((bounds[2]-bounds[0])/w,(bounds[3]-bounds[1])/h);
@@ -167,12 +174,15 @@ export class GardenEngine {
       });
       this.talentView = this.sprite(this.flowerMaterial, 0, 0, 3, 3, 1); this.talentView.visible = false;
       this.buildWorld();
+      this.traversalViews = new TraversalViews(this);
       // 门牌用本地手写字体画，先等字体就绪；等不到就用系统楷体。
       try { await document.fonts.load('40px GardenHand'); } catch { /* 字体没装好不影响游玩。 */ }
       if (this.isDisposed) return;
       this.roomViews = new RoomViews(this);
       this.isReady = true; this.callbacks.onReady();
-      this.publish('清完一间房，跳到发光的门上。');
+      const room = currentRoom(this.world, this.roomState);
+      const cave = caveForPlayer(room, this.players[0]);
+      this.publish(cave?.name ? `继续探索${cave.name}` : cave ? '走到提灯下可以出洞' : room.traversal?.name ? room.traversal.hint : '清完一间房，跳到发光的门上。');
     } catch (error) {
       if (!this.isDisposed) this.callbacks.onError('彩笔素材还没准备好。请检查文件是否完整，再试一次。');
       console.error('花园素材加载失败', error);
@@ -273,8 +283,9 @@ export class GardenEngine {
     if (event.code === 'Escape' || event.code === 'KeyP') { if (!event.repeat) this.requestPause(); return; }
     if (!this.keys.has(event.code)) {
       // 站在摊位前，“上”用来买东西，不跳。门是跳上去就进。
+      const player = this.players[0];
       if (['KeyW', 'ArrowUp'].includes(event.code) && this.canInteract()) this.isInteracting = true;
-      else if (['Space', 'KeyW'].includes(event.code) || this.players.length === 1 && event.code === 'ArrowUp') this.jumps[0] = true;
+      else if (event.code === 'Space' || !player.grip && !player.launch?.isDrop && (event.code === 'KeyW' || this.players.length === 1 && event.code === 'ArrowUp')) this.jumps[0] = true;
       if (event.code === 'KeyK') this.isCasting = true;
     }
     this.keys.add(event.code);
@@ -285,7 +296,11 @@ export class GardenEngine {
     if(isPressed)this.heldKeys?.add(`touch:${action}`);
     if (isPressed && action === 'enter') { this.isInteracting = true; return; }
     if (isPressed && action === 'spell') { this.isCasting = true; return; }
-    if (isPressed) { if (['jump', 'drop'].includes(action) && !this.touch.has(action)) this.jumps[0] = true; this.touch.add(action); }
+    if (isPressed) {
+      const player = this.players[0];
+      if (!this.touch.has(action) && (action === 'jump' || action === 'drop' && !player.grip && !climbEntryAt(currentRoom(this.world, this.roomState).traversal, player))) this.jumps[0] = true;
+      this.touch.add(action);
+    }
     else this.touch.delete(action);
   }
   setGamepadInput(input) {
@@ -351,13 +366,25 @@ export class GardenEngine {
   }
   roomBounds() {
     const room = currentRoom(this.world, this.roomState);
+    const player = this.players[0];
+    const activeCave = caveForPlayer(room, player);
+    if (activeCave) return { minX: activeCave.left, maxX: activeCave.right, minY: activeCave.floorY - 4 };
+    const cave = room.traversal?.cave;
     const barrier = encounterBarrier(this.world, this.roomState, this.difficulty.isExtraWave);
     // 每间房有自己的掉落线：最低的平台再往下 6。
-    return { minX: room.left + 0.3, maxX: barrier ? barrier.x - 1 : room.right - 0.3, minY: room.fallY };
+    const bounds = { minX: room.left + 0.3, maxX: barrier ? barrier.x - 1 : room.right - 0.3, minY: room.fallY };
+    if (cave?.ridgeX !== undefined) {
+      if (player.x < cave.ridgeX) bounds.maxX = Math.min(bounds.maxX, cave.ridgeX - 1.35);
+      else bounds.minX = cave.ridgeX + 1.35;
+    }
+    for (const ridge of room.traversal?.ridges || []) {
+      if (player.x <= ridge.x + .1 && player.y < ridge.y) bounds.maxX = Math.min(bounds.maxX, ridge.x);
+    }
+    return bounds;
   }
   canInteract() {
     const player = this.players[0];
-    return !!stallAt(this.world, this.roomState, player);
+    return !!(stallAt(this.world, this.roomState, player) || caveMouthAt(currentRoom(this.world, this.roomState), player));
   }
   cameraTarget() {
     const averageX = this.players.reduce((sum, player) => sum + player.x, 0) / this.players.length;
@@ -366,9 +393,16 @@ export class GardenEngine {
     if (boss) { const arena=this.world.bossArenas[boss.arenaId]; return { x: (arena.left+arena.right)/2, y: arena.y+4.5 }; }
     // 镜头锁在当前房间里。房间比画面窄就居中，不让别的房间露出来。
     const room = currentRoom(this.world, this.roomState), min = room.left + this.camera.right - 3, max = room.right - this.camera.right + 3;
+    const cave = caveForPlayer(room, this.players[0]);
+    if (cave) {
+      const { left, right, floorY } = cave;
+      const reach = this.camera.right * .72;
+      return { x: right - left < reach * 2 ? (left + right) / 2 : Math.max(left + reach, Math.min(right - reach, averageX)), y: Math.max(floorY, averageY) + 2.3 };
+    }
     const x = min > max ? (room.left + room.right) / 2 : Math.max(min, Math.min(max, averageX + Math.min(5, this.camera.right * 0.25)));
     // 往上爬的房间多看一点头顶，往下跳的房间多看一点脚下。
-    const lift = room.look === 'up' ? 5 : room.look === 'down' ? 0.5 : 4;
+    const isAscending = room.traversal?.ridges && averageX < room.traversal.practiceUntilX;
+    const lift = isAscending ? 5.6 : room.look === 'up' ? 5 : room.look === 'down' ? 0.5 : 4;
     return { x, y: averageY + (this.journey.pending ? -4 : lift) };
   }
   snapCamera() { const target = this.cameraTarget(); this.cameraX = target.x; this.cameraY = target.y; }
@@ -436,7 +470,7 @@ export class GardenEngine {
     rescue(player, start, start.x - 2); player.recoveries--; player.protection = 1;
     this.waves = []; this.enemyShots = []; this.lure = undefined; this.checkpointId = start.id;
     this.snapCamera(); this.callbacks.onSound('checkpoint');
-    this.publish(`${ROOM_KINDS[room.kind].name}：${room.puzzle ? PUZZLES[room.puzzle.kind].hint : ROOM_KINDS[room.kind].hint}`);
+    this.publish(room.traversal?.name ? `${room.traversal.name}，${room.traversal.hint}` : `${ROOM_KINDS[room.kind].name}：${room.puzzle ? PUZZLES[room.puzzle.kind].hint : ROOM_KINDS[room.kind].hint}`);
     this.callbacks.onLifeChange?.(this.snapshot());
   }
   interact(player) {
@@ -449,6 +483,9 @@ export class GardenEngine {
       if (!message) { this.callbacks.onSound('block'); this.publish(resourcesFor(this.adventure).balance < item.price ? `碎片不够，${item.name}要 ${item.price} 片。` : '现在用不上这个。'); return; }
       this.skillEffects.burst(player.x, player.y + 1, this.elapsed, true); this.callbacks.onSound('skill');
       this.publish(message); this.callbacks.onLifeChange?.(this.snapshot());
+    } else {
+      const mouth = caveMouthAt(currentRoom(this.world, state), player);
+      if (mouth) beginCrawl(player, mouth);
     }
   }
   rerollPending(expectedId) {
@@ -458,14 +495,24 @@ export class GardenEngine {
   roomSnapshot() {
     const world = this.world, state = this.roomState, room = currentRoom(world, state), player = this.players[0];
     const stall = stallAt(world, state, player), resources = resourcesFor(this.adventure);
+    const caveMouth = caveMouthAt(room, player);
+    const traversal = room.traversal;
+    const isClimbing = !!player.grip;
+    const canDescend = !!climbEntryAt(traversal, player);
+    const isDroppingFromGrip = !!player.launch?.isDrop;
+    const cave = caveForPlayer(room, player);
+    const traversalHint = cave ? (cave.id ? '翻过洞内高低石台，提灯下可以出洞' : '走到提灯下可以再钻出去')
+      : isClimbing ? player.grip.point.isLedge ? '再跳一次，或向下加跳松手' : '上下攀爬，向下加跳松手'
+      : isDroppingFromGrip ? '朝岩壁移动，或向上抓住' : canDescend ? '向下抓住岩壁' : traversal?.name ? traversal.hint : '';
     return {
-      roomId: room.id, depth: room.depth, kind: room.kind, name: ROOM_KINDS[room.kind].name, isCleared: isRoomCleared(state), trait: room.trait || null,
+      roomId: room.id, depth: room.depth, kind: room.kind, name: cave?.name || traversal?.name || ROOM_KINDS[room.kind].name, isCleared: isRoomCleared(state), trait: room.trait || null,
+      areaId: cave?.id, isClimbing, canDescend, isDroppingFromGrip, traversalHint,
       ...roomProgress(world, state, this.difficulty.isExtraWave),
       layers: world.zones.map((zone, depth) => ({ kind: depth < state.path.length ? world.rooms[state.path[depth]].kind : depth === world.zones.length - 1 ? 'boss' : null, stars: state.stars[state.path[depth]] || 0 })),
       stars: starTotal(state), combo: state.combo, difficulty: this.adventure.difficulty,
       puzzle: room.puzzle ? { kind: room.puzzle.kind, ...PUZZLES[room.puzzle.kind] } : null,
       doors: world.doors.filter(item => item.roomId === room.id).map(item => ({ id: item.id })),
-      prompt: stall ? (isStallSold(state, stall) ? '卖完了' : `买${SHOP_ITEMS[stall.id].name}`) : '',
+      prompt: stall ? (isStallSold(state, stall) ? '卖完了' : `买${SHOP_ITEMS[stall.id].name}`) : caveMouth ? (cave ? '出洞' : traversal?.cave?.name ? `进入${traversal.cave.name}` : '进洞') : '',
       sets: setCounts(this.adventure), rerolls: resources.rerolls || 0, tierUp: resources.tierUp || 0,
     };
   }
@@ -521,12 +568,17 @@ export class GardenEngine {
     moveCampaignPlatforms(this.world.lifts, this.elapsed);
     stepMechanisms(this.world, this.players[0], this.elapsed, STEP);
     const nearby = item => this.players.some(p => Math.abs(item.x-p.x)<45 && Math.abs(item.y-p.y)<24);
-    const platforms = this.platforms.filter(nearby), enemies = this.world.enemies.filter(nearby);
+    const activeRoom = currentRoom(this.world, this.roomState);
+    const isInCave = !!this.players[0].safe?.isCave;
+    const caveId = this.players[0].safe?.caveId;
+    const platforms = this.platforms.filter(p => !!p.isCave === isInCave && p.caveId === caveId && nearby(p)), enemies = this.world.enemies.filter(nearby);
     tickResources(this.adventure, STEP); tickEffects(this.adventure, STEP);
     if (useRecovery(this.adventure, this.survival, upgradePower(this.adventure))) this.publish('回血 +10！');
     // 同屏主动出手的怪最多 3 只。
+    const practiceEnd = activeRoom.traversal?.practiceUntilX;
+    const attackRight = this.players[0].x < practiceEnd ? Math.min(practiceEnd, this.cameraX + this.camera.right) : this.cameraX + this.camera.right;
     stepAdventureEnemies(enemies, this.players, STEP, this.elapsed, this.enemyShots, {
-      bounds: { left: this.cameraX-this.camera.right, right: this.cameraX+this.camera.right }, maxAttackers: 3,
+      bounds: { left: this.cameraX-this.camera.right, right: attackRight }, maxAttackers: 3,
       allEnemies: this.world.enemies, lure: this.lure, attackGate: this.attackGate, warningBonus: this.world.warningBonus,
     });
     const previousBoss=currentBoss(this.world),previousStage=previousBoss?.attackStage;
@@ -552,19 +604,34 @@ export class GardenEngine {
       const left = index === 0 ? this.keys.has('KeyA') || this.hasControl('left') || isSingle && this.keys.has('ArrowLeft') : this.keys.has('ArrowLeft');
       const right = index === 0 ? this.keys.has('KeyD') || this.hasControl('right') || isSingle && this.keys.has('ArrowRight') : this.keys.has('ArrowRight');
       const down = index === 0 ? this.keys.has('KeyS') || this.hasControl('drop') || isSingle && this.keys.has('ArrowDown') : this.keys.has('ArrowDown');
+      const up = this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.hasControl('up');
       const previousY = player.y, wasGrounded = player.isGrounded;
+      const wasClimbing = !!player.grip;
       const powers = upgradePower(this.adventure, index);
       const speedMultiplier = (player.inkUntil > this.elapsed ? 0.65 : 1) * (1 + (!player.isGrounded ? (powers.air || 0) * 0.05 : 0) + (player.hasteUntil > this.elapsed ? 0.12 : 0));
-      if (powers.feather && !player.isGrounded && player.vy < -3 && (this.keys.has('Space') || this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.hasControl('jump'))) player.vy = -3;
-      player.fallPeak = Math.max(player.fallPeak ?? player.y, player.y);
-      const result = stepPlayer(player, { direction: (this.keys.has('KeyA') || this.keys.has('KeyD') || this.keys.has('ArrowLeft') || this.keys.has('ArrowRight') || this.touch.has('left') || this.touch.has('right')) ? Number(right) - Number(left) : (this.gamepadDirection || 0), speedMultiplier, jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, STEP, { ...this.world, isFiniteLife: true, ...this.roomBounds() });
+      const isBraking = powers.feather && !wasGrounded && !down && player.vy < -3 && (this.keys.has('Space') || this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.hasControl('jump'));
+      if (isBraking) player.vy = -3;
+      player.fallPeak = wasGrounded || wasClimbing || isBraking || player.vy > 0 ? player.y : Math.max(player.fallPeak ?? player.y, player.y);
+      const isManualHorizontal = ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'].some(key => this.keys.has(key)) || this.touch.has('left') || this.touch.has('right');
+      const result = stepTraversal(player, { direction: isManualHorizontal ? Number(right) - Number(left) : (this.gamepadDirection || 0), vertical: Number(up) - Number(down), speedMultiplier, jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, this.platforms, STEP, { isFiniteLife: true, ...this.roomBounds() }, activeRoom.traversal);
       this.jumps[index] = false;
-      constrainBossArena(this.world,player);
-      if (player.isGrounded) {
-        if (powers.safeLanding && !wasGrounded && player.fallPeak-player.y > 4.2) player.protection = Math.max(player.protection, 1.2);
-        player.fallPeak = player.y;
+      if (result.isJumped || result.isDropped || player.grip) player.fallPeak = player.y;
+      if (result.isTraversed) {
+        this.snapCamera();
+        this.waves = [];
+        this.enemyShots = [];
+        this.callbacks.onSound('checkpoint');
+        const cave = caveForPlayer(activeRoom, player);
+        this.publish(cave?.name ? `进入${cave.name}` : cave ? '进洞啦，往里找宝物。' : '出来啦，继续往前走。');
+        this.callbacks.onLifeChange?.(this.snapshot());
       }
+      constrainBossArena(this.world,player);
       if (result.isRescued) { this.hurt(true); return; }
+      if (player.isGrounded) {
+        const dropHeight = player.fallPeak - player.y;
+        player.fallPeak = player.y;
+        if (powers.safeLanding && !wasGrounded && !wasClimbing && !result.isTraversed && dropHeight > 4.2) player.protection = Math.max(player.protection, 1.2);
+      }
       if (player.isGrounded && player.ground?.isCheckpoint && !player.ground.isMoving) this.checkpointId = player.ground.id;
       if (result.isJumped) this.callbacks.onSound('jump');
       if (player.safe.isCheckpoint && player.safe.progress > this.checkpoint) {
@@ -579,13 +646,14 @@ export class GardenEngine {
         for (const hit of areaAttack(player.x, player.y + 0.8, 2.5 + powers.landing, enemies, this.elapsed, powers)) this.recordHit(hit);
         this.skillEffects.burst(player.x, player.y + 0.5, this.elapsed);
       }
-      if (powers.companion && this.elapsed > (player.nextCompanion || 0) && !this.waves.some(w => w.isActive && w.firingWeapon === 'companion')) {
+      const canAttack = !player.grip && !player.crawl;
+      if (canAttack && powers.companion && this.elapsed > (player.nextCompanion || 0) && !this.waves.some(w => w.isActive && w.firingWeapon === 'companion')) {
         player.nextCompanion = this.elapsed + 3 / powers.companion;
         this.waves.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right }, 'firefly', powers).map(w => ({...w, firingWeapon:'companion'})));
       }
       while (this.visited.has(this.furthestPlatform+1)) this.furthestPlatform++;
-      const isFiring = index === 0 ? this.keys.has('KeyJ') || this.hasControl('attack') : this.keys.has('Enter');
-      const manual={hits:this.spellHits,isCast:this.isCasting,isAuto:getPlaySettings().isAutoSpell};
+      const isFiring = canAttack && (index === 0 ? this.keys.has('KeyJ') || this.hasControl('attack') : this.keys.has('Enter'));
+      const manual={hits:this.spellHits,isCast:canAttack&&this.isCasting,isAuto:getPlaySettings().isAutoSpell};
       this.spellHits=0;this.isCasting=false;
       const magic=stepMagic(this.adventure,this.survival,player,this.world.enemies,this.enemyShots,STEP,this.elapsed,isFiring,{left:this.cameraX-this.camera.right,right:this.cameraX+this.camera.right},manual);
       for(const hit of magic.hits)this.recordHit(hit);
@@ -754,7 +822,7 @@ export class GardenEngine {
       adventure: structuredClone(this.adventure), pendingReward: this.journey.pending ? structuredClone(this.journey.pending) : null,
       pendingLifeLoot:this.combatLoot?.pendingId??null,
       rooms: this.roomSnapshot(),
-      enemyGuide: roomEnemyGuide(this.world, this.roomState, this.players[0], project, this.difficulty.isExtraWave, { width: this.host.clientWidth, height: this.host.clientHeight }),
+      enemyGuide: this.players[0].safe?.isCave ? null : roomEnemyGuide(this.world, this.roomState, this.players[0], project, this.difficulty.isExtraWave, { width: this.host.clientWidth, height: this.host.clientHeight }),
       guide: treasure ? { ...project(treasure.x, treasure.y), direction: treasure.x < this.players[0].x ? '左边有宝物' : '右边有宝物' } : null,
       requiredFlowers:this.world.requiredFlowers,totalProgress:this.world.zones.length,defeatedIds:[...this.defeatedIds], flowers: this.collected, collectedIds: [...this.collectedIds], pickups, collection: score.collection, distance: this.distance,
       gardens: this.furthestPlatform, platform: this.furthestPlatform, seconds: Math.floor(this.elapsed),
@@ -786,7 +854,11 @@ export class GardenEngine {
         view.visible=drop.choice===null;view.position.set(point.x,point.y+(this.isReducedMotion?0:Math.sin(this.elapsed*2.5)*.15),1);
       }
       this.backdrops.forEach(mesh => { mesh.position.x = this.cameraX; mesh.position.y=this.cameraY-(this.isNewLandscape ? 2 : 1); const aspect=mesh.material.map.image.width/mesh.material.map.image.height;const width=this.isNewLandscape ? Math.max(this.camera.right*2+1,(this.camera.top*2+1)*aspect) : Math.max(44,this.camera.right*2+8,(this.camera.top*2+8)*aspect);mesh.scale.set(width,width/aspect,1); });
-      for (const p of this.platforms) {const view=this.platformViews.get(p.id);view.position.set(p.x,p.y,0);view.rotation.z=Math.atan(p.slope || 0);if(p.collapseAt!==undefined&&this.elapsed<p.collapseAt)view.position.y+=Math.sin(this.elapsed*40)*.04;view.visible=p.isEnabled!==false && Math.abs(p.x-this.cameraX)<this.camera.right+p.width/2+12 && Math.abs(p.y-this.cameraY)<this.camera.top+12;}
+      const isInCave = !!this.players[0].safe?.isCave;
+      const caveId = this.players[0].safe?.caveId;
+      for (const mesh of this.backdrops) mesh.visible = !isInCave;
+      for (const p of this.platforms) {const view=this.platformViews.get(p.id);view.position.set(p.x,p.y,0);view.rotation.z=Math.atan(p.slope || 0);if(p.collapseAt!==undefined&&this.elapsed<p.collapseAt)view.position.y+=Math.sin(this.elapsed*40)*.04;view.visible=!!p.isCave===isInCave && p.caveId===caveId && p.isEnabled!==false && Math.abs(p.x-this.cameraX)<this.camera.right+p.width/2+12 && Math.abs(p.y-this.cameraY)<this.camera.top+12;}
+      this.traversalViews?.update(this.roomState.roomId, this.players[0], this.cameraX, this.cameraY, this.camera);
       for(const h of this.world.hazards || []){const view=this.hazardViews.get(h.id),state=hazardState(h,this.elapsed);view.group.visible=Math.abs(h.x-this.cameraX)<this.camera.right+6;if(h.kind==='block')continue;if(h.kind==='pendulum')view.group.rotation.z=state.angle;else if(h.kind==='icicle'){view.group.visible&&=state.isWarning||state.isActive;view.group.position.y=state.y;view.mesh.scale.y=1.7;view.mesh.position.y=.85;}else{view.mesh.scale.y=(h.kind==='thorns'?1.35:2.8)*(state.isActive?1:state.isWarning?.45:.12);view.mesh.position.y=view.mesh.scale.y/2;view.mesh.material.opacity=state.isActive?1:.5;}view.mesh.material.color.set(state.isWarning?'#ffd367':'#ffffff');}
       for (const sw of this.world.switches) this.switchViews.get(sw.id).material.color.set(sw.isOpen ? '#b6f4a2' : '#ffffff');
       this.skillEffects.update(this.waves,this.players,this.elapsed,this.cameraX,this.camera.right,this.adventure.loadouts.map(l => l.weapon));
@@ -800,11 +872,16 @@ export class GardenEngine {
       }
       this.players.forEach((player, index) => {
         const mesh = this.playerViews[index], size = CHARACTERS[this.survival.character].height;
-        mesh.position.set(player.x, player.y + size * 0.43, 0.6 + index * 0.2);
-        mesh.rotation.z = !this.isReducedMotion && !this.isPaused && player.isGrounded ? Math.sin(this.elapsed * 16) * Math.abs(player.vx) * 0.006 : 0;
+        const poseName = player.crawl ? 'crawl' : player.grip ? 'climb' : null;
+        const pose = poseName && this.traversalMaterials[`${this.survival.character}-${poseName}`];
+        const height = size * (player.crawl ? .6 : player.grip ? .93 : 1);
+        const width = pose ? height * pose.map.image.width / pose.map.image.height : size;
+        const gripOffset = player.grip && !player.grip.point.side ? width * .37 * player.facing : 0;
+        mesh.position.set(player.x - gripOffset, player.y + height * (pose ? .49 : .43), 0.6 + index * 0.2);
+        mesh.rotation.z = !this.isReducedMotion && !this.isPaused && player.grip && (player.grip.isMoving || player.grip.move) ? Math.sin(this.elapsed * 14) * .045 * player.facing : !this.isReducedMotion && !this.isPaused && player.isGrounded ? Math.sin(this.elapsed * 16) * Math.abs(player.vx) * 0.006 : 0;
         const isAttacking = this.elapsed < (player.attackUntil || 0);
-        mesh.material=this.characterMaterials[this.survival.character][isAttacking ? 'attack' : 'standing'];
-        mesh.scale.set(size * player.facing, size, 1);
+        mesh.material=pose ?? this.characterMaterials[this.survival.character][isAttacking ? 'attack' : 'standing'];
+        mesh.scale.set(width * player.facing, height, 1);
         mesh.material.opacity = player.protection > 0 ? (this.isReducedMotion ? 0.65 : 0.55 + Math.sin(this.elapsed * 16) * 0.25) : 1;
       });
       const effect = this.talentEffect;

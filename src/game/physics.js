@@ -5,7 +5,7 @@ export function createPlayer(platform, offset = 0) {
   return { x: platform.x + offset, y: platformY(platform,platform.x+offset), vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, safeX: platform.x + offset, facing: 1, recoveries: 0, protection: 0, knockTime: 0, dropTime: 0, springTime: 0 };
 }
 export function rescue(player, platform = player.safe, x = platform.x) {
-  Object.assign(player, { x, y: platformY(platform,x), vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, protection: 2, knockTime: 0, dropTime: 0, springTime: 0, isAirJumpUsed: false });
+  Object.assign(player, { x, y: platformY(platform,x), vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, protection: 2, knockTime: 0, dropTime: 0, springTime: 0, isAirJumpUsed: false, grip: null, launch: null, crawl: null });
   if (!platform.isMoving) { player.safe = platform; player.safeX = x; }
   player.recoveries += 1;
 }

@@ -19,7 +19,7 @@ import { validateRun } from '../server/store.mjs';
 const storage=()=>{const data=new Map();return {getItem:key=>data.get(key) ?? null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};};
 const bossOf=world=>world.enemies[world.bossArenas[0].bossId-1];
 
-test('八个世界各有一场首领，开战前睡着，同一个种子不变',()=>{
+test('每个世界各有一场首领，开战前睡着，同一个种子不变',()=>{
   for(const act of WORLD_ACTS)for(const seed of [1,42,137]) {
     const w=createRoomWorld(seed,act),b=bossOf(w);
     assert.equal(w.bossArenas.length,1,act.id);assert.deepEqual(w,createRoomWorld(seed,act));

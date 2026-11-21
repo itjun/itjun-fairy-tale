@@ -9,6 +9,7 @@ export const LEVELS = Object.freeze([
   { id: 'snow', route: 'cave', name: '雪人乐园', subtitle: '和企鹅收集小雪花', image: 'level-snow', sources: [], backdropWidth: 30, backdropY: -1.5, backdropOffset: 4, story: '戴好围巾，和雪人、企鹅一起找小雪花。', platforms: 11, requiredFlowers: 7, bonus: 90, gapMin: 1, gapRange: 0.7, rise: 1.1, color: '#7376bb', side: '#bddde9', surface: 'paper-texture', topColor: '#edf7ff', finish: 'collectible-snowflake' },
   { id: 'forest', route: 'canopy', name: '蘑菇森林', subtitle: '去猫头鹰的树屋做客', image: 'level-forest', sources: [], backdropWidth: 30, backdropY: -1.5, backdropOffset: 4, story: '跟着萤火虫，穿过大树，找到松鼠的小树屋。', platforms: 12, requiredFlowers: 7, bonus: 90, gapMin: 1, gapRange: 0.8, rise: 1.3, color: '#347d73', side: '#b8c5a0', topColor: '#aed7a0', finish: 'collectible-mushroom' },
   { id: 'cartoon', route: 'canopy', name: '卡通梦工场', subtitle: '跟机器人和恐龙去冒险', image: 'level-cartoon', sources: [], backdropWidth: 30, backdropY: -1.5, backdropOffset: 4, story: '机器人、恐龙和小火箭，邀请你参加气球派对。', platforms: 12, requiredFlowers: 8, bonus: 100, gapMin: 1.1, gapRange: 0.8, rise: 1.4, color: '#b4556c', side: '#dcb8e9', surface: 'paper-texture', topColor: '#efb5de', finish: 'collectible-balloon' },
+  { id: 'desert', route: 'cave', name: '沙漠绿洲', subtitle: '攀过砂岩，钻进洞窟', image: 'level-desert', sources: [], story: '沿凸石爬上砂岩峡谷，跳过风车遗迹，从洞里回到绿洲。', platforms: 12, requiredFlowers: 8, bonus: 110, color: '#aa6540', side: '#e7b671', surface: 'paper-texture', topColor: '#f4cc83', finish: 'collectible-star' },
 ]);
 const CHAPTERS = [
   [['花丘分岔','hills'],['拱桥花径','arches'],['彩虹断谷','clouds']],
@@ -20,7 +21,7 @@ const CHAPTERS = [
   [['树根回环','roots'],['树干攀登','trunk'],['树冠横渡','canopy']],
   [['积木拼桥','blocks'],['玩具工厂','factory'],['火箭高塔','rocket']],
 ];
-export const STAGES = Object.freeze(LEVELS.flatMap((level, worldIndex) => CHAPTERS[worldIndex].map(([chapterName, structure], chapter) => ({
+export const STAGES = Object.freeze(LEVELS.flatMap((level, worldIndex) => (CHAPTERS[worldIndex] || []).map(([chapterName, structure], chapter) => ({
   ...level, id: `${level.id}-${chapter + 1}`, themeId: level.id, worldIndex, chapter, chapterName, structure,
   index: worldIndex * 3 + chapter, roomCount: 3 + worldIndex + chapter, bonus: level.bonus + chapter * 25,
 }))));
@@ -34,6 +35,7 @@ const WORLD_RULES = [
   ['冰面停步', 'ice'],
   ['爬上树屋', 'climb'],
   ['机关接力', 'relay'],
+  ['攀岩钻洞', 'desert'],
 ];
 export const WORLD_ACTS = Object.freeze(LEVELS.map((level, worldIndex) => {
   const [chapterName, structure] = WORLD_RULES[worldIndex];

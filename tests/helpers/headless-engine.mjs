@@ -9,7 +9,7 @@ export function headless(mode = 'boss', levelId = WORLD_ACTS[0].id) {
   const fixture = roomFixture(mode, levelId), stage = WORLD_ACTS.find(act => act.id === levelId), world = createRoomWorld(fixture.run.seed, stage);
   const game = Object.assign(Object.create(GardenEngine.prototype), {
     world, platforms: world.platforms, stage, seed: fixture.run.seed, levelKey: `${levelId}:${fixture.run.seed}`,
-    players: [createPlayer(world.start)], isPaused: false, keys: new Set(), touch: new Set(), jumps: [false],
+    players: [createPlayer(world.start)], isPaused: false, keys: new Set(), touch: new Set(), gamepad: new Set(), jumps: [false],
     damageNumbers: [], damageSequence: 0, pickups: [], checkpoint: 0, distance: 0, rewardAt: 0, spellHits: 0, attackGate: { next: 0 },
     camera: { right: 24 }, cameraX: 0, cameraY: 0, skillEffects: { burst() {} },
     treasureViews: new Map(world.treasures.map(item => [item.id, { isCollected: false, kind: item.kind, mesh: { visible: true } }])),

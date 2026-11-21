@@ -6,6 +6,8 @@ import { bossBaseline } from './boss-health.js';
 import { BOSS_THEMES, bossSkills } from './boss-skills.js';
 import { ELITE_TRAITS, monsterVitality } from './monster-roles.js';
 import { ARENAS, LAYER, ROOM_SHAPES, addTraps, createBuilder, homesOf, patternsFor, pickHome, placeEnemy } from './room-terrain.js';
+import { buildDesertRoute, finishTraversal } from './room-traversal.js';
+import { expandDesertExpedition } from './desert-expedition.js';
 
 export const ROOM_KINDS = Object.freeze({
   intro: { name: '开场房', hint: '先熟悉这个世界的机关' },
@@ -345,6 +347,7 @@ export function createRoomWorld(seed, selected) {
     for (const { kind, reward } of layer) {
       const room = beginRoom(world, builder, depth, kind, reward, left);
       let bossParts = null;
+      if (theme.id === 'desert') buildDesertRoute(builder, room, random);
       if (['intro', 'mechanism'].includes(kind)) buildMechanism(builder, stage, room, random);
       if (kind === 'battle') buildCombatRoom(world, builder, stage, room, random, false);
       if (kind === 'elite') buildCombatRoom(world, builder, stage, room, random, true);
@@ -426,10 +429,13 @@ export function createRoomWorld(seed, selected) {
     }
   }
   world.signature = `${world.rooms.map(room => `${room.kind}:${room.reward || '-'}:${room.puzzle?.kind || room.trait || room.shape || room.arena || ''}`).join('|')}#${world.mainPath.map(id => { const platform = world.platforms[id]; return `${platform.x.toFixed(1)},${platform.y.toFixed(1)}`; }).join(';')}`;
+  // 支路沿用已有入口平台，额外编号放在尾部，旧存档仍按原拓扑和编号续关。
+  finishTraversal(world, appendRoomPlatform);
+  if (theme.id === 'desert') expandDesertExpedition(world, appendRoomPlatform);
   return world;
 }
 
-// 原图生成完才追加平台，不改变随机数序列和已有编号，第 10 版存档仍回到原落脚点。
+// 原图生成完才追加平台，保留随机数序列和已有编号。
 function appendRoomPlatform(world, room, x, y, width, skin) {
   const platform = { id: world.platforms.length, x, y, width, isOneWay: true, zone: room.depth, progress: room.depth, skin, roomId: room.id };
   world.platforms.push(platform);

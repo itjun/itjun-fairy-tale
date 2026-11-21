@@ -42,6 +42,7 @@ export const EXPANDED_THEME_MONSTERS = Object.freeze({
   snow: ['snowball', 'snowflower', 'puff', 'toy', 'icicle', 'pillow', 'umbrella', 'bell', 'penguin', 'balloon', 'plane'],
   forest: ['mushroom', 'squirrel', 'firefly', 'leaf', 'moth', 'leafshield', 'flowerpot', 'burrow', 'dandelion', 'octopus', 'balloon'],
   cartoon: ['toy', 'candy', 'fish', 'firefly', 'paint', 'bell', 'ink', 'moth', 'twins', 'plane', 'octopus'],
+  desert: ['sandcastle', 'burrow', 'wool', 'moth', 'crab', 'dandelion', 'leafshield', 'jelly', 'puff', 'balloon', 'bell'],
 });
 export const WEAPONS = Object.freeze({
   lightblade: { name:'近战光刀', shortName:'光刀', image:'weapon-lightblade', hint:'伤害 96，挥出大型刀光，每刀可砍碎一发敌方攻击', damage:96, interval:0.4, family:'power', isMelee:true },

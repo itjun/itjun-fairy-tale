@@ -8,9 +8,10 @@ export const BOSS_THEMES = Object.freeze({
   snow: { image:'boss-snowman', leader:'雪人国王', kinds:['snowball','snowflower','icicle'], family:'frost' },
   forest: { image:'boss-tree', leader:'古树守卫', kinds:['mushroom','squirrel','moth'], family:'nature' },
   cartoon: { image:'boss-toy', leader:'发条巨人', kinds:['toy','paint','bell'], family:'power' },
+  desert: { image:'boss-crab', leader:'砂岩蟹王', kinds:['sandcastle','burrow','crab'], family:'nature' },
 });
 // 首领先用哪一招：半血前只用这一招，半血后和下一招轮着来。
-const FIRST_SKILL = { rainbow: 0, family: 1, sweet: 1, beach: 0, meadow: 2, snow: 0, forest: 0, cartoon: 1 };
+const FIRST_SKILL = { rainbow: 0, family: 1, sweet: 1, beach: 0, meadow: 2, snow: 0, forest: 0, cartoon: 1, desert: 0 };
 const SKILLS = {
   rainbow: [
     {name:'花瓣散射',kind:'fan',image:'flower',speed:8},
@@ -51,6 +52,10 @@ const SKILLS = {
     {name:'飞星光波',kind:'aimed',image:'weapon-boomerang',speed:10},
     {name:'积木落雨',kind:'rain',image:'enemy-toy',speed:8},
     {name:'发条冲锋',kind:'charge',image:'weapon-boomerang',speed:10},
+  ],
+  desert: [
+    {name:'沙浪冲锋',kind:'charge',image:'monster-sandcastle',speed:9},
+    {name:'砂石落雨',kind:'rain',image:'collectible-shell',speed:8},
   ],
 };
 

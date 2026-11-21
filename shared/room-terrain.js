@@ -5,12 +5,12 @@ import { monsterVitality } from './monster-roles.js';
 export const LAYER = 2.4;
 export const MIN_GAP = 1.1;
 const LAYER_SLACK = 0.2;
-const SURFACES = { rainbow: 'bank', family: 'roof', sweet: 'cookie', beach: 'rock', meadow: 'bank', snow: 'ice', forest: 'root', cartoon: 'blocks' };
+const SURFACES = { rainbow: 'bank', family: 'roof', sweet: 'cookie', beach: 'rock', meadow: 'bank', snow: 'ice', forest: 'root', cartoon: 'blocks', desert: 'sand' };
 // 补进房间的陷阱都贴着地面。钟摆要一整座桥才摆得开，只留在家人小镇自己的屋顶机关里。
-const TRAPS = { rainbow: 'thorns', family: 'thorns', sweet: 'steam', beach: 'geyser', meadow: 'thorns', snow: 'icicle', forest: 'thorns', cartoon: 'steam' };
-const BLOCKS = { rainbow: 'thorns', family: 'blocks', sweet: 'blocks', beach: 'thorns', meadow: 'thorns', snow: 'thorns', forest: 'thorns', cartoon: 'blocks' };
-const LIFTS = { rainbow: 'leaf', family: 'gear', sweet: 'gear', beach: 'raft', meadow: 'gear', snow: 'ice', forest: 'leaf', cartoon: 'gear' };
-const CRUMBLES = { rainbow: 'cloud', family: 'cloud', sweet: 'cookie', beach: 'cloud', meadow: 'cloud', snow: 'ice', forest: 'cloud', cartoon: 'blocks' };
+const TRAPS = { rainbow: 'thorns', family: 'thorns', sweet: 'steam', beach: 'geyser', meadow: 'thorns', snow: 'icicle', forest: 'thorns', cartoon: 'steam', desert: 'steam' };
+const BLOCKS = { rainbow: 'thorns', family: 'blocks', sweet: 'blocks', beach: 'thorns', meadow: 'thorns', snow: 'thorns', forest: 'thorns', cartoon: 'blocks', desert: 'blocks' };
+const LIFTS = { rainbow: 'leaf', family: 'gear', sweet: 'gear', beach: 'raft', meadow: 'gear', snow: 'ice', forest: 'leaf', cartoon: 'gear', desert: 'raft' };
+const CRUMBLES = { rainbow: 'cloud', family: 'cloud', sweet: 'cookie', beach: 'cloud', meadow: 'cloud', snow: 'ice', forest: 'cloud', cartoon: 'blocks', desert: 'sand' };
 // 怪按行动方式挑落脚点：会射的站高台，会飞的守坑和竖井，会冲的放长平地，会跳的放台阶。
 const SPOT_FOR_ROLE = { shooter: 'perch', flyer: 'air', charger: 'run', hopper: 'step' };
 
@@ -142,6 +142,11 @@ export function patternsFor(structure) {
       b.next(0, 8, 1.15);
       b.lift('y', 5.5, 'gear');
     },
+    desert(b) {
+      b.next(1.2, 6, b.gap());
+      b.next(0, 5, b.gap(), { isCrumbling: true });
+      b.next(-1.2, 9, b.gap());
+    },
   }[structure];
 }
 
@@ -257,7 +262,7 @@ export function addTraps(world, room, builder, count) {
   const inRoom = () => world.hazards.filter(hazard => room.platformIds.includes(hazard.platformId));
   const isTimed = platform => !!platform && inRoom().some(hazard => hazard.kind !== 'block' && hazard.platformId === platform.id);
   const isBusy = platform => world.springs.some(item => item.platformId === platform.id) || world.switches.some(item => item.platformId === platform.id) || inRoom().some(hazard => hazard.platformId === platform.id);
-  const candidates = path.filter((platform, index) => index > 0 && platform.id !== room.exitId && !platform.isMoving && !platform.isCheckpoint && !platform.isCrumbling
+  const candidates = path.filter((platform, index) => index > 0 && platform.id !== room.exitId && !platform.isMoving && !platform.isCheckpoint && !platform.isTraversalPractice && !platform.isCrumbling
     && !platform.slope && !platform.isSeesaw && platform.gateId === undefined && !platform.conveyor && !platform.isIce && platform.width >= 7 && !isBusy(platform))
     .map(platform => ({ platform, order: (platform.isTrapSpot ? 0 : 1) + random() }))
     .sort((a, b) => a.order - b.order).map(item => item.platform);

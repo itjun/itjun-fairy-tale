@@ -20,6 +20,7 @@ export const LEVEL_COLLECTIBLES = {
   snow: ['snowflake', 'star', 'heart', 'icecream'],
   forest: ['mushroom', 'flower', 'star', 'heart'],
   cartoon: ['balloon', 'star', 'rainbow', 'icecream', 'heart'],
+  desert: ['star', 'heart', 'shell', 'flower'],
 };
 
 // 用独立随机序列排列宝物，避免改变已有种子的跳台位置。

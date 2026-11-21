@@ -24,7 +24,7 @@ const player=()=>({x:0,y:0,facing:1});
 const bounds={left:-20,right:20};
 function grant(a,type,id,rarity='legendary',s=newSurvival()) {const j=newJourney();j.pending={id:crypto.randomUUID(),player:0,choices:[{type,id,rarity}]};assert.ok(chooseReward(a,j,0,s));return s;}
 
-test('八个世界关各一场首领，30 种怪物都会出场，首领房门口有补给',()=>{
+test('每个世界关各一场首领，30 种怪物都会出场，首领房门口有补给',()=>{
  const seen=new Set();
  assert.equal(Object.keys(MONSTERS).length,30);
  for(const act of WORLD_ACTS)for(const seed of [1,42,137,999,2024]){
@@ -117,7 +117,7 @@ test('127 份原创音效离线打包，混音最多 12 声部，同批发射合
  mixer.play('boss-warning');assert.equal(mixer.voices.length,12);assert.ok(mixer.voices.some(v=>v.name==='boss-warning'));mixer.pause();assert.equal(mixer.voices.length,0);assert.equal(mixer.loops.size,0);
 });
 
-test('五类白装基础武器都能打败八位首领',()=>{
+test('五类白装基础武器都能打败每位世界首领',()=>{
  let fights=0;
  for(const act of WORLD_ACTS){
   const source=createRoomWorld(42,act),arena=source.bossArenas[0];
@@ -134,7 +134,7 @@ test('五类白装基础武器都能打败八位首领',()=>{
    assert.ok(e.isDefeated,`${act.id}/${e.name}/${kind} 基础伤害不足或无法命中`);fights++;
   }
  }
- assert.equal(fights,40);
+ assert.equal(fights, WORLD_ACTS.length * 5);
 });
 test('飞行存档保留同轮共享命中特效，血条耗尽等着选的状态读回来不变',()=>{
  const a=newAdventure(1);a.weaponRanks.blade=3;a.weapons=['blade'];a.loadouts[0].weapons=['blade'];

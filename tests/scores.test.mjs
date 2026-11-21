@@ -29,7 +29,7 @@ test('新增世界与旧关卡成绩共存，重启后仍可按主题筛选和�
       assert.equal(report.points[0].levelId, level.id);
     }
     const all = store.report(range);
-    assert.equal(all.summary.sessions, 6);
+    assert.equal(all.summary.sessions, 1 + worlds.length);
     assert.equal(all.summary.total, 20 + worlds.reduce((sum, level) => sum + level.requiredFlowers * 10 + level.bonus, 0));
   } finally { store.close(); rmSync(dir, { recursive: true }); }
 });
