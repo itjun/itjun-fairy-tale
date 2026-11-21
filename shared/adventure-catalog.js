@@ -59,7 +59,7 @@ export const UPGRADES = Object.freeze({
   petal: { name: '花瓣护心', hint: '打败 12 只小怪，回血 10', image: 'upgrade-petal', family: 'nature', category: 'survival' },
   armor: { name: '叶片护甲', hint: '每片区域挡一次伤害，不能挡掉坑', image: 'monster-leafshield', family: 'nature', category: 'survival' },
   cotton: { name: '软软棉衣', hint: '受伤时不容易被撞飞', image: 'monster-wool', family: 'frost', category: 'survival' },
-  safeLanding: { name: '安稳落脚', hint: '落下高台时，短暂保护自己', image: 'lift-leaf', family: 'flight', category: 'survival' },
+  safeLanding: { name: '安稳落脚', hint: '高处落地伤害减半，落地后短暂受到保护', image: 'lift-leaf', family: 'flight', category: 'survival' },
   courage: { name: '小小勇气', hint: '血量不超过 20% 时挡一次伤害，每小关一次', image: 'collectible-heart', family: 'power', category: 'survival' },
   wreath: { name: '守护花环', hint: '清空一片区域，获得一次护罩', image: 'flower', family: 'nature', category: 'survival' },
   recycle: { name: '彩笔回收', hint: '放弃本次奖励，可换 3 片彩笔碎片', image: 'upgrade-recycle', family: 'nature', category: 'resource' },

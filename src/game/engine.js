@@ -20,7 +20,7 @@ import { MONSTERS, WEAPONS } from '../../shared/adventure-catalog.js';
 import { newAdventure, newJourney, upgradePower, activeWeapons, weaponRank, weaponShotCount, migrateAdventure, tickEffects, chooseReward, recycleReward } from './adventure.js';
 import { fireAdventureWeapon, fireLoadout, stepAdventureWave, areaAttack, attackSource } from './adventure-combat.js';
 import { stepAdventureEnemies, releaseCandyChildren } from './adventure-enemies.js';
-import { createPlayer, rescue, revivalPoint } from './physics.js';
+import { createPlayer, landingDamage, rescue, revivalPoint } from './physics.js';
 import { beginCrawl, caveForPlayer, caveMouthAt, climbEntryAt, stepTraversal } from './traversal.js';
 import { DESERT_IMAGES, TRAVERSAL_IMAGES, TraversalViews } from './traversal-view.js';
 import { campaignScore } from '../../shared/campaign.js';
@@ -516,7 +516,7 @@ export class GardenEngine {
       sets: setCounts(this.adventure), rerolls: resources.rerolls || 0, tierUp: resources.tierUp || 0,
     };
   }
-  hurt(isFall = false, amount = 10) {
+  hurt(isFall = false, amount = 10, source) {
     const powers = upgradePower(this.adventure);
     const player = this.players[0];
     const beforeLife = this.survival.hp;
@@ -527,14 +527,17 @@ export class GardenEngine {
       recordHurt(this.roomState,true,false);this.callbacks.onSound('player-hurt');this.publish('掉下去了，回到刚才站的地方。');
       return;
     }
-    amount = Math.max(1, Math.round(amount * this.difficulty.damage * (1 - 0.15 * setLevel(this.adventure, 'bubble'))));
-    const shieldHits=!isFall?consumeMagicShield(this.adventure,player,this.world.enemies,this.elapsed):null;
+    const isLanding = source === 'landing';
+    const isFallDamage = isFall || isLanding;
+    amount = isFall ? 25 : Math.max(1, Math.round(amount * this.difficulty.damage * (1 - 0.15 * setLevel(this.adventure, 'bubble'))));
+    const shieldHits = isFallDamage ? null : consumeMagicShield(this.adventure, player, this.world.enemies, this.elapsed);
     for(const hit of shieldHits || [])this.recordHit(hit);
-    const result = shieldHits ? 'armor' : damageWithBuild(this.adventure, this.survival, powers, this.levelKey, player.safe?.zone ?? 0, isFall, amount);
+    const result = shieldHits ? 'armor' : damageWithBuild(this.adventure, this.survival, powers, this.levelKey, player.safe?.zone ?? 0, isFallDamage, amount);
     if (!result) return;
     if (['hurt','death'].includes(result)) recordHurt(this.roomState, isFall, result === 'death');
     if(['shield','armor','courage'].includes(result))for(const hit of shieldCounter(this.adventure,player,this.world.enemies,this.elapsed))this.recordHit(hit);
-    this.damageNumbers.push({id:++this.damageSequence,x:player.x,y:player.y+2.5,at:this.elapsed,damage:Math.max(0,beforeLife-this.survival.hp),isPlayer:true,blocked:['armor','shield','courage'].includes(result)?amount:0});
+    const lostHp = Math.max(0, beforeLife - this.survival.hp);
+    this.damageNumbers.push({id:++this.damageSequence,x:player.x,y:player.y+2.5,at:this.elapsed,damage:lostHp,isPlayer:true,blocked:['armor','shield','courage'].includes(result)?amount:0});
     if (powers.cotton) player.knockVx *= 0.25;
     if (result === 'courage') player.protection = Math.max(player.protection, 4);
     if (result === 'hurt' && powers.breeze) {
@@ -544,7 +547,10 @@ export class GardenEngine {
     }
     if (result === 'armor' || result === 'courage') { this.talentEffect = { x:player.x, y:player.y+1, at:this.elapsed, isShield:true }; this.publish(result === 'armor' ? '小本领挡住了伤害！' : '小小勇气保护你！'); }
     if (result === 'shield') { this.talentEffect = { x:this.players[0].x, y:this.players[0].y + 1, at:this.elapsed, isShield:true }; this.publish('彩虹护盾挡住啦！'); }
-    if (result === 'hurt') this.publish(`血量 ${this.survival.hp}/${this.survival.maxHp}，小心前方！`);
+    if (result === 'hurt') {
+      const message = isLanding ? `高处落地，扣了 ${lostHp} 点血。` : `血量 ${this.survival.hp}/${this.survival.maxHp}，小心前方！`;
+      this.publish(isLanding && !lostHp ? '落地受伤，补给帮你回了血。' : message);
+    }
     if (result === 'death') { this.revival = revivalPoint(player, this.platforms, isFall); this.pause(true); this.publish(this.survival.lives ? `扣掉一条命，还剩 ${this.survival.lives} 条。` : '生命用完了，这次冒险结束。'); }
     if(isFall && result !== 'death'){const point=revivalPoint(player,this.platforms,true);rescue(player,this.platforms[point.platformId],this.platforms[point.platformId].x+point.offsetX);player.protection=1;}
     this.callbacks.onSound(result==='death'?'life-lost':['shield','armor','courage'].includes(result)?'block':'player-hurt');
@@ -630,7 +636,15 @@ export class GardenEngine {
       if (player.isGrounded) {
         const dropHeight = player.fallPeak - player.y;
         player.fallPeak = player.y;
-        if (powers.safeLanding && !wasGrounded && !wasClimbing && !result.isTraversed && dropHeight > 4.2) player.protection = Math.max(player.protection, 1.2);
+        if (!wasGrounded && !wasClimbing && !result.isTraversed) {
+          if (powers.safeLanding && dropHeight > 4.2) player.protection = Math.max(player.protection, 1.2);
+          const damage = landingDamage(dropHeight);
+          if (damage) {
+            player.protection = Math.max(player.protection, 1);
+            this.hurt(false, powers.safeLanding ? damage / 2 : damage, 'landing');
+            if (this.survival.phase !== 'alive') return;
+          }
+        }
       }
       if (player.isGrounded && player.ground?.isCheckpoint && !player.ground.isMoving) this.checkpointId = player.ground.id;
       if (result.isJumped) this.callbacks.onSound('jump');

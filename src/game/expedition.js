@@ -29,7 +29,7 @@ export function useRecovery(adventure, survival, powers, isHurt = false) {
   if (powers.petal && r.petals >= 12) { r.petals -= 12; return heal(survival,10); }
   return false;
 }
-export function damageWithBuild(adventure, survival, powers, levelKey, zone, isFall = false, amount = 10) {
+export function damageWithBuild(adventure, survival, powers, levelKey, zone, isFall = false, amount = isFall ? 25 : 10) {
   const r = resourcesFor(adventure), zoneKey = `${levelKey}:${zone}`;
   if (survival.phase !== 'alive') return false;
   if (!isFall && !(survival.character === 'dad' && survival.shieldRemaining <= 0)) {

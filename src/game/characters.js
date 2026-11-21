@@ -31,11 +31,11 @@ export function addLife(s, amount = 1) {
   if (s.phase !== 'alive' || s.lives >= 999) return false;
   s.lives = Math.min(999, s.lives + amount); s.revision++; return true;
 }
-export function takeDamage(s, isFall = false, amount = 10) {
+export function takeDamage(s, isFall = false, amount = isFall ? 25 : 10) {
   if (s.phase !== 'alive') return false;
   s.revision++;
   if (!isFall && s.character === 'dad' && s.shieldRemaining <= 0) { s.shieldRemaining = 20; return 'shield'; }
-  s.hp = Math.max(0, s.hp - (isFall ? 25 : Math.max(1, Math.round(amount))));
+  s.hp = Math.max(0, s.hp - Math.max(1, Math.round(amount)));
   if (!s.hp) { s.lives = Math.max(0, s.lives - 1); s.phase = s.lives ? 'fallen' : 'over'; return 'death'; }
   return 'hurt';
 }

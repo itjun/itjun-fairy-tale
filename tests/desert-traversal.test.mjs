@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { WORLD_ACTS } from '../shared/levels.js';
 import { createRoomWorld } from '../shared/room-world.js';
-import { rescue } from '../src/game/physics.js';
+import { landingDamage, rescue } from '../src/game/physics.js';
 import { caveForPlayer, caveMouthAt, reachableGrips } from '../src/game/traversal.js';
 import { readAdventure, writeAdventure } from '../src/game/save.js';
 import { roomFixture } from './helpers/adventure-fixtures.mjs';
@@ -135,19 +135,85 @@ test('触屏可以从台边下攀、半途松手再抓墙，然后安全爬到�
   assert.equal(game.survival.hp, 100);
 });
 
-test('摇杆向下可沿横向抓点退到山脚', () => {
+test('摇杆向下可退过横向抓点，半途松手按当前位置到落脚面的距离扣血', () => {
   const { game, room, player, fixture } = fixtureAt(1);
   fixture.state.adventure.difficulty = 'normal';
   game.restoreState(fixture.state);
   const last = room.traversal.grips.filter(point => !point.isJumpOnly).at(-1);
   const top = game.platforms[last.restId];
   const descend = new Set(['down']);
+  const drop = new Set(['down', 'confirm']);
 
   rescue(player, top, last.x);
   game.setGamepadInput({ actions: descend });
   run(game, 7, () => player.isGrounded && player.ground !== top && player.y === 0);
   assert.equal(player.ground?.id, room.path[1]);
   assert.equal(game.survival.hp, 100);
+
+  const damage = [];
+  for (const time of [.3, .65, 1.8]) {
+    game.clearInput();
+    game.survival.hp = 100;
+    rescue(player, top, last.x);
+    game.setGamepadInput({ actions: descend });
+    run(game, time);
+    assert.ok(player.grip);
+    const releaseY = player.y;
+    game.setGamepadInput({ actions: drop });
+    run(game, 1 / 120);
+    assert.equal(player.grip, null);
+    assert.equal(player.y, releaseY);
+    assert.equal(game.survival.hp, 100);
+
+    run(game, 2, () => player.isGrounded);
+    assert.ok(player.isGrounded);
+    const lost = 100 - game.survival.hp;
+    assert.equal(lost, landingDamage(releaseY - player.y));
+    assert.equal(game.survival.lives, 3);
+    damage.push(lost);
+  }
+  assert.ok(damage[0] > damage[1] && damage[1] > damage[2]);
+  assert.equal(damage[2], 0);
+});
+
+test('下坠时按上能抓住下方凸石，再松手只计算第二段落差', () => {
+  const { game, room, player, fixture } = fixtureAt(1);
+  fixture.state.adventure.difficulty = 'normal';
+  game.restoreState(fixture.state);
+  game.heldKeys = new Set();
+  const press = code => game.keyDown({ code, preventDefault() {} });
+  const unpress = code => game.keys.delete(code);
+  const summit = room.traversal.grips.filter(point => !point.isJumpOnly).at(-1);
+  rescue(player, game.platforms[summit.restId], summit.x);
+
+  press('ArrowDown');
+  run(game, .65);
+  const firstY = player.y;
+  press('Space');
+  run(game, 1 / 120);
+  unpress('Space');
+  unpress('ArrowDown');
+  assert.equal(player.grip, null);
+
+  press('ArrowUp');
+  run(game, .7, () => !!player.grip);
+  unpress('ArrowUp');
+  assert.ok(player.grip?.point.section === summit.section && player.y < firstY);
+  assert.equal(player.vy, 0);
+  assert.equal(game.survival.hp, 100);
+  assert.equal(game.damageNumbers.length, 0);
+
+  const secondY = player.y;
+  press('ArrowDown');
+  press('Space');
+  run(game, 1 / 120);
+  unpress('Space');
+  unpress('ArrowDown');
+  run(game, 2, () => player.isGrounded);
+  assert.ok(player.isGrounded);
+  const lost = 100 - game.survival.hp;
+  assert.equal(lost, landingDamage(secondY - player.y));
+  assert.ok(lost > 0 && lost < landingDamage(firstY - player.y));
 });
 
 test('风车遗迹可从矮墙接力跳抓石柱和横梁', () => {

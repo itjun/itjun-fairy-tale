@@ -1,5 +1,7 @@
 export { randomGenerator } from '../../shared/random.js';
 export const RULES = Object.freeze({ speed: 6, gravity: 23, jump: 12.6, radius: 0.28, coyote: 0.14, buffer: 0.16 });
+// 给四位角色的平地二段跳留足安全高度。
+export function landingDamage(height) { return Math.min(100, Math.ceil(Math.max(0, height - 8.5) * 4)); }
 export function platformY(platform, x) { return platform.y + (platform.slope || 0) * Math.max(-platform.width / 2, Math.min(platform.width / 2, x - platform.x)); }
 export function createPlayer(platform, offset = 0) {
   return { x: platform.x + offset, y: platformY(platform,platform.x+offset), vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, safeX: platform.x + offset, facing: 1, recoveries: 0, protection: 0, knockTime: 0, dropTime: 0, springTime: 0 };
