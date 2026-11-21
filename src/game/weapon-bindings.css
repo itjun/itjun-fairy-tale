@@ -1,0 +1,78 @@
+.weapon-bindings {
+  position:absolute; inset:0; z-index:65; overflow:auto;
+  display:grid; justify-items:center; align-content:safe center;
+  box-sizing:border-box; min-width:0; padding:16px 16px 14px;
+  background:#faf5e9;
+  color:#4b3426;
+}
+.weapon-bindings::before {
+  content:''; position:fixed; inset:0; background:url('/assets/paper-texture.png') center / 640px auto;
+  opacity:.24; mix-blend-mode:multiply; pointer-events:none;
+}
+.weapon-bindings header {
+  position:absolute; inset:16px 26px auto; display:flex;
+  align-items:center; justify-content:space-between; gap:12px; z-index:1;
+}
+.weapon-bindings h1 {
+  margin:0; color:#4b3426; font-size:clamp(24px,4.9vw,64px); line-height:1.1;
+  -webkit-text-stroke:.6px currentColor;
+}
+.weapon-bindings h1:focus { outline:none; }
+#root .weapon-bindings header button {
+  padding:6px 12px; background:none; border:none; color:inherit; font-size:clamp(17px,2.5vw,30px);
+}
+.weapon-bindings header .pad-key { min-width:37px; height:32px; }
+.weapon-wheel {
+  --ink-line:#9a7752;
+  width:min(65vw, calc(100dvh - 134px), 540px);
+  min-width:min(80vw, 185px); aspect-ratio:1; position:relative; border-radius:50%;
+  background:var(--ink-line); border:2px solid var(--ink-line); box-sizing:border-box;
+}
+#root .weapon-wheel > button {
+  position:absolute; inset:0; border:none; border-radius:0; padding:0; min-height:0;
+  background:#fbefd8; transition:none; transform:none;
+}
+#root .weapon-wheel > button::before,.weapon-wheel-center::before {
+  content:''; position:absolute; inset:0; background:url('/assets/paper-texture.png') center / 520px auto;
+  opacity:.20; mix-blend-mode:multiply; pointer-events:none;
+}
+#root .weapon-wheel > button[aria-pressed="true"], #root .weapon-wheel > button:focus-visible {
+  background:#bfe687;
+}
+.weapon-wheel > button img {
+  position:absolute; left:var(--icon-x); top:var(--icon-y); width:22%; height:22%;
+  object-fit:contain; transform:translate(-50%,-50%); pointer-events:none;
+}
+.weapon-wheel > button[data-attack="lightblade"] img { scale:1.25; filter:drop-shadow(0 0 1px #6094a6); }
+.weapon-wheel-center {
+  position:absolute; inset:29%; border-radius:50%; border:2px solid var(--ink-line);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  background:#f9eddb; overflow:hidden;
+  box-sizing:border-box; padding:7px; line-height:1.15;
+}
+.weapon-wheel-center strong { font-size:clamp(20px, min(5.1vw, 8.5vh), 63px); -webkit-text-stroke:.6px currentColor; }
+.weapon-wheel-center .is-long { font-size:clamp(16px, min(3.1vw, 5vh), 42px); }
+.weapon-wheel-center span { font-size:clamp(13px, min(2.5vw, 3.7vh), 27px); margin-top:.25em; }
+.weapon-bindings-controls { position:relative; width:min(100%, 890px); text-align:center; }
+.weapon-bindings-controls p { margin:8px 0 8px; font-size:clamp(16px, 3vw, 35px); line-height:1.1; }
+.weapon-bindings-slots { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:clamp(4px, 1vw, 14px); }
+#root .weapon-bindings-slots button {
+  justify-content:center; gap:clamp(4px, 1vw, 12px); min-height:clamp(45px, 8vh, 66px); padding:6px 9px;
+  font-size:clamp(13px, 2.35vw, 28px); color:inherit; background:#f9edda;
+  border:2px solid #9a7752; border-radius:999px; border-image:none;
+}
+#root .weapon-bindings-slots button:disabled { opacity:.86; filter:none; }
+.weapon-bindings-slots kbd:not(.pad-key) {
+  display:inline-grid; place-items:center; min-width:26px; height:26px; border:1.5px solid #9a7752;
+  border-radius:50%; font:inherit;
+}
+.weapon-bindings-slots img { width:clamp(19px, 4vw, 40px); height:clamp(19px, 4vw, 40px); object-fit:contain; }
+.weapon-bindings-slots button > span { display:grid; gap:2px; text-align:left; min-width:0; }
+.weapon-bindings-slots progress { width:min(100%, 68px); height:6px; accent-color:#9267b5; }
+#root .weapon-wheel-next { margin:5px auto 0; padding:4px 9px; min-height:32px; }
+@media (max-width:700px), (max-height:560px) {
+  .weapon-bindings { padding-top:50px; }
+  .weapon-bindings header { inset:8px 12px auto; }
+  .weapon-wheel { width:min(88vw, calc(100dvh - 158px), 460px); }
+  .weapon-bindings .pad-key { min-width:23px; height:23px; padding:0 3px; }
+}

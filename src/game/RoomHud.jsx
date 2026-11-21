@@ -7,6 +7,8 @@ import { ROOM_KINDS } from '../../shared/room-world.js';
 import { WORLD_ACTS } from '../../shared/levels.js';
 import { DIFFICULTIES } from './difficulty.js';
 import { SETS, SET_STEPS } from './sets.js';
+import { ATTACK_KEYS, attackBindings, attackItem } from './attack-bindings.js';
+import { AttackSlotContent } from './AttackSlots.jsx';
 import './rooms.css';
 
 // 进度条上每间房用一个字，孩子一眼能认出来。
@@ -23,8 +25,8 @@ function roomLine(rooms) {
 // 第 9 版游玩中的界面：左上命和血，中间这一章的房间，右上碎片和连击，右下三个键。
 export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause, touchProps }) {
   const rooms = stats.rooms, survival = stats.survival, magic = stats.adventure?.magic;
-  const spells = magic?.equipped || [], isSpellReady = spells.some(id => magic.ready.includes(id));
-  const weapons = stats.activeWeapons?.length ? stats.activeWeapons : ['blade'];
+  const bindings = attackBindings(stats.adventure);
+  const firingClass = id => !id ? '' : id === stats.busyAttack ? 'is-busy' : magic?.ready.includes(id) ? 'is-ready' : '';
   const talent = person.name === '爸爸' ? (survival.shieldRemaining > 0 ? `护盾 ${Math.ceil(survival.shieldRemaining)} 秒后好` : '护盾准备好了') : ['妈妈', '姐姐'].includes(person.name) ? `${person.talent} ${survival.attacks || 0}/4` : '';
   const line = roomLine(rooms);
   return <div className="room-hud" inert={!isPlaying}>
@@ -59,12 +61,18 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
     {isPlaying && rooms.prompt && <div className="room-hud-prompt" role="status">{isGamepad ? <><PadKey name="stick" />往上推</> : <kbd>W</kbd>}<span>{rooms.prompt}</span></div>}
     <aside className="room-hud-keys" aria-label="按键">
       <span>{isGamepad ? <PadKey name="A" /> : <kbd>空格</kbd>}跳</span>
-      <span>{isGamepad ? <PadKey name="X" /> : <kbd>J</kbd>}{weapons.map(id => <img key={id} src={`./assets/${WEAPONS[id].image}.png`} alt={WEAPONS[id].shortName} />)}</span>
-      {spells.length > 0 && <span className={isSpellReady ? 'is-ready' : ''}>{isGamepad ? <PadKey name="Y" /> : <kbd>K</kbd>}{spells.map(id => <i key={id}><img src={`./assets/${SPELLS[id].image}.png`} alt={SPELLS[id].name} /><progress aria-label={`${SPELLS[id].name}能量`} value={magic.active.some(effect => effect.id === id) ? 0 : magic.charges[id] || 0} max={SPELLS[id].charge} /></i>)}{isSpellReady && <em>可以放了</em>}</span>}
+      {bindings.map((id, slot) => <span key={slot} className={firingClass(id)}><AttackSlotContent {...{ slot, id, magic, isGamepad }} /></span>)}
     </aside>
     {isPlaying && <div className="touch-controls room-touch" aria-label="触屏操作">
       <div><button aria-label="向左走" {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label="向右走" {...touchProps('right')}><ArrowRight size={30} /></button>{(rooms.isClimbing || rooms.isDroppingFromGrip) && <button aria-label={rooms.isClimbing ? '往上爬' : '抓住岩壁'} {...touchProps('up')}><ArrowUp size={27} /></button>}<button aria-label={rooms.isClimbing || rooms.canDescend ? '往下爬' : '向下跳台'} {...touchProps('drop')}><ArrowDown size={27} /></button></div>
-      <div>{rooms.prompt && <button aria-label={rooms.prompt} {...touchProps('enter')}>进</button>}{spells.length > 0 && <button aria-label="放大招" className={isSpellReady ? 'is-ready' : ''} {...touchProps('spell')}>招</button>}<button aria-label="攻击" {...touchProps('attack')}>打</button><button className="touch-jump" aria-label="跳跃" {...touchProps('jump')}><ArrowUp size={29} /><span>跳</span></button></div>
+      <div>{rooms.prompt && <button aria-label={rooms.prompt} {...touchProps('enter')}>进</button>}<button className="touch-jump" aria-label="跳跃" {...touchProps('jump')}><ArrowUp size={29} /><span>跳</span></button></div>
+      <div className="room-touch-attacks" aria-label="武器快捷键">
+        {bindings.map((id, slot) => <button key={slot} className={firingClass(id)} disabled={!id}
+          aria-label={id ? `攻击 ${ATTACK_KEYS[slot].pad} ${attackItem(id).name}` : `${ATTACK_KEYS[slot].pad} 空位`}
+          {...touchProps(ATTACK_KEYS[slot].action)}>
+          <AttackSlotContent {...{ slot, id, magic }} isGamepad />
+        </button>)}
+      </div>
     </div>}
   </div>;
 }

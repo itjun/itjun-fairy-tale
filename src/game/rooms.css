@@ -42,12 +42,12 @@
 .room-hud-keys { right:24px; bottom:24px; display:flex; align-items:flex-end; gap:12px; }
 .room-hud-keys>span { display:flex; align-items:center; gap:8px; min-height:44px; padding:8px 14px; font-size:21px; }
 .room-hud-keys img { width:32px; height:32px; object-fit:contain; }
-.room-hud-keys i { display:flex; flex-direction:column; align-items:center; gap:2px; }
-.room-hud-keys progress { width:44px; height:8px; accent-color:#aa75bf; }
-.room-hud-keys em { font-style:normal; color:#8a5a00; }
+.room-hud-keys>span>span { display:grid; gap:2px; }
+.room-hud-keys progress,.room-touch-attacks progress { width:44px; height:7px; accent-color:#aa75bf; }
 .room-hud-keys kbd,.room-hud-prompt kbd { display:inline-grid; place-items:center; min-width:30px; height:30px; padding:0 8px; box-sizing:border-box; border:2.5px solid #2f2a25; border-radius:11px 13px 12px 10px; background:#fffdf6; font-size:16px; }
 .room-hud-keys .is-ready { background:#fbe9a4; animation:spell-ready 1s ease-in-out infinite alternate; }
 .room-hud-keys .is-ready .pad-key { box-shadow:0 0 0 4px #f6d35b88; }
+.room-hud-keys .is-busy,.room-touch-attacks .is-busy { border-radius:16px; background:#e3efc8; }
 @keyframes spell-ready { from { transform:scale(1); } to { transform:scale(1.07); } }
 
 .room-hud-prompt { position:absolute; left:50%; bottom:128px; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:12px 24px; font-size:26px; color:#5c1f38; white-space:nowrap; }
@@ -68,6 +68,11 @@
 }
 #root .room-touch button { font-size:22px; }
 #root .room-touch button.is-ready { background:#fbe9a4; }
+#root .room-touch .room-touch-attacks { position:absolute; right:0; bottom:calc(100% + 8px); }
+#root .room-touch-attacks button { position:relative; min-width:53px; width:auto; padding:4px 7px; gap:2px; }
+.room-touch-attacks button img { width:22px; height:24px; object-fit:contain; }
+.room-touch-attacks button > span { display:grid; font-size:12px; white-space:nowrap; }
+.room-touch-attacks button .pad-key { min-width:21px; height:21px; font-size:13px; }
 
 /* 出发前选难度。 */
 .difficulty-row { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px 16px; margin:8px 0; font-size:18px; }
@@ -112,5 +117,12 @@
   .overview-sets { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media(max-width:1099px),(pointer:coarse) { .room-hud-keys { display:none; } .room-hud-prompt { bottom:190px; font-size:20px; } }
+html[data-input-mode="gamepad"] #root .room-touch { display:none; }
+@media(max-width:1099px),(pointer:coarse) {
+  html:not([data-input-mode="gamepad"]) .platform-game[data-rooms] :is(.boss-warning,.room-hud-prompt) { bottom:228px; }
+  html[data-input-mode="gamepad"] .room-hud-keys { display:flex; right:12px; bottom:12px; gap:4px; }
+  html[data-input-mode="gamepad"] .room-hud-keys>span { padding:5px 7px; min-height:38px; font-size:14px; gap:3px; }
+  html[data-input-mode="gamepad"] .room-hud-keys img { width:21px; height:21px; }
+}
 @media(max-width:700px) { .room-hud-path { top:86px; } .room-hud-path p span { display:none; } .platform-game[data-rooms=true] .boss-health { top:190px; width:80%; } }
 @media(prefers-reduced-motion:reduce) { .room-fade,.album-toast,.room-hud-keys .is-ready,#root .room-hud-side .room-hud-combo { animation:none; } .room-fade { display:none; } }

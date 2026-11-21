@@ -2,9 +2,9 @@ import { useGamepad } from '../input/GamepadSupport.jsx';
 import { CombatAudio } from './combat-audio.js';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Heart, Star } from '@phosphor-icons/react';
-import { INITIAL_LIVES, CHARACTERS, newSurvival, takeDamage, recordAttack, bloomAtHit } from './characters.js';
+import { INITIAL_LIVES, CHARACTERS, newSurvival, takeDamage, applyWeaponTalent, bloomAtHit } from './characters.js';
 import { createPlayer, stepPlayer } from './physics.js';
-import { fireLoadout, fireAdventureWeapon, stepAdventureWave, attackSource } from './adventure-combat.js';
+import { fireLoadout, stepAdventureWave, attackSource } from './adventure-combat.js';
 import { WEAPONS, UPGRADES } from './adventure.js';
 import { starterAdventure, recommendedStarter } from './starter-build.js';
 import { StarterPicker } from './StarterPicker.jsx';
@@ -44,10 +44,7 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
       if (keys.has('KeyJ') || pad.actions.has('attack') || isTrying) {
         const shots = fireLoadout(player,elapsed,{left:0,right:28},adventure,0,waves);
         if (shots.length) {
-          if (recordAttack(survival)) {
-            if (character === 'mom') { const floralCharge={isUsed:false}; shots.forEach(shot=>{shot.floralCharge=floralCharge;}); }
-            if (character === 'sister' && !waves.some(w => w.isActive && w.firingWeapon === 'talent')) shots.push(...fireAdventureWeapon({...player,nextShot:0},elapsed,{left:0,right:28},'stars').map(w => ({...w, firingWeapon:'talent'})));
-          }
+          applyWeaponTalent(survival, shots);
           for(const kind of new Set(shots.map(attackSource)))mixer.play(`${kind}:fire`);
           waves.push(...shots); onProgress({...survival});
         }
@@ -56,7 +53,15 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
         takeDamage(survival); effect={x:player.x,y:player.y+1,at:elapsed,isShield:true}; nextContact=elapsed+20; onProgress({...survival});
       }
       const spawned=[];
-      for (const wave of waves) { const result=stepAdventureWave(wave,[enemy],[floor],dt,elapsed,player); spawned.push(...result.spawned); for(const hit of result.hits){mixer.play(`${attackSource(wave)}:hit`);if(hit.blocked)mixer.play('block');} const bloom=bloomAtHit(wave,result.hits,[enemy],elapsed); if(bloom) effect=bloom; }
+      for (const wave of waves) {
+        const result=stepAdventureWave(wave,[enemy],[floor],dt,elapsed,player); spawned.push(...result.spawned);
+        for(const hit of result.hits){mixer.play(`${attackSource(wave)}:hit`);if(hit.blocked)mixer.play('block');}
+        const bloom=bloomAtHit(wave,result.hits,[enemy],elapsed); if(bloom) effect=bloom;
+        if (wave.bonusEffect && result.hits.some(hit => hit.damage)) {
+          effect = { x: enemy.x, y: enemy.y + 1, at: elapsed, spark: 'collectible-star' };
+          delete wave.bonusEffect;
+        }
+      }
       waves=[...waves.filter(w=>w.isActive),...spawned].slice(-80); enemy.hp=999;enemy.isDefeated=false;
       context.clearRect(0,0,node.width,node.height);
       // 近战练习按正式关卡的相对比例放大，刀光才能对齐手部和练习靶。
@@ -77,7 +82,7 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
       }
       if(effect && elapsed-effect.at<1.7) {
         if(effect.isShield) picture('collectible-rainbow',player.x,player.y+2.3,5,3);
-        else for(let i=0;i<5;i++)picture('flower',effect.x+Math.cos(i*1.25)*1.5,effect.y+Math.sin(i*1.25)*1.5,1.8,1.8);
+        else for(let i=0;i<5;i++)picture(effect.spark || 'flower',effect.x+Math.cos(i*1.25)*1.5,effect.y+Math.sin(i*1.25)*1.5,1.8,1.8);
       }
       frame=requestAnimationFrame(draw);
     }

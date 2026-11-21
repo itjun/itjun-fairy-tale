@@ -66,7 +66,6 @@ export function applyBossToughness(boss, stage, pressure, cycle = 1) {
 }
 export function stepBosses(world, player, dt, elapsed, shots, adventure) {
   const stage=findStage(world.stageId);
-  const pressure=adventure?weaponPressure(adventure):1;
   for (const arena of world.bossArenas || []) {
     const boss=world.enemies[arena.bossId-1];
     if (boss.isDefeated) { for(const shot of shots)if(shot.bossId===boss.id)shot.isActive=false;continue; }
@@ -75,7 +74,7 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
       if (previous && !world.enemies[previous.bossId-1].isDefeated || player.x < arena.left || player.x > arena.right || Math.abs(player.y-arena.y)>9) continue;
       boss.isDormant=false;boss.attackTime=0;
     }
-    if (stage) applyBossToughness(boss, stage, pressure, world.cycle);
+    if (stage && !boss.elapsed) applyBossToughness(boss, stage, weaponPressure(adventure), world.cycle);
     boss.elapsed+=dt;
     // 已经预告的招式先放完，换阶段不取消蓄力，也不重新开始休息。
     if (boss.isWorldBoss && !boss.isEnraged && boss.hp <= boss.maxHp/2 && boss.attackStage === 'rest') boss.isEnraged=true;

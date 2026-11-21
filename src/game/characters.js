@@ -2,7 +2,7 @@ export const INITIAL_LIVES = 3;
 export const CHARACTERS = Object.freeze({
   dad: { name: '爸爸', image: 'dad-player', attack: 'dad-attack', height: 2.65, talent: '彩虹护盾', icon: 'collectible-rainbow', hint: '抵挡一次伤害，游玩 20 秒后恢复。', detail: '护盾挡不住掉坑。' },
   mom: { name: '妈妈', image: 'mom-player', attack: 'mom-attack', height: 2.5, talent: '花朵缠绕', icon: 'flower', hint: '每攻击四次，花朵让小怪慢下来。', detail: '命中时开花，让附近小怪减速 2 秒。' },
-  sister: { name: '姐姐', image: 'sister-player', attack: 'sister-attack', height: 2.2, talent: '星雨连击', icon: 'collectible-star', hint: '每攻击四次，追加一阵向前的星雨。', detail: '可以和每一种武器搭配。' },
+  sister: { name: '姐姐', image: 'sister-player', attack: 'sister-attack', height: 2.2, talent: '星雨连击', icon: 'collectible-star', hint: '每第四轮武器攻击附上星光，伤害提高 25%。', detail: '可以和每一种武器搭配。' },
   little: { name: '妹妹', image: 'little-player', attack: 'little-attack', height: 1.9, talent: '更高的二段跳', icon: 'lift-leaf', hint: '大家都能再跳一次，妹妹这一下跳得更高。', detail: '落地后恢复，按住不会自动连跳。' },
 });
 export const INITIAL_HP = 100;
@@ -54,4 +54,17 @@ export function bloomAtHit(wave, hits, enemies, elapsed) {
   const target = hits[0].enemy;
   for (const enemy of enemies) if (!enemy.isDefeated && !enemy.isDormant && Math.hypot(enemy.x-target.x, enemy.y-target.y) < 4) enemy.slowUntil = Math.max(enemy.slowUntil || 0, elapsed + 2);
   return { x: target.x, y: target.y + 0.8, at: elapsed };
+}
+
+export function applyWeaponTalent(survival, waves) {
+  if (!recordAttack(survival)) return;
+  if (survival.character === 'mom') {
+    const charge = { isUsed: false };
+    for (const wave of waves) wave.floralCharge = charge;
+  } else if (survival.character === 'sister') {
+    for (const wave of waves) {
+      wave.damage = Math.round(wave.damage * 1.25);
+      wave.bonusEffect = 'stars';
+    }
+  }
 }

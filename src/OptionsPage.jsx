@@ -1,4 +1,4 @@
-import { SpeakerHigh, SpeakerSlash, Trophy, Images, Star, HandHeart, Lightning, Gauge } from '@phosphor-icons/react';
+import { SpeakerHigh, SpeakerSlash, Trophy, Images, Star, HandHeart, Gauge } from '@phosphor-icons/react';
 import { HomePage } from './HomePage.jsx';
 import { DesktopActions } from './DesktopActions.jsx';
 import { DesktopBackups } from './DesktopBackups.jsx';
@@ -23,7 +23,6 @@ export function OptionsPage({ category, onCategory, onBack, backLabel, isSound, 
           ? <b>{DIFFICULTIES[runDifficulty].name}</b>
           : <div className="option-chips">{Object.entries(DIFFICULTIES).map(([id, item]) => <button key={id} aria-pressed={settings.difficulty === id} onClick={() => setPlaySettings({ difficulty: id })}>{item.name}</button>)}</div>}</div>
         <button className="quiet-button" aria-pressed={settings.isHelpOn} onClick={() => setPlaySettings({ isHelpOn: !settings.isHelpOn })}><HandHeart />帮一把：{settings.isHelpOn ? '开' : '关'}</button>
-        <button className="quiet-button" aria-pressed={settings.isAutoSpell} onClick={() => setPlaySettings({ isAutoSpell: !settings.isAutoSpell })}><Lightning />大招满了自动放：{settings.isAutoSpell ? '开' : '关'}</button>
         <button className="quiet-button" aria-pressed={isSound} onClick={onSound}>{isSound ? <SpeakerHigh /> : <SpeakerSlash />}声音：{isSound ? '开' : '关'}</button>
         <p className="option-note">{isInGame ? '难度在出发前选，这次冒险不能换。' : `${DIFFICULTIES[settings.difficulty].hint}。下一次出发时用这个难度。`}帮一把打开时，同一间房里倒下两次会送一层护盾。</p>
       </section>}

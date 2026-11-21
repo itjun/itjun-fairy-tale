@@ -36,11 +36,11 @@ export class SkillEffects {
       }
     }
   }
-  burst(x, y, at, isReward = false, isCompact = false) {
+  burst(x, y, at, isReward = false, isCompact = false, spark = 'stars') {
     if (this.bursts.length >= 24) this.scene.remove(this.bursts.shift().group);
     const group = this.group(); group.position.set(x, y, 1.4);
     this.add(group, 'bubble', 1, 1);
-    for (let i = 0; i < (this.isReducedMotion || isCompact ? 4 : 10); i++) this.add(group, 'stars', 0.6, 0.6);
+    for (let i = 0; i < (this.isReducedMotion || isCompact ? 4 : 10); i++) this.add(group, spark, 0.6, 0.6);
     this.bursts.push({ group, at, isReward, isCompact });
   }
   updateMagic(effects) {

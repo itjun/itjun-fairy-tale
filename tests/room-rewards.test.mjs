@@ -198,23 +198,21 @@ test('轻松档首领预告更久', () => {
   assert.ok(Math.abs(measure(0.6) - measure(0) - 0.6) < 0.05);
 });
 
-test('第 9 版大招靠武器打中攒能量，按 Y 才放；打开自动时继续攻击也会放', () => {
+test('大招靠武器打中充能，按所绑定的技能才释放', () => {
   const { adventure, survival } = run();
   const id = Object.keys(SPELLS)[0], need = SPELLS[id].charge;
   adventure.magic = { ...newMagic(), ranks: { [id]: 1 }, equipped: [id], charges: { [id]: 0 } };
   const player = { x: 0, y: 0, facing: 1 }, enemy = { id: 1, x: 3, y: 0, height: 1, hp: 500, maxHp: 500, combatVersion: 2 };
   const bounds = { left: -20, right: 20 };
-  const step = manual => stepMagic(adventure, survival, player, [enemy], [], 1 / 120, 1, true, bounds, manual);
-  for (let frame = 0; frame < 600; frame++) step({ hits: 0, isCast: false, isAuto: false });
+  const step = manual => stepMagic(adventure, survival, player, [enemy], [], 1 / 120, 1, bounds, manual);
+  for (let frame = 0; frame < 600; frame++) step({ hits: 0 });
   assert.equal(adventure.magic.charges[id], 0, '光按着攻击不打中不涨');
-  step({ hits: 2, isCast: false, isAuto: false });
+  step({ hits: 2 });
   assert.equal(adventure.magic.charges[id], Math.min(need, 2 * CHARGE_PER_HIT));
-  step({ hits: Math.ceil(need / CHARGE_PER_HIT), isCast: false, isAuto: false });
+  step({ hits: Math.ceil(need / CHARGE_PER_HIT) });
   assert.deepEqual(adventure.magic.ready, [id]);
-  assert.deepEqual(step({ hits: 0, isCast: false, isAuto: false }).events, [], '满了不按不放');
-  assert.deepEqual(step({ hits: 0, isCast: true, isAuto: false }).events, [{ type: 'cast', id }]);
+  assert.deepEqual(step().events, [], '满了不按不放');
+  assert.deepEqual(step({ castId: 'snow' }).events, [], '按其他招式的键不会代放');
+  assert.deepEqual(step({ castId: id }).events, [{ type: 'cast', id }]);
   assert.deepEqual(adventure.magic.ready, []);
-
-  adventure.magic = { ...newMagic(), ranks: { [id]: 1 }, equipped: [id], charges: { [id]: need }, ready: [id] };
-  assert.equal(step({ hits: 0, isCast: false, isAuto: true }).events.some(event => event.type === 'cast'), true);
 });

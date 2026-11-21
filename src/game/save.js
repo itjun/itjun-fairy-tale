@@ -75,6 +75,7 @@ export function readAdventure(storage=localStorage) {
     if (state.combatLoot?.pendingId!=null && (state.survival.phase!=='alive'||state.isCompleted||state.journey.pending)) return null;
     if(state.players.some(p=>p.weaponCycles&&Object.entries(p.weaponCycles).some(([id,n])=>!WEAPONS[id]||!Number.isInteger(n)||n<0||n>=60)))return null;
     if (state.players.some(p => p.weaponShots && Object.entries(p.weaponShots).some(([id,value])=>!WEAPONS[id] || !Number.isFinite(value) || value<0 || value>2))) return null;
+    if (state.players.some(p => !isOptionalNumber(p.attackRemaining, 2.500001) || !isOptionalNumber(p.companionRemaining, 3.000001))) return null;
     state.survival = migrateSurvival(state.survival);
     migrateAdventure(state.adventure);migratePendingReward(state.adventure,state.journey);
     return saved;

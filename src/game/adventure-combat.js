@@ -1,38 +1,39 @@
 import { fireSkill, stepWave, damageEnemy } from './combat.js';
-import { activeWeapons, upgradePower, weaponShotCount } from './adventure.js';
+import { upgradePower, weaponShotCount } from './adventure.js';
 import { WEAPONS } from '../../shared/adventure-catalog.js';
 import { weaponDamage } from './growth.js';
 import { placeLightblade, stepLightblade } from './melee.js';
+import { attackBindings } from './attack-bindings.js';
 
 export function attackSource(wave) {
   return WEAPONS[wave.firingWeapon] ? wave.firingWeapon : wave.source || wave.kind;
 }
 
-export function fireLoadout(player, elapsed, bounds, adventure, index = 0, activeWaves = player.weaponWaves || []) {
+export function canStartAttack(player, elapsed, adventure, activeWaves, index = 0) {
+  return elapsed >= (player.nextAttackAt || 0) && !adventure.magic?.active.length
+    && !activeWaves.some(wave => wave.isActive && (wave.ownerIndex ?? 0) === index);
+}
+
+export function fireLoadout(player, elapsed, bounds, adventure, index = 0, activeWaves = player.weaponWaves || [], weapon = attackBindings(adventure)[0]) {
+  if (!WEAPONS[weapon] || !attackBindings(adventure).includes(weapon)
+      || !canStartAttack(player, elapsed, adventure, activeWaves, index)
+      || elapsed < (player.weaponShots?.[weapon] || 0)) return [];
   player.weaponShots ||= {}; player.weaponCycles ||= {};
-  const shots = [];
-  for (const weapon of activeWeapons(adventure,index)) {
-    // 同一武器的一轮全部结束才可再发；读档直接从保存的弹道恢复占用。
-    if (activeWaves.some(w => w.isActive && (w.ownerIndex ?? 0) === index && (w.firingWeapon || w.kind) === weapon)) continue;
-    // 冷却期间没有弹道要生成，不必每个物理步长重算这一把武器的全部本领。
-    if (elapsed < (player.weaponShots[weapon] || 0)) continue;
-    const emitter = {...player, nextShot:player.weaponShots[weapon] || 0};
-    const waves = fireAdventureWeapon(emitter, elapsed, bounds, weapon, upgradePower(adventure,index,weapon));
-    player.weaponShots[weapon] = emitter.nextShot;
-    if(waves.length){
-      player.attackUntil=Math.max(player.attackUntil || 0,emitter.attackUntil);player.weaponCycles[weapon]=((player.weaponCycles[weapon] || 0)+1)%60;
-      if(adventure.qualities?.[`weapon:${weapon}`]==='legendary'){
-        const root=waves[0];
-        if(weapon==='blade')waves.push({...root,direction:-root.direction,remaining:Math.max(2,(root.x-(root.direction>0?bounds.left:bounds.right))*root.direction),damage:Math.round(root.damage*.5),powers:{},hitIds:new Set()});
-        if(weapon==='stars'&&player.weaponCycles[weapon]%4===0)for(const slope of [-.3,0,.3])waves.push({...root,slope,damage:Math.round(root.damage*.5),powers:{},hitIds:new Set()});
-        if(weapon==='flame'&&player.weaponCycles[weapon]%15===0)for(let i=0;i<4;i++)waves.push({...root,kind:'pulse',source:'flame',x:root.x+root.direction*4,y:root.y+1.5,delay:.3*i,age:0,radius:3,damage:Math.round(root.damage*1.5),powers:{}});
-      }
-    }
-    waves.forEach(w => { w.firingWeapon = weapon; w.ownerIndex = index; });
-    shots.push(...waves);
+  const emitter = { ...player, nextShot: player.weaponShots[weapon] || 0 };
+  const waves = fireAdventureWeapon(emitter, elapsed, bounds, weapon, upgradePower(adventure, index, weapon));
+  if (!waves.length) return waves;
+  player.weaponShots[weapon] = player.nextAttackAt = emitter.nextShot;
+  player.attackUntil = Math.max(player.attackUntil || 0, emitter.attackUntil);
+  player.weaponCycles[weapon] = ((player.weaponCycles[weapon] || 0) + 1) % 60;
+  if (adventure.qualities?.[`weapon:${weapon}`] === 'legendary') {
+    const root = waves[0];
+    if(weapon==='blade')waves.push({...root,direction:-root.direction,remaining:Math.max(2,(root.x-(root.direction>0?bounds.left:bounds.right))*root.direction),damage:Math.round(root.damage*.5),powers:{},hitIds:new Set()});
+    if(weapon==='stars'&&player.weaponCycles[weapon]%4===0)for(const slope of [-.3,0,.3])waves.push({...root,slope,damage:Math.round(root.damage*.5),powers:{},hitIds:new Set()});
+    if(weapon==='flame'&&player.weaponCycles[weapon]%15===0)for(let i=0;i<4;i++)waves.push({...root,kind:'pulse',source:'flame',x:root.x+root.direction*4,y:root.y+1.5,delay:.3*i,age:0,radius:3,damage:Math.round(root.damage*1.5),powers:{}});
   }
-  player.weaponWaves = [...activeWaves.filter(w => w.isActive), ...shots];
-  return shots;
+  waves.forEach(wave => { wave.firingWeapon = weapon; wave.ownerIndex = index; });
+  player.weaponWaves = waves;
+  return waves;
 }
 
 export function fireAdventureWeapon(player, elapsed, bounds, weapon, powers = {}) {

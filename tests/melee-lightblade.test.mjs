@@ -12,6 +12,7 @@ const target = (id, x, extra = {}) => ({ id, x, y: 0, width: .4, height: 2, hp: 
 function build(weapons = ['lightblade'], upgrades = {}, rank = 1) {
   const a = newAdventure(42);
   a.weapons = [...weapons]; a.weaponRanks = { lightblade: rank }; a.upgrades = upgrades;
+  a.attackBindings = [weapons[0], weapons[1] ?? null, null];
   a.loadouts[0] = { weapon: weapons[0], weapons: [...weapons], upgrades: Object.keys(upgrades) };
   return a;
 }
@@ -129,12 +130,14 @@ test('近战存档拒绝损坏范围和时序，最高 99 级双重连斩仍可�
   assert.equal(fireLoadout(p, 16.2, bounds, a, 0, restored.waves).length, 198);
 });
 
-test('近战与远程可同时装备，远程在途不会锁住下一刀', () => {
+test('近战与远程独立绑定，远程在途锁住下一刀', () => {
   const p = owner(), a = build(['moonblade', 'lightblade']), waves = fireLoadout(p, 0, bounds, a);
-  assert.deepEqual(waves.map(w => w.kind), ['moonblade', 'lightblade']);
+  assert.deepEqual(waves.map(w => w.kind), ['moonblade']);
   step(waves, [], p, .45);
   assert.equal(waves[0].isActive, true);
-  const next = fireLoadout(p, .45, bounds, a, 0, waves);
+  assert.deepEqual(fireLoadout(p, .45, bounds, a, 0, waves, 'lightblade'), []);
+  step(waves, [], p, 2.5, .45);
+  const next = fireLoadout(p, 3, bounds, a, 0, waves, 'lightblade');
   assert.deepEqual(next.map(w => w.kind), ['lightblade']);
   assert.deepEqual(activeWeapons(a), ['moonblade', 'lightblade']);
   assert.ok(isValidAdventure(a, 1));
@@ -153,26 +156,28 @@ test('光刀可作为初始武器及探索奖励，四位角色推荐搭配保�
 });
 
 test('真实引擎手柄长按、暂停和恢复遵循同一挥斩轮次', () => {
-  const game = headless('room'); game.adventure = build(['moonblade', 'lightblade']); game.survival.character = 'dad';
+  const game = headless('room'); game.adventure = build(['lightblade', 'moonblade']); game.survival.character = 'dad';
   game.world.enemies.forEach(e => { e.isDormant = true; });
   const sounds = []; game.callbacks.onSound = sound => sounds.push(sound);
   game.setGamepadInput({ actions: new Set(['attack']), direction: 0 });
   run(game, .05);
   assert.equal(game.waves.filter(w => w.kind === 'lightblade').length, 1);
-  assert.ok(sounds.includes('lightblade:fire')); assert.ok(sounds.includes('moonblade:fire'));
+  assert.ok(sounds.includes('lightblade:fire')); assert.ok(!sounds.includes('moonblade:fire'));
   game.pause(true);
   const state = game.exportState(); game.tick();
   assert.deepEqual(game.exportState().projectiles, state.projectiles);
   const restored = headless('room'); restored.restoreState(state);
   restored.world.enemies.forEach(e => { e.isDormant = true; });
-  restored.setGamepadInput({ actions: new Set(['attack']), direction: 0 });
+  restored.setGamepadInput({ actions: new Set(['spell']), direction: 0 });
   run(restored, .08);
   assert.equal(restored.waves.filter(w => w.kind === 'lightblade').length, 1, '恢复后不能叠出额外一刀');
-  assert.equal(restored.waves.filter(w => w.kind === 'moonblade').length, 1);
+  assert.equal(restored.waves.filter(w => w.kind === 'moonblade').length, 0);
   const after = []; restored.callbacks.onSound = sound => after.push(sound);
   run(restored, .5);
-  assert.ok(after.includes('lightblade:fire'));
-  assert.equal(after.includes('moonblade:fire'), false, '远程原轮仍在屏内');
+  assert.ok(!after.some(sound => sound.endsWith(':fire')), '读档后忙碌时按下 Y 不补发');
+  restored.setGamepadInput({ actions: new Set(), direction: 0 }); run(restored, .02);
+  restored.setGamepadInput({ actions: new Set(['spell']), direction: 0 }); run(restored, .02);
+  assert.ok(after.includes('moonblade:fire'));
 });
 
 test('真实引擎派生攻击音效保留原武器归属', () => {

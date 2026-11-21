@@ -21,26 +21,23 @@ function hit(enemy,elapsed,damage,x,source) {
 }
 export const CHARGE_PER_HIT = 1.5;
 // 只由固定游玩步长调用；充能、持续效果、命中记录一起保存，暂停不推进。
-// 第 9 版传入 manual：武器打中才攒能量（hits），按 Y 放（isCast）；打开“满了自动放”时继续攻击也会放（isAuto）。
-export function stepMagic(adventure,survival,player,enemies,shots,dt,elapsed,isFiring,bounds,manual) {
+// 房间玩法按命中充能。castId 指定这次按键绑定的大招。
+export function stepMagic(adventure, survival, player, enemies, shots, dt, elapsed, bounds, { hits: weaponHits = 0, castId = null } = {}) {
   if(dt<=0)return {hits:[],events:[]};
   const m=adventure.magic ||= newMagic(),hits=[],events=[];
   m.gap=Math.max(0,m.gap-dt);m.counterCooldown=Math.max(0,m.counterCooldown-dt);
   const visible=enemies.filter(e=>!e.isDefeated&&!e.isDormant&&!e.isHidden&&e.x>=bounds.left&&e.x<=bounds.right&&Math.abs(e.y-player.y)<14);
   for(const id of m.equipped) {
-    if(m.active.some(e=>e.id===id)||m.ready.includes(id)||(manual?!manual.hits:!isFiring||!visible.length))continue;
-    m.charges[id]=Math.min(SPELLS[id].charge,(m.charges[id] || 0)+(manual?manual.hits*CHARGE_PER_HIT:dt));
+    if(!weaponHits || m.active.some(e=>e.id===id) || m.ready.includes(id))continue;
+    m.charges[id]=Math.min(SPELLS[id].charge,(m.charges[id] || 0)+weaponHits*CHARGE_PER_HIT);
     if(m.charges[id]===SPELLS[id].charge)m.ready.push(id);
   }
-  const isCasting=manual?manual.isCast||manual.isAuto&&isFiring&&visible.length>0:isFiring&&visible.length>0;
-  if(isCasting && !m.gap) {
-    const id=m.ready.find(key=>m.equipped.includes(key)&&(manual?.isCast||key!=='fire'||visible.some(e=>Math.hypot(e.x-player.x,e.y-player.y)<6.5)));
-    if(id){
-      m.ready=m.ready.filter(key=>key!==id);m.charges[id]=0;m.gap=2.5;
-      m.active.push({id,age:0,nextTick:0,duration:SPELLS[id].duration+(id==='fire'?m.ranks[id]-1:0),x:player.x,y:player.y+1,isShield:id==='fire',hitIds:[]});
-      if(id==='rain'){heal(survival,10);for(const shot of shots)if(!shot.bossId&&Math.abs(shot.x-player.x)<20)shot.isActive=false;}
-      events.push({type:'cast',id});
-    }
+  if (castId && !m.gap && !m.active.length && m.equipped.includes(castId) && m.ready.includes(castId)) {
+    const id = castId;
+    m.ready = m.ready.filter(key => key !== id); m.charges[id] = 0; m.gap = 2.5;
+    m.active.push({id,age:0,nextTick:0,duration:SPELLS[id].duration+(id==='fire'?m.ranks[id]-1:0),x:player.x,y:player.y+1,isShield:id==='fire',hitIds:[]});
+    if(id==='rain'){heal(survival,10);for(const shot of shots)if(!shot.bossId&&Math.abs(shot.x-player.x)<20)shot.isActive=false;}
+    events.push({type:'cast',id});
   }
   for(const effect of m.active) {
     const id=effect.id,rank=m.ranks[id],isLegend=adventure.qualities?.[`spell:${id}`]==='legendary';

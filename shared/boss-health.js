@@ -5,7 +5,7 @@ export function bossBaseline(stage, cycle = 1) {
   return Math.round((1200 + stage.worldIndex * 68) * cycleModifiers(cycle).health);
 }
 
-// 一把基础弯刀的压力是 1，血量不变。叠了更多武器时，开战再把首领加厚，最多到 1.8 倍。
+// 开战时根据绑定招式的最高单武器输出加厚，最多到 1.8 倍。
 export function bossToughness(pressure) {
   const piled = Math.max(1, Number.isFinite(pressure) ? pressure : 1);
   return 1 + Math.min(0.8, (piled - 1) * 0.18);

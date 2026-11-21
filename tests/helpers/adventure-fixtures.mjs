@@ -35,6 +35,7 @@ export function roomFixture(mode = 'door', levelId = WORLD_ACTS[0].id, { seed = 
   adventure.ruleset = 9; adventure.difficulty = 'easy'; adventure.locked = [];
   if (['boss', 'boss-high', 'finish', 'stack'].includes(mode)) {
     adventure.weapons = ['blade', 'bubble', 'boomerang']; adventure.loadouts[0].weapons = [...adventure.weapons]; adventure.loadouts[0].weapon = adventure.weapons[0];
+    adventure.attackBindings = [...adventure.weapons];
     adventure.growth = { collected: 3, power: 2, hearts: 3 }; adventure.effects = { rainbowBoost: 40 };
     survival.maxHp = 160; survival.hp = 140;
   }

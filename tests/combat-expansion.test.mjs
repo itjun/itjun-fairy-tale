@@ -22,9 +22,13 @@ import {readFileSync} from 'node:fs';
 const target=(id=1,x=4)=>({id,x,y:0,width:2,height:3,hp:10000,maxHp:10000,combatVersion:2});
 const player=()=>({x:0,y:0,facing:1});
 const bounds={left:-20,right:20};
+function singleWeapon(id) {
+ const a=newAdventure(1);a.weapons=[id];a.loadouts[0].weapons=[id];a.loadouts[0].weapon=id;a.attackBindings=[id,null,null];
+ return a;
+}
 function grant(a,type,id,rarity='legendary',s=newSurvival()) {const j=newJourney();j.pending={id:crypto.randomUUID(),player:0,choices:[{type,id,rarity}]};assert.ok(chooseReward(a,j,0,s));return s;}
 
-test('每个世界关各一场首领，30 种怪物都会出场，首领房门口有补给',()=>{
+test('八个世界关各一场首领，30 种怪物都会出场，首领房门口有补给',()=>{
  const seen=new Set();
  assert.equal(Object.keys(MONSTERS).length,30);
  for(const act of WORLD_ACTS)for(const seed of [1,42,137,999,2024]){
@@ -61,36 +65,36 @@ test('旧待选卡不被替换，补传奇后保存再次迁移不变',()=>{
  migratePendingReward(a,j);assert.equal(j.pending.choices.length,4);assert.deepEqual(j.pending.choices.slice(0,3).map(c=>c.id),['blade','bubble','rapid']);assert.equal(j.pending.choices[3].rarity,'legendary');
  assert.ok(isValidJourney(j,1));const saved=structuredClone(j);migratePendingReward(a,j);assert.deepEqual(j,saved);
 });
-test('四大招仅攻击可见敌人时充能，火环距离不合适不阻塞其他就绪技能',()=>{
+test('四大招靠武器命中充能，只释放指定的大招',()=>{
  const a=newAdventure(1),s=newSurvival(),p=player();for(const id of Object.keys(SPELLS))grant(a,'spell',id,'epic');
- for(let i=0;i<100;i++)stepMagic(a,s,p,[],[],.1,i*.1,true,bounds);assert.deepEqual(Object.values(a.magic.charges),[0,0,0,0]);
- const enemy=target(1,12);stepMagic(a,s,p,[enemy],[],1,1,false,bounds);assert.equal(a.magic.charges.fire,0);
+ for(let i=0;i<100;i++)stepMagic(a,s,p,[],[],.1,i*.1,bounds);assert.deepEqual(Object.values(a.magic.charges),[0,0,0,0]);
+ const enemy=target(1,12);stepMagic(a,s,p,[enemy],[],1,1,bounds);assert.equal(a.magic.charges.fire,0);
  for(const id of a.magic.equipped)a.magic.charges[id]=SPELLS[id].charge;a.magic.ready=['fire','thunder','snow','rain'];
- const r=stepMagic(a,s,p,[enemy],[],.01,2,true,bounds);assert.equal(r.events[0].id,'thunder');assert.equal(a.magic.gap,2.5);assert.ok(a.magic.ready.includes('fire'));
- const saved=structuredClone(a);stepMagic(a,s,p,[enemy],[],0,2,true,bounds);assert.deepEqual(a,saved);assert.ok(isValidMagic(a.magic));
+ const r=stepMagic(a,s,p,[enemy],[],.01,2,bounds,{castId:'thunder'});assert.equal(r.events[0].id,'thunder');assert.equal(a.magic.gap,2.5);assert.ok(a.magic.ready.includes('fire'));
+ const saved=structuredClone(a);stepMagic(a,s,p,[enemy],[],0,2,bounds);assert.deepEqual(a,saved);assert.ok(isValidMagic(a.magic));
 });
 test('甘霖只回血一次且不加命、不清首领弹；持续技能跨存档接续，不重复触发',()=>{
  const a=newAdventure(1),s=newSurvival(),p=player();grant(a,'spell','rain');s.hp=40;a.magic.charges.rain=26;a.magic.ready=['rain'];
- const shots=[{isActive:true,x:1},{isActive:true,x:1,bossId:3}];stepMagic(a,s,p,[target()],shots,.01,0,true,bounds);
+ const shots=[{isActive:true,x:1},{isActive:true,x:1,bossId:3}];stepMagic(a,s,p,[target()],shots,.01,0,bounds,{castId:'rain'});
  assert.equal(s.hp,50);assert.equal(s.lives,3);assert.equal(shots[0].isActive,false);assert.equal(shots[1].isActive,true);
- const copy=JSON.parse(JSON.stringify(a));for(let i=1;i<=41;i++)stepMagic(copy,s,p,[target()],[],.1,i*.1,false,bounds);
+ const copy=JSON.parse(JSON.stringify(a));for(let i=1;i<=41;i++)stepMagic(copy,s,p,[target()],[],.1,i*.1,bounds);
  assert.equal(s.hp,50);assert.equal(copy.magic.shield,1);assert.equal(copy.magic.charges.rain,0);assert.ok(isValidMagic(copy.magic));
  assert.deepEqual(consumeMagicShield(copy,p,[],5),[]);assert.equal(consumeMagicShield(copy,p,[],5),null);
 });
 test('雪幕冻结有免疫窗，BOSS 只减速；雷链单次同目标至多两击',()=>{
  for(const id of ['snow','thunder']){
   const a=newAdventure(1),s=newSurvival(),p=player(),e=target(),boss={...target(2,7),isBoss:true};grant(a,'spell',id);a.magic.charges[id]=SPELLS[id].charge;a.magic.ready=[id];
-  let count=0;for(let i=0;i<40;i++){const r=stepMagic(a,s,p,[e,boss],[],.1,i*.1,true,bounds);count+=r.hits.filter(h=>h.enemy.id===1).length;}
+  let count=0;for(let i=0;i<40;i++){const r=stepMagic(a,s,p,[e,boss],[],.1,i*.1,bounds,{castId:i===0?id:null});count+=r.hits.filter(h=>h.enemy.id===1).length;}
   if(id==='snow'){assert.equal(boss.frozenUntil,undefined);assert.ok(e.freezeImmuneUntil>3);assert.ok(e.frozenUntil<2);assert.ok(boss.slowUntil>0);}else assert.ok(count<=2);
  }
 });
 test('火龙固定节拍伤害不随帧率倍增，月牙传奇子弹不递归，泡泡不重复结算直击',()=>{
- const simulate=dt=>{const a=newAdventure(1);a.weapons=['flame'];a.loadouts[0].weapons=['flame'];const p=player(),e=target();let waves=[];for(let t=0;t<2;t+=dt){waves.push(...fireLoadout(p,t,bounds,a));for(const wave of waves)stepAdventureWave(wave,[e],[],dt,t);waves=waves.filter(w=>w.isActive);}return 10000-e.hp;};
+ const simulate=dt=>{const a=singleWeapon('flame'),p=player(),e=target();let waves=[];for(let t=0;t<2;t+=dt){waves.push(...fireLoadout(p,t,bounds,a,0,waves));for(const wave of waves)stepAdventureWave(wave,[e],[],dt,t);waves=waves.filter(w=>w.isActive);}return 10000-e.hp;};
  assert.ok(Math.abs(simulate(1/60)-simulate(1/120))<=18);
  const a=newAdventure(1);grant(a,'weapon','moonblade');const p=player(),enemies=[target(1,3),target(2,7)];let waves=fireLoadout(p,0,bounds,a),children=0;
  for(let n=0;n<360;n++){const spawned=[];for(const wave of waves){const r=stepAdventureWave(wave,enemies,[],1/120,n/120);children+=r.spawned.filter(w=>w.isLegendChild).length;spawned.push(...r.spawned);}waves=[...waves.filter(w=>w.isActive),...spawned];}
  assert.equal(children,2);
- const b=newAdventure(1);b.weapons=['bubble'];b.loadouts[0].weapons=['bubble'];const e=target(1,2),[wave]=fireLoadout(player(),0,bounds,b);for(let i=0;i<100;i++)stepAdventureWave(wave,[e],[],1/120,i/120);assert.equal(10000-e.hp,WEAPONS.bubble.damage);
+ const b=singleWeapon('bubble'),e=target(1,2),[wave]=fireLoadout(player(),0,bounds,b);for(let i=0;i<100;i++)stepAdventureWave(wave,[e],[],1/120,i/120);assert.equal(10000-e.hp,WEAPONS.bubble.damage);
 });
 test('新怪物动作、破壳与同屏预算真实生效',()=>{
  const make=kind=>({...target(),...MONSTERS[kind],kind,baseY:0,minX:0,maxX:10,direction:1,speed:1,phase:0,elapsed:2.49,hasShell:kind==='penguin'});
@@ -99,7 +103,7 @@ test('新怪物动作、破壳与同屏预算真实生效',()=>{
  const octopus=make('octopus'),shots=[];stepAdventureEnemies([octopus],[player()],.1,3,shots);assert.equal(shots[0].kind,'inklob');for(let i=0;i<30;i++)stepAdventureEnemies([],[player()],.1,3+i*.1,shots);assert.equal(shots[0].kind,'ink');
 });
 test('飞行弹道保存恢复，命中后消失且不再进入存档',()=>{
- const a=newAdventure(1),p=player(),e=target(1,8);a.weapons=['blade'];a.loadouts[0].weapons=['blade'];
+ const a=singleWeapon('blade'),p=player(),e=target(1,8);
  const waves=fireLoadout(p,0,bounds,a);stepAdventureWave(waves[0],[e],[],.01,.01);
  const state=saveProjectiles(waves,[]);assert.ok(isValidProjectiles(state,{enemies:[e]}));
  const restored=restoreProjectiles(JSON.parse(JSON.stringify(state)));
@@ -108,7 +112,7 @@ test('飞行弹道保存恢复，命中后消失且不再进入存档',()=>{
  assert.equal(saveProjectiles(restored.waves,[]).waves.length,0);
  state.waves[0].hitIds=[999];assert.equal(isValidProjectiles(state,{enemies:[e]}),false);
 });
-test('127 份原创音效离线打包，混音最多 12 声部，同批发射合并且预警优先',()=>{
+test('离线音效打包，混音最多 12 声部，同批发射合并且预警优先',()=>{
  for(const name of AUDIO_FILES){const wav=readFileSync(new URL(`../public/audio/combat/${name}.wav`,import.meta.url));assert.equal(wav.toString('ascii',0,4),'RIFF');assert.ok(wav.length>2000);}
  const context={currentTime:1,state:'running',destination:{},createBufferSource(){return {connect(){},start(){},stop(){},disconnect(){}};},createGain(){return {gain:{value:0,cancelScheduledValues(){},setTargetAtTime(){}},connect(){},disconnect(){}};}};
  const mixer=new CombatAudio();mixer.context=context;for(const name of AUDIO_FILES)mixer.buffers.set(name,{});
@@ -123,11 +127,11 @@ test('五类白装基础武器都能打败每位世界首领',()=>{
   const source=createRoomWorld(42,act),arena=source.bossArenas[0];
   for(const kind of ['blade','bubble','stars','moonblade','flame']){
    const w=structuredClone(source),e=w.enemies[arena.bossId-1];
-   const a=newAdventure(2);a.weapons=[kind];a.loadouts[0].weapons=[kind];a.loadouts[0].weapon=kind;
+   const a=singleWeapon(kind);
    const p={x:e.x-6,y:arena.y,facing:1,isGrounded:true,ground:w.platforms[arena.floorId]};let waves=[];
    for(let t=0;t<45&&!e.isDefeated;t+=1/60){
     p.x=Math.max(arena.left+1,Math.min(arena.right-1,e.x-6));p.facing=e.x>=p.x?1:-1;
-    stepBosses(w,p,1/60,t,[]);waves.push(...fireLoadout(p,t,{left:p.x-20,right:p.x+20},a));
+    stepBosses(w,p,1/60,t,[]);waves.push(...fireLoadout(p,t,{left:p.x-20,right:p.x+20},a,0,waves));
     const spawned=[];for(const wave of waves)spawned.push(...stepAdventureWave(wave,[e],w.platforms,1/60,t).spawned);
     waves=[...waves.filter(w=>w.isActive),...spawned];
    }
@@ -137,7 +141,7 @@ test('五类白装基础武器都能打败每位世界首领',()=>{
  assert.equal(fights, WORLD_ACTS.length * 5);
 });
 test('飞行存档保留同轮共享命中特效，血条耗尽等着选的状态读回来不变',()=>{
- const a=newAdventure(1);a.weaponRanks.blade=3;a.weapons=['blade'];a.loadouts[0].weapons=['blade'];
+ const a=singleWeapon('blade');a.weaponRanks.blade=3;
  const waves=fireLoadout(player(),0,bounds,a),charge={isUsed:false};waves.forEach(w=>{w.floralCharge=charge;w.bindingCharge=charge;});
  const restored=restoreProjectiles(JSON.parse(JSON.stringify(saveProjectiles(waves,[]))));
  restored.waves[0].floralCharge.isUsed=true;assert.ok(restored.waves.every(w=>w.floralCharge.isUsed));
@@ -150,12 +154,12 @@ test('飞行存档保留同轮共享命中特效，血条耗尽等着选的状�
 });
 test('星雨和光刃命中后都消失；传奇雷链为回响保留第二击',()=>{
  for(const kind of ['stars','blade']){
-  const a=newAdventure(1);a.weapons=[kind];a.loadouts[0].weapons=[kind];const enemies=[target(1,3),target(2,7)],[wave]=fireLoadout(player(),0,bounds,a);
+  const a=singleWeapon(kind),enemies=[target(1,3),target(2,7)],[wave]=fireLoadout(player(),0,bounds,a);
   for(let i=0;i<120;i++)stepAdventureWave(wave,enemies,[],1/120,i/120);
   assert.ok(enemies[0].hp<10000);assert.equal(enemies[1].hp<10000,false);
  }
  const a=newAdventure(2),s=newSurvival();for(let i=0;i<3;i++)grant(a,'spell','thunder','epic');grant(a,'spell','thunder','legendary');assert.equal(a.magic.ranks.thunder,3);
  a.magic.charges.thunder=20;a.magic.ready=['thunder'];const times=[],e=target();
- for(let i=0;i<20;i++){const r=stepMagic(a,s,player(),[e],[],.1,i*.1,true,bounds);for(const h of r.hits)if(h.enemy.id===e.id)times.push(i*.1);}
+ for(let i=0;i<20;i++){const r=stepMagic(a,s,player(),[e],[],.1,i*.1,bounds,{castId:i===0?'thunder':null});for(const h of r.hits)if(h.enemy.id===e.id)times.push(i*.1);}
  assert.equal(times.length,2);assert.ok(times[1]>=1.3);
 });

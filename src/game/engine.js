@@ -1,7 +1,7 @@
 import { saveProjectiles, restoreProjectiles } from './projectile-state.js';
 import { applyCycleHealth, cycleModifiers } from '../../shared/adventure-cycle.js';
 import { stepMagic, consumeMagicShield, shieldCounter, newMagic } from './magic.js';
-import { CHARACTERS, newSurvival, migrateSurvival, reviveSurvival, recordAttack, bloomAtHit } from './characters.js';
+import { CHARACTERS, newSurvival, migrateSurvival, reviveSurvival, applyWeaponTalent, bloomAtHit } from './characters.js';
 import { resourcesFor, damageWithBuild, recordDefeat, completeEncounter, tickResources, useRecovery, heal } from './expedition.js';
 import { newRoomState, currentRoom, stepRoom, recordCombo, recordHurt, doorAt, enterDoor, stallAt, isStallSold, isRoomCleared, roomProgress, starTotal, encounterBarrier } from './rooms.js';
 import { roomEnemyGuide } from './room-guide.js';
@@ -19,7 +19,8 @@ import { starterAdventure } from './starter-build.js';
 import { newCombatLoot, rollCombatLoot, lootPosition, nearbyLoot, chooseLifeLoot, LIFE_CHOICES } from './combat-loot.js';
 import { MONSTERS, WEAPONS } from '../../shared/adventure-catalog.js';
 import { newAdventure, newJourney, upgradePower, activeWeapons, weaponRank, weaponShotCount, migrateAdventure, tickEffects, chooseReward, recycleReward } from './adventure.js';
-import { fireAdventureWeapon, fireLoadout, stepAdventureWave, areaAttack, attackSource } from './adventure-combat.js';
+import { canStartAttack, fireLoadout, stepAdventureWave, areaAttack, attackSource } from './adventure-combat.js';
+import { ATTACK_KEYS, attackBindings, attackInput, bindAttack } from './attack-bindings.js';
 import { stepAdventureEnemies, releaseCandyChildren } from './adventure-enemies.js';
 import { createPlayer, landingDamage, rescue, revivalPoint } from './physics.js';
 import { beginCrawl, caveForPlayer, caveMouthAt, climbEntryAt, stepTraversal } from './traversal.js';
@@ -48,7 +49,7 @@ export class GardenEngine {
     this.world = createRoomWorld(seed, level, this.adventure.cycle);
     // 选门闯房间：房间进度单独记，难度和画册里还没解锁的东西跟着这次冒险走。
     this.roomState = newRoomState(this.world);
-    this.spellHits = 0; this.isInteracting = false; this.isCasting = false; this.rewardAt = 0;
+    this.spellHits = 0; this.isInteracting = false; this.attackInput = { down: [] }; this.rewardAt = 0;
     this.applyRoomRules(difficulty, locked);
     this.journey = newJourney(); this.levelKey = `${level.id}:${seed}`; this.attackGate = { next: 0 }; this.enemyShots = []; this.enemyShotViews = new Map();
     this.claimedSupplies = []; this.hazardViews = new Map(); this.supplyViews = new Map();
@@ -281,14 +282,13 @@ export class GardenEngine {
   keyDown(event) {
     this.heldKeys.add(event.code);
     if (this.isPaused || event.repeat && !this.keys.has(event.code)) return;
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'Enter', 'Escape', 'KeyP'].includes(event.code)) event.preventDefault();
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'KeyL', 'Escape', 'KeyP'].includes(event.code)) event.preventDefault();
     if (event.code === 'Escape' || event.code === 'KeyP') { if (!event.repeat) this.requestPause(); return; }
     if (!this.keys.has(event.code)) {
       // 站在摊位前，“上”用来买东西，不跳。门是跳上去就进。
       const player = this.players[0];
       if (['KeyW', 'ArrowUp'].includes(event.code) && this.canInteract()) this.isInteracting = true;
       else if (event.code === 'Space' || !player.grip && !player.launch?.isDrop && (event.code === 'KeyW' || this.players.length === 1 && event.code === 'ArrowUp')) this.jumps[0] = true;
-      if (event.code === 'KeyK') this.isCasting = true;
     }
     this.keys.add(event.code);
   }
@@ -297,7 +297,6 @@ export class GardenEngine {
     if (this.isPaused) return;
     if(isPressed)this.heldKeys?.add(`touch:${action}`);
     if (isPressed && action === 'enter') { this.isInteracting = true; return; }
-    if (isPressed && action === 'spell') { this.isCasting = true; return; }
     if (isPressed) {
       const player = this.players[0];
       if (!this.touch.has(action) && (action === 'jump' || action === 'drop' && !player.grip && !climbEntryAt(currentRoom(this.world, this.roomState).traversal, player))) this.jumps[0] = true;
@@ -310,13 +309,12 @@ export class GardenEngine {
     const actions = input?.actions || new Set();
     if (actions.has('confirm') && !this.gamepad.has('jump')) this.jumps[0] = true;
     if (actions.has('up') && !this.gamepad.has('up') && this.canInteract()) this.isInteracting = true;
-    if (actions.has('spell') && !this.gamepad.has('spell')) this.isCasting = true;
     this.gamepad = new Set([...actions].map(action => action === 'confirm' ? 'jump' : action === 'down' ? 'drop' : action));
     this.gamepadDirection = input?.direction || 0;
   }
   releaseGamepad() { this.gamepad?.clear(); this.gamepadDirection = 0; }
   hasControl(action) { return this.touch.has(action) || this.gamepad?.has(action); }
-  clearInput() { this.releaseGamepad(); this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; this.isInteracting = false; this.isCasting = false; }
+  clearInput() { this.releaseGamepad(); this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; this.isInteracting = false; this.attackInput = { down: [] }; }
   pause(isPaused) { if (!isPaused && (this.survival.phase !== 'alive'||this.combatLoot?.pendingId!=null)) return; this.isPaused = isPaused; if(isPaused)this.callbacks.onSound('pause'); this.clearInput(); this.accumulator = 0; }
   requestPause() { if (!this.isPaused) { this.pause(true); this.callbacks.onPause(); } }
   returnToSafety() {
@@ -332,6 +330,13 @@ export class GardenEngine {
     const adventure=starterAdventure(this.seed,build);
     if(!adventure)return false;
     this.adventure=adventure;this.applyRoomRules(difficulty,locked);this.players.forEach(p=>{p.weaponShots={};});this.publish();return true;
+  }
+  equipAttack(slot, id) {
+    if (!this.isPaused || this.survival.phase !== 'alive' || this.isCompleted
+        || this.journey.pending || this.combatLoot.pendingId !== null) return false;
+    if (!bindAttack(this.adventure, slot, id)) return false;
+    this.publish();
+    return true;
   }
   openLifeLoot(enemyId) {
     if(this.isPaused||this.isCompleted||this.survival.phase!=='alive'||this.journey.pending||nearbyLoot(this.combatLoot,this.world,this.players[0])?.enemyId!==enemyId)return false;
@@ -603,6 +608,11 @@ export class GardenEngine {
         this.callbacks.onSound(wave.clash.isIcicle ? `${attackSource(wave)}:hit` : 'lightblade:clash');
       }
       const hits = result.hits;
+      if (wave.bonusEffect && hits.some(hit => hit.damage)) {
+        const target = hits.find(hit => hit.damage).enemy;
+        this.skillEffects.burst(target.x, target.y + target.height / 2, this.elapsed, false, true, wave.bonusEffect);
+        delete wave.bonusEffect;
+      }
       const bloom = bloomAtHit(wave, hits, this.world.enemies, this.elapsed); if (bloom) this.talentEffect = bloom;
       spawned.push(...result.spawned);
       for (const hit of hits) this.recordHit({...hit,source:attackSource(wave)});
@@ -664,35 +674,8 @@ export class GardenEngine {
         for (const hit of areaAttack(player.x, player.y + 0.8, 2.5 + powers.landing, enemies, this.elapsed, powers)) this.recordHit(hit);
         this.skillEffects.burst(player.x, player.y + 0.5, this.elapsed);
       }
-      const canAttack = !player.grip && !player.crawl;
-      if (canAttack && powers.companion && this.elapsed > (player.nextCompanion || 0) && !this.waves.some(w => w.isActive && w.firingWeapon === 'companion')) {
-        player.nextCompanion = this.elapsed + 3 / powers.companion;
-        this.waves.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right }, 'firefly', powers).map(w => ({...w, firingWeapon:'companion'})));
-      }
       while (this.visited.has(this.furthestPlatform+1)) this.furthestPlatform++;
-      const isFiring = canAttack && (index === 0 ? this.keys.has('KeyJ') || this.hasControl('attack') : this.keys.has('Enter'));
-      const manual={hits:this.spellHits,isCast:canAttack&&this.isCasting,isAuto:getPlaySettings().isAutoSpell};
-      this.spellHits=0;this.isCasting=false;
-      const magic=stepMagic(this.adventure,this.survival,player,this.world.enemies,this.enemyShots,STEP,this.elapsed,isFiring,{left:this.cameraX-this.camera.right,right:this.cameraX+this.camera.right},manual);
-      for(const hit of magic.hits)this.recordHit(hit);
-      for(const effect of this.adventure.magic.active)this.callbacks.onSound(`${effect.id}:loop`);
-      for(const event of magic.events)this.callbacks.onSound(`${event.id}:${event.type}`);
-      this.callbacks.onSound(isFiring&&activeWeapons(this.adventure).includes('flame')?'flame:loop':'flame:stop');
-      if (isFiring) {
-        const bounds = { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right };
-        bounds.bottom = this.cameraY - (this.camera.top || 18); bounds.top = this.cameraY + (this.camera.top || 18);
-        const shots = fireLoadout(player, this.elapsed, bounds, this.adventure, index, this.waves);
-        if (shots.length) {
-          const resources = resourcesFor(this.adventure);
-          if (powers.bind && !resources.bindCooldown) { resources.bindCooldown = 5; const charge = { isUsed: false }; shots.forEach(shot => { shot.bindingCharge = charge; }); }
-          if (powers.lure && !resources.lureCooldown) { resources.lureCooldown = 8; this.lure = { x:player.x-player.facing*2, y:player.y, until:this.elapsed+3 }; this.talentEffect = { ...this.lure, at:this.elapsed }; }
-          if (recordAttack(this.survival)) {
-            if (this.survival.character === 'mom') { const floralCharge = { isUsed:false }; shots.forEach(shot => { shot.floralCharge = floralCharge; }); }
-            if (this.survival.character === 'sister' && !this.waves.some(w => w.isActive && w.firingWeapon === 'talent')) shots.push(...fireAdventureWeapon({ ...player, nextShot: 0 }, this.elapsed, bounds, 'stars', powers).map(w => ({...w, firingWeapon:'talent'})));
-          }
-          this.waves.push(...shots); for(const id of new Set(shots.map(attackSource)))this.callbacks.onSound(`${id}:fire`);
-        }
-      }
+      this.stepPlayerAttack(player, index, powers);
       for (const hazard of this.world.hazards) if (touchingHazard(player,hazard,this.elapsed)) { player.protection=1; this.hurt(false,15); if(this.survival.phase!=='alive')return; }
       const supply=takeLifeSupply(this.world,this.claimedSupplies,player,this.survival,this.adventure,powers);
       if(supply){this.supplyViews.get(supply.id).visible=false;this.skillEffects.burst(supply.x,supply.y,this.elapsed,true);this.publish(supply.kind==='medkit'?'回血 +25！':'血瓶 +1 条命！');this.callbacks.onLifeChange?.(this.snapshot());}
@@ -742,10 +725,57 @@ export class GardenEngine {
       this.publish('关卡完成啦！宝物和勇气，都是你的收获。'); this.callbacks.onComplete?.(this.snapshot());
     }
   }
+  stepPlayerAttack(player, index, powers) {
+    const adventure = this.adventure, bindings = attackBindings(adventure), magic = adventure.magic;
+    const down = [];
+    ATTACK_KEYS.forEach(({ code, action }, slot) => {
+      if (this.keys.has(code) || this.hasControl(action)) down.push(slot);
+    });
+    const canStart = !player.grip && !player.crawl && canStartAttack(player, this.elapsed, adventure, this.waves, index);
+    const input = attackInput(this.attackInput, down, slot => {
+      const id = bindings[slot];
+      return canStart && id && (WEAPONS[id] ? this.elapsed >= (player.weaponShots?.[id] || 0) : magic.ready.includes(id) && magic.gap <= STEP);
+    });
+    const id = canStart && input ? bindings[input.slot] : null;
+    const bounds = { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right,
+      bottom: this.cameraY - (this.camera.top || 18), top: this.cameraY + (this.camera.top || 18) };
+    const result = stepMagic(adventure, this.survival, player, this.world.enemies, this.enemyShots, STEP, this.elapsed,
+      bounds, { hits: this.spellHits, castId: input?.isPressed && SPELLS[id] ? id : null });
+    this.spellHits = 0;
+    for (const hit of result.hits) this.recordHit(hit);
+    for (const effect of magic.active) this.callbacks.onSound(`${effect.id}:loop`);
+    for (const event of result.events) {
+      if (event.type === 'cast') player.nextAttackAt = this.elapsed + magic.gap;
+      this.callbacks.onSound(`${event.id}:${event.type}`);
+    }
+    this.callbacks.onSound(this.waves.some(wave => wave.firingWeapon === 'flame') ? 'flame:loop' : 'flame:stop');
+    if (!WEAPONS[id]) return;
+    const shots = fireLoadout(player, this.elapsed, bounds, adventure, index, this.waves, id);
+    if (!shots.length) return;
+    const resources = resourcesFor(adventure);
+    if (powers.bind && !resources.bindCooldown) {
+      resources.bindCooldown = 5;
+      const charge = { isUsed: false };
+      for (const shot of shots) shot.bindingCharge = charge;
+    }
+    if (powers.lure && !resources.lureCooldown) {
+      resources.lureCooldown = 8;
+      this.lure = { x: player.x - player.facing * 2, y: player.y, until: this.elapsed + 3 };
+      this.talentEffect = { ...this.lure, at: this.elapsed };
+    }
+    applyWeaponTalent(this.survival, shots);
+    if (powers.companion && this.elapsed >= (player.nextCompanion || 0)) {
+      player.nextCompanion = this.elapsed + 3 / powers.companion;
+      shots[0].damage += 10 + 4 * powers.companion;
+      shots[0].bonusEffect = 'firefly';
+    }
+    this.waves.push(...shots);
+    this.callbacks.onSound(`${id}:fire`);
+  }
   recordHit(hit) {
     if (hit.damage) {
       // 武器打中才给大招攒能量；大招自己和护盾反击不算。
-      if (!SPELLS[hit.source] && hit.source !== 'shield') this.spellHits++;
+      if (WEAPONS[hit.source]) this.spellHits++;
       const frost = setLevel(this.adventure, 'frost');
       if (frost && !hit.enemy.isBoss) hit.enemy.slowUntil = Math.max(hit.enemy.slowUntil || 0, this.elapsed + frost);
     }
@@ -800,7 +830,10 @@ export class GardenEngine {
       visited:[...this.visited],switches:this.world.switches.filter(s=>s.isOpen).map(s=>s.id),
       brokenIcicles: this.world.hazards.filter(hazard => hazard.isBroken).map(hazard => hazard.id),
       enemies:this.world.enemies.map(saveEnemy),
-      players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),weaponCycles:{...p.weaponCycles},weaponShots:Object.fromEntries(Object.entries(p.weaponShots || {}).map(([id,value])=>[id,Math.max(0,value-this.elapsed)]))}))};
+      players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),
+        attackRemaining: Math.max(0, (p.nextAttackAt || 0) - this.elapsed),
+        companionRemaining: Math.max(0, (p.nextCompanion || 0) - this.elapsed),
+        weaponCycles:{...p.weaponCycles},weaponShots:Object.fromEntries(Object.entries(p.weaponShots || {}).map(([id,value])=>[id,Math.max(0,value-this.elapsed)]))}))};
   }
   restoreState(state) {
     if (state.version!==this.world.version || state.seed!==this.seed || state.levelId!==(this.stage || this.level).id) throw new Error('存档地图不一致');
@@ -819,12 +852,22 @@ export class GardenEngine {
     Object.assign(this,restoreProjectiles(state.projectiles));
     this.enemyShots=this.shots;delete this.shots;
     this.elapsed=state.elapsed; this.collectedIds=[...state.collectedIds];this.collected=this.collectedIds.length;this.defeatedIds=[...state.defeatedIds];this.visited=new Set(state.visited);
+    this.attackInput = { down: [] };
     this.furthestPlatform=0;while(this.visited.has(this.furthestPlatform+1))this.furthestPlatform++;
     for(const id of this.collectedIds){const v=this.treasureViews.get(id);if(v){v.isCollected=true;v.mesh.visible=false;}}
     for(const saved of state.enemies) restoreEnemy(this.world.enemies[saved.id-1],saved);
     for(const id of state.switches){const sw=this.world.switches[id];sw.isOpen=true;this.platforms[sw.bridgeId].isEnabled=true;}
     moveCampaignPlatforms(this.world.lifts,this.elapsed);
-    this.players.forEach((p,i)=>{const saved=state.players[i];rescue(p,this.platforms[saved.safeId],saved.safeX);p.recoveries=saved.recoveries;p.facing=saved.facing;if(saved.protection!==undefined)p.protection=saved.protection;p.nextShot=this.elapsed+(saved.shotRemaining || 0);p.inkUntil=this.elapsed+(saved.inkRemaining || 0);p.weaponCycles={...saved.weaponCycles};p.weaponShots=Object.fromEntries(Object.entries(saved.weaponShots || {}).map(([id,value])=>[id,this.elapsed+value]));});
+    this.players.forEach((p,i)=>{
+      const saved=state.players[i];
+      rescue(p,this.platforms[saved.safeId],saved.safeX);p.recoveries=saved.recoveries;p.facing=saved.facing;
+      if(saved.protection!==undefined)p.protection=saved.protection;
+      p.nextShot=this.elapsed+(saved.shotRemaining || 0);p.inkUntil=this.elapsed+(saved.inkRemaining || 0);
+      const attackRemaining = saved.attackRemaining ?? Math.max(0, ...Object.values(saved.weaponShots || {}));
+      p.nextAttackAt = attackRemaining ? this.elapsed + attackRemaining : 0;
+      p.nextCompanion = saved.companionRemaining ? this.elapsed + saved.companionRemaining : 0;
+      p.weaponCycles={...saved.weaponCycles};p.weaponShots=Object.fromEntries(Object.entries(saved.weaponShots || {}).map(([id,value])=>[id,this.elapsed+value]));
+    });
     this.cameraX = this.players.reduce((sum, p) => sum + p.x, 0) / this.players.length + Math.min(5, this.camera.right * 0.25);
     this.cameraY = this.players.reduce((sum, p) => sum + p.y, 0) / this.players.length + (this.journey.pending ? -4 : 4);
     this.snapCamera();
@@ -844,6 +887,7 @@ export class GardenEngine {
     const boss=bossStatus(this.world,this.elapsed);
     return { ...score, boss, bossTarget:boss?.warning?project(boss.warningX,boss.warningY):null, damageNumbers:this.damageNumbers.map(hit=>({...hit,...project(hit.x,hit.y+(this.elapsed-hit.at)*1.4)})), weaponStats:Object.fromEntries(activeWeapons(this.adventure).map(id=>[id,weaponDamage(id,this.adventure.growth?.power || 0,weaponRank(this.adventure,id))])), weaponCounts:Object.fromEntries(activeWeapons(this.adventure).map(id=>[id,weaponShotCount(id,upgradePower(this.adventure,0,id))])), activeWeapons:activeWeapons(this.adventure), timedEffects:{...this.adventure.effects}, hazards:(this.world.hazards || []).filter(h=>Math.abs(h.x-this.players[0].x)<12).map(h=>({...h,...hazardState(h,this.elapsed),...project(h.x,h.y+3)})), survival: structuredClone(this.survival), skill:this.adventure.loadouts[0].weapon, skillRevision:this.adventure.revision,
       adventure: structuredClone(this.adventure), pendingReward: this.journey.pending ? structuredClone(this.journey.pending) : null,
+      busyAttack: this.adventure.magic.active[0]?.id || this.waves[0]?.firingWeapon,
       pendingLifeLoot:this.combatLoot?.pendingId??null,
       rooms: this.roomSnapshot(),
       enemyGuide: this.players[0].safe?.isCave ? null : roomEnemyGuide(this.world, this.roomState, this.players[0], project, this.difficulty.isExtraWave, { width: this.host.clientWidth, height: this.host.clientHeight }),
@@ -900,7 +944,8 @@ export class GardenEngine {
         mesh.material.color.set(state.isWarning ? '#ffd367' : '#ffffff');
       }
       for (const sw of this.world.switches) this.switchViews.get(sw.id).material.color.set(sw.isOpen ? '#b6f4a2' : '#ffffff');
-      this.skillEffects.update(this.waves,this.players,this.elapsed,this.cameraX,this.camera.right,this.adventure.loadouts.map(l => l.weapon));
+      this.skillEffects.update(this.waves,this.players,this.elapsed,this.cameraX,this.camera.right,
+        [this.waves[0]?.firingWeapon || attackBindings(this.adventure).find(id => WEAPONS[id]) || 'blade']);
       this.skillEffects.updateMagic(this.adventure.magic?.active || []);
       for(const supply of this.world.supplies || [])if(supply.bossId)this.supplyViews.get(supply.id).visible=!this.claimedSupplies.includes(supply.id)&&this.world.enemies[supply.bossId-1].isDefeated;
       for (const [shot, view] of this.enemyShotViews) if (!this.enemyShots.includes(shot)) { this.scene.remove(view); this.enemyShotViews.delete(shot); }

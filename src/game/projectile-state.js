@@ -38,6 +38,7 @@ export function isValidProjectiles(state,world) {
       && (w.firingWeapon === undefined || WEAPONS[w.firingWeapon] || ['companion','talent'].includes(w.firingWeapon))
       && (w.ownerIndex === undefined || w.ownerIndex === 0)
       && (w.isCoasting === undefined || typeof w.isCoasting === 'boolean')
+      && (w.bonusEffect === undefined || ['stars','firefly'].includes(w.bonusEffect))
       && (w.flightBounds === undefined || w.flightBounds && [w.flightBounds.left,w.flightBounds.right].every(Number.isFinite) && w.flightBounds.left < w.flightBounds.right
         && ['top','bottom'].every(key => w.flightBounds[key] === undefined || Number.isFinite(w.flightBounds[key]))
         && (w.flightBounds.bottom === undefined || w.flightBounds.top === undefined || w.flightBounds.bottom < w.flightBounds.top)))

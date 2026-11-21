@@ -11,6 +11,7 @@ const player = () => ({x:0, y:0, facing:1});
 const enemy = (id, x, extra = {}) => ({id, x, y:0, width:1, height:2, hp:1000, maxHp:1000, combatVersion:2, ...extra});
 function build(kind, upgrades = {}) {
   const a = newAdventure(42); a.weapons = [kind]; a.weaponRanks = {[kind]:1}; a.upgrades = upgrades;
+  a.attackBindings = [kind, null, null];
   a.loadouts[0] = {weapon:kind, weapons:[kind], upgrades:Object.keys(upgrades)};
   return a;
 }

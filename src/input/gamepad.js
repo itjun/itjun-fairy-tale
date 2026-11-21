@@ -127,21 +127,27 @@ export function startGamepad() {
     const isPlaying = !!gameplay?.isActive();
     const isPractice = !isPlaying && document.activeElement?.hasAttribute('data-gamepad-practice');
     const isStamp = !isPlaying && document.activeElement?.hasAttribute('data-gamepad-stamps');
+    const isBindings = scope.dataset.gamepadPage === 'weapon-bindings';
     const key = isPlaying ? 'playing' : isPractice ? 'practice' : isStamp ? 'stamps' : `${document.querySelector('.platform-game')?.dataset.gameStatus || ''}:${scope.dataset.gamepadPage || ''}:${scope.querySelector('h1,h2')?.textContent || ''}`;
     if (context !== scope || contextKey !== key) {
       release(); context = scope; contextKey = key;
-      publish({ context: isPlaying ? 'playing' : isPractice ? 'practice' : isStamp ? 'stamps' : 'menu' });
+      publish({ context: isPlaying ? 'playing' : isPractice ? 'practice' : isStamp ? 'stamps' : isBindings ? 'bindings' : 'menu' });
       describedAt = 0;
     }
-    if (!isPlaying && time - describedAt > 250) { describedAt = time; describe(scope); }
+    if (!isPlaying && !isBindings && time - describedAt > 250) { describedAt = time; describe(scope); }
+    if (isBindings && !input.faceX) input.actions.delete('attack');
     const step = gate.step(input, time);
     if (!step.isReady) return;
-    if (step.navigation || step.pressed.size || input.scroll) { stickUntil = performance.now() + 500; publish({ mode: 'gamepad', notice: '' }); }
+    if (step.navigation || step.pressed.size || input.scroll || isBindings && Math.hypot(input.stick.x, input.stick.y) >= .52) { stickUntil = performance.now() + 500; publish({ mode: 'gamepad', notice: '' }); }
     if (isPlaying) {
       // 游玩中 B 不暂停，孩子乱按也不会被打断。
       if (step.pressed.has('pause')) { release(); gameplay.pause(); return; }
       if (step.pressed.has('interact')) { gameplay.interact(); return; }
       gameplay.input(input);
+      return;
+    }
+    if (isBindings) {
+      scope.dispatchEvent(new CustomEvent('garden:bindings-input', { detail: { stick: input.stick, pressed: step.pressed } }));
       return;
     }
     if ((isPractice || isStamp) && (step.pressed.has('previous') || step.pressed.has('next'))) {

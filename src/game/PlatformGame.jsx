@@ -7,8 +7,9 @@ import { DeathPanel } from './DeathPanel.jsx';
 import { recommendedStarter, isValidStarter } from './starter-build.js';
 import { LifeLootPanel } from './LifeLootPanel.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Play, House, Trophy, Check, ListBullets, GearSix } from '@phosphor-icons/react';
+import { ArrowRight, Play, House, Trophy, Check, ListBullets, GearSix, Sword } from '@phosphor-icons/react';
 import { RoomHud, RunOverview } from './RoomHud.jsx';
+import { WeaponBindingsPage } from './WeaponBindingsPage.jsx';
 import { OptionsPage } from '../OptionsPage.jsx';
 import { DIFFICULTIES, getPlaySettings, setPlaySettings, usePlaySettings } from './difficulty.js';
 import { readAlbum, writeAlbum, recordAlbum, lockedItems } from '../album/album.js';
@@ -157,6 +158,12 @@ export function PlatformGame({ onExit, initialSound = true }) {
     if (run.current && statusRef.current === 'playing') persist(engine.current.snapshot(), 'playing');
   }, [stats.flowers, stats.platform, stats.combatScore, stats.skillRevision]);
   function trapMenuFocus(event) {
+    if (event.key === 'Escape' && statusRef.current === 'paused') {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) start();
+      return;
+    }
     if (event.key !== 'Tab') return;
     const buttons = [...menu.current.querySelectorAll('button:not(:disabled)')];
     const first = buttons[0], last = buttons.at(-1);
@@ -203,7 +210,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
     };
   }
   const isResult = status === 'completed';
-  const isAdventureDialog = ['reward','camp','life-loot','fallen','ended','overview','options'].includes(status);
+  const isAdventureDialog = ['reward','camp','life-loot','fallen','ended','overview','options','weapon-bindings'].includes(status);
   const isGamepad = gamepadState.mode === 'gamepad';
   const locked = lockedItems(readAlbum());
   const starterBuild = [...starterBuilds[character].weapons.map(id => `weapon:${id}`), ...starterBuilds[character].upgrades.map(id => `upgrade:${id}`)].some(id => locked.includes(id)) ? recommendedStarter(character) : starterBuilds[character];
@@ -224,6 +231,10 @@ export function PlatformGame({ onExit, initialSound = true }) {
     if (from === 'playing') persist(engine.current.snapshot(), 'paused');
   }
   function closeOverview() { if (overviewFrom.current === 'playing') start(); else changeStatus('paused'); }
+  function equipWeapon(slot, id) {
+    const game = engine.current;
+    if (statusRef.current === 'weapon-bindings' && game?.equipAttack(slot, id)) persist(game.snapshot(), 'paused');
+  }
   function recyclePending(id, player) {
     if (!engine.current.recyclePending(id, player)) return;
     persist(engine.current.snapshot(), 'paused');
@@ -239,7 +250,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
   }
   return <div className="platform-game" data-game-status={status} data-adventure={!!stats.adventure} data-rooms data-level={level.id} data-player-positions={JSON.stringify(stats.positions)} data-platform-count={stats.platforms} data-route={level.id} data-enemy-count={stats.enemies} data-boss-active={!!stats.boss}>
     <div className="game-canvas" ref={host} />
-    {stats.rooms && stats.survival && !['loading','ready','camp','error','overview','options'].includes(status) && <RoomHud stats={stats} person={person} isGamepad={isGamepad} isPlaying={status === 'playing'} warning={!sync.isSaved && !sync.message.startsWith('正在') ? sync.message : ''} onPause={pause} touchProps={touchProps} />}
+    {stats.rooms && stats.survival && !['loading','ready','camp','error','overview','options','weapon-bindings'].includes(status) && <RoomHud stats={stats} person={person} isGamepad={isGamepad} isPlaying={status === 'playing'} warning={!sync.isSaved && !sync.message.startsWith('正在') ? sync.message : ''} onPause={pause} touchProps={touchProps} />}
     {albumNotice && <div key={albumNotice.id} className="album-toast" role="status"><img src="./assets/flower.png" alt="" />{albumNotice.text}</div>}
     <div className="score-popups" aria-hidden="true">{stats.pickups?.map(pickup=><span key={pickup.id} className="score-popup" style={{left:`${Math.max(12,Math.min(88,pickup.x))}%`,top:`${Math.max(30,Math.min(75,pickup.y))}%`,animationPlayState:status==='playing'?'running':'paused'}}><img src={`./assets/${pickup.kind ? COLLECTIBLES[pickup.kind].image : "enemy-burst"}.png`} alt=""/>+{pickup.points} 分</span>)}</div>
     {stats.boss && <aside className="boss-health" aria-label="BOSS 生命"><div><strong>{stats.boss.name}</strong><span>{stats.boss.hp} / {stats.boss.maxHp}</span><small className={stats.boss.isWeak ? 'is-weak' : ''}>{stats.boss.isWeak ? '露出破绽了，快打！伤害翻倍' : stats.boss.isEnraged ? '首领着急了，多了一招' : '这一章的首领'}</small></div><progress aria-label={`${stats.boss.name}生命`} value={stats.boss.hp} max={stats.boss.maxHp}/></aside>}
@@ -260,6 +271,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
       restart(0,true);return true;
     }}/>}
     {status === 'overview' && stats.adventure && <RunOverview stats={stats} onBack={closeOverview} />}
+    {status === 'weapon-bindings' && stats.adventure && <WeaponBindingsPage adventure={stats.adventure} isGamepad={isGamepad} onBind={equipWeapon} onBack={() => changeStatus('paused')} />}
     {status === 'options' && <OptionsPage category={optionsCategory} onCategory={setOptionsCategory} onBack={() => changeStatus('paused')} backLabel="回到暂停" isSound={isSound} onSound={toggleSound} runDifficulty={stats.adventure?.difficulty || 'normal'} />}
     {status !== 'playing' && !isAdventureDialog && <div className="adventure-overlay"><section ref={menu} onKeyDown={trapMenuFocus} className={`adventure-menu ${status==='ready'?'level-menu':''}`} role="dialog" aria-modal="true" aria-labelledby="adventure-heading">
       <span className="adventure-kicker">带着画里的自己，去看更大的世界</span>
@@ -269,10 +281,11 @@ export function PlatformGame({ onExit, initialSound = true }) {
         <p className="level-source">{WORLD_ACTS[markedIndex].sources.length ? `这一关组合了原画 ${WORLD_ACTS[markedIndex].sources.join('、')} 的元素。` : WORLD_ACTS[markedIndex].story}</p>
         <div className="collectible-preview" aria-label="这一关的宝物">{LEVEL_COLLECTIBLES[WORLD_ACTS[markedIndex].themeId].map(id=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt=""/>{COLLECTIBLES[id].name} <b>{COLLECTIBLES[id].points} 分</b></span>)}</div>
         <div className="difficulty-row"><span>难度</span><div className="option-chips" aria-label="难度" data-gamepad-tabs="换难度">{Object.entries(DIFFICULTIES).map(([id, item]) => <button key={id} aria-pressed={settings.difficulty === id} onClick={() => setPlaySettings({ difficulty: id })}>{item.name}</button>)}</div><small>{DIFFICULTIES[settings.difficulty].hint}。出发后这次冒险不能换。</small></div>
-        {!isGamepad && <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd> 攻击</span><span><kbd>K</kbd> 大招</span><span><kbd>W</kbd> 在小店买</span></div>}<small className="game-reassurance">一章是四间房加一场首领。清完一间，跳到发光的门上。初始 {INITIAL_LIVES} 条命，血条用完后选继续或重来。</small>
+        {!isGamepad && <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> 武器和大招</span><span><kbd>W</kbd> 在小店买</span></div>}<small className="game-reassurance">一章是四间房加一场首领。清完一间，跳到发光的门上。初始 {INITIAL_LIVES} 条命，血条用完后选继续或重来。</small>
       </>}
       <div className="adventure-menu-actions">
         {['ready','paused'].includes(status)&&<button className="primary-button" data-gamepad-resume={status === 'paused' || undefined} data-gamepad-back={status === 'paused' || undefined} onClick={() => status === 'ready' ? changeStatus('camp') : start()}><Play size={21} weight="fill"/>{status==='paused'?'继续探险':'选择角色'}<ArrowRight size={21}/></button>}
+        {status === 'paused' && stats.adventure && <button className="quiet-button" onClick={() => changeStatus('weapon-bindings')}><Sword size={20} />武器搭配</button>}
         {status === 'paused' && stats.adventure && <button className="quiet-button" onClick={() => openOverview('paused')}><ListBullets size={20}/>本领一览</button>}
         {status === 'paused' && <button className="quiet-button" onClick={() => { setOptionsCategory('game'); changeStatus('options'); }}><GearSix size={20}/>选项</button>}
         {status === 'fallen' && <button className="primary-button" onClick={() => { if (engine.current.revive()) start(); }}>从这里继续</button>}

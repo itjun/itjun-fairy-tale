@@ -17,6 +17,7 @@ export function starterAdventure(seed,build) {
   if(!isValidStarter(build))return null;
   const adventure=newAdventure(seed);
   adventure.weapons=[...build.weapons];
+  adventure.attackBindings=[build.weapons[0],null,null];
   adventure.upgrades=Object.fromEntries(build.upgrades.map(id=>[id,1]));
   adventure.loadouts=[{weapon:build.weapons[0],weapons:[...build.weapons],upgrades:[...build.upgrades]}];
   adventure.starter = structuredClone(build);

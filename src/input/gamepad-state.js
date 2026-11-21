@@ -12,7 +12,8 @@ export function readXboxPad(pad, deadzone = 0.22) {
   if (y > 0.55 || button(13)) actions.add('down');
   for (const [name, index] of Object.entries({ confirm: 0, back: 1, attack: 2, spell: 3, previous: 4, next: 5, interact: 8, pause: 9 })) if (button(index)) actions.add(name);
   if (button(7)) actions.add('attack');
-  return { actions, direction, scroll: Math.abs(axis(3)) > 0.25 ? axis(3) : 0,
+  const stick = { x: button(14) ? -1 : button(15) ? 1 : x, y: button(12) ? -1 : button(13) ? 1 : y };
+  return { actions, direction, stick, faceX: button(2), scroll: Math.abs(axis(3)) > 0.25 ? axis(3) : 0,
     isNeutral: !pad.buttons.some((_, index) => button(index)) && pad.axes.every(value => Math.abs(value) <= deadzone) };
 }
 

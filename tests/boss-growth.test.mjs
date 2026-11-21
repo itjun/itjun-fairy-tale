@@ -19,7 +19,7 @@ import { validateRun } from '../server/store.mjs';
 const storage=()=>{const data=new Map();return {getItem:key=>data.get(key) ?? null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};};
 const bossOf=world=>world.enemies[world.bossArenas[0].bossId-1];
 
-test('每个世界各有一场首领，开战前睡着，同一个种子不变',()=>{
+test('八个世界各有一场首领，开战前睡着，同一个种子不变',()=>{
   for(const act of WORLD_ACTS)for(const seed of [1,42,137]) {
     const w=createRoomWorld(seed,act),b=bossOf(w);
     assert.equal(w.bossArenas.length,1,act.id);assert.deepEqual(w,createRoomWorld(seed,act));
@@ -28,19 +28,23 @@ test('每个世界各有一场首领，开战前睡着，同一个种子不变',
   }
 });
 
-test('同一次发射各武器伤害不同，命中扣真实血量，往返与连锁不会沿用固定 1 点',()=>{
+test('各武器独立发射，按各自伤害扣真实血量',()=>{
   const a=newAdventure(1);a.weapons=['blade','bubble','stars','boomerang','seed','firefly'];a.loadouts[0].weapons=[...a.weapons];a.growth.power=2;
-  const p={x:0,y:0,facing:1},shots=fireLoadout(p,0,{left:-25,right:25},a);
-  for(const id of a.weapons)assert.equal(shots.find(s=>s.kind===id).damage,weaponDamage(id,2));
+  const bounds={left:-25,right:25};
+  for(const id of a.weapons) {
+    a.attackBindings=[id,null,null];
+    const [shot]=fireLoadout({x:0,y:0,facing:1},0,bounds,a);
+    assert.equal(shot.damage,weaponDamage(id,2));
+  }
   assert.deepEqual(a.weapons.map(id=>weaponDamage(id)),[30,55,32,34,72,22]);
   const enemy={id:1,x:3,y:0,width:2,height:3,hp:100,maxHp:100,combatVersion:2};
-  const blade=shots.find(s=>s.kind==='blade');const result=stepAdventureWave(blade,[enemy],[],.2,.2);
+  a.attackBindings=['blade','firefly',null];
+  const p={x:0,y:0,facing:1},[blade]=fireLoadout(p,0,bounds,a);
+  const result=stepAdventureWave(blade,[enemy],[],.2,.2);
   assert.equal(enemy.hp,64);assert.equal(result.hits[0].damage,36);
   assert.equal(stepAdventureWave(blade,[enemy],[],.01,.21).hits.length,0);
-  assert.equal(fireLoadout(p,.29,{left:-25,right:25},a).length,0);
-  assert.deepEqual(fireLoadout(p,.31,{left:-25,right:25},a),[], '飞行中的萤火不能继续连发');
-  stepAdventureWave(shots.find(s=>s.kind==='firefly'),[enemy],[],.2,.35);
-  assert.deepEqual(fireLoadout(p,.36,{left:-25,right:25},a).map(s=>s.kind),['firefly']);
+  assert.deepEqual(fireLoadout(p,.29,bounds,a,0,[blade],'firefly'),[], '光刃收招前不能换键抢发');
+  assert.deepEqual(fireLoadout(p,.41,bounds,a,0,[blade],'firefly').map(s=>s.kind),['firefly']);
 });
 
 test('收集四份材料增长血量上限和全部武器攻击，命数不变',()=>{
@@ -100,7 +104,7 @@ test('首领的血量、招式、预告落点和成长随存档保留，改坏�
   const invalid=structuredClone(saved);invalid.state.enemies.find(e=>e.id===b.id).attackStage='skip';writeAdventure(invalid.run,invalid.state,mem);assert.equal(readAdventure(mem),null);
 });
 
-test('轻松难度只带一把没强化的弯刀，主动跳跃躲招能在 20 秒内打赢八位首领',t=>{
+test('轻松难度只带一把没强化的弯刀，主动跳跃躲招能在 20 秒内打赢各世界首领',t=>{
   const results=[];
   for(const act of WORLD_ACTS) {
     const g=headless('boss-moon',act.id),boss=bossOf(g.world),start=g.elapsed;
@@ -155,7 +159,8 @@ test('叠厚的武器开战才加厚首领，最多 1.8 倍；单把弯刀保持
   stepBosses(untouched,{x:arena.left+2,y:arena.y},1/60,1,[],plain);
   assert.ok(weaponPressure(plain)<=1);assert.equal(boss.maxHp,baseline);
   const stacked=newAdventure(7);
-  stacked.growth.power=5;stacked.weapons=['blade','boomerang','stars','seed','firefly','bubble','moonblade'];stacked.weaponRanks={blade:2,moonblade:2};stacked.upgrades={double:1,fan:1};
+  stacked.growth.power=5;stacked.weapons=['blade','boomerang','stars','seed','firefly','bubble','moonblade'];stacked.weaponRanks={blade:2,moonblade:6};stacked.upgrades={double:1,fan:1};
+  stacked.attackBindings=['blade','moonblade','stars'];
   stacked.loadouts[0].weapons=[...stacked.weapons];stacked.loadouts[0].weapon='blade';stacked.loadouts[0].upgrades=['double','fan'];
   const world=createRoomWorld(42,act),enemy=bossOf(world),half=Math.floor(baseline/2),target=bossTargetHp(act,weaponPressure(stacked));
   enemy.hp=half;stepBosses(world,{x:arena.left+2,y:arena.y},1/60,1,[],stacked);

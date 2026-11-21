@@ -6,10 +6,11 @@ import { setLevel } from './sets.js';
 import { DIFFICULTIES } from './difficulty.js';
 import { addLife } from './characters.js';
 import { newMagic, isValidMagic, CHARGE_PER_HIT } from './magic.js';
+import { attackBindings, isValidAttackBindings } from './attack-bindings.js';
 export { WEAPONS, UPGRADES };
 
 export function newAdventure(seed, count = 1) {
-  return { version: 2, cycle: 1, starterVersion:1, seed, resources: newResources(), growth:newGrowth(), effects: {}, weapons: ['moonblade'], weaponRanks:{}, qualities:{}, magic:newMagic(), revivalWaves:0, counterShield:0, upgrades: {}, loadouts: Array.from({ length: count }, () => ({ weapon: 'moonblade', weapons: ['moonblade'], upgrades: [] })), revision: 0 };
+  return { version: 2, cycle: 1, starterVersion:1, seed, resources: newResources(), growth:newGrowth(), effects: {}, weapons: ['moonblade'], attackBindings: ['moonblade', null, null], weaponRanks:{}, qualities:{}, magic:newMagic(), revivalWaves:0, counterShield:0, upgrades: {}, loadouts: Array.from({ length: count }, () => ({ weapon: 'moonblade', weapons: ['moonblade'], upgrades: [] })), revision: 0 };
 }
 export function newJourney() { return { routes: {}, claimed: [], pending: null, queued: [], fragments: 0 }; }
 export function activeWeapons(adventure, index = 0) { return adventure.loadouts[index].weapons || [adventure.loadouts[index].weapon]; }
@@ -19,14 +20,14 @@ export function weaponShotCount(weapon,powers={}) { return ((powers.weaponRank |
 export function weaponPressure(adventure, index = 0) {
   if (!adventure) return 1;
   let dps = 0;
-  for (const id of activeWeapons(adventure, index)) {
+  for (const id of attackBindings(adventure)) {
     const weapon = WEAPONS[id];
     if (!weapon?.interval) continue;
     const powers = upgradePower(adventure, index, id);
     const damage = weaponDamage(id, powers.attackGrowth || 0, powers.weaponRank || 1);
     const shots = weaponShotCount(id, powers);
     const interval = weapon.interval / (1 + 0.18 * (powers.rapid || 0));
-    dps += damage * shots / interval;
+    dps = Math.max(dps, damage * shots / interval);
   }
   // 厚度仍以原来「一把基础弯刀、每 0.18 秒」为 1。弯刀放慢后不再把首领血量跟着抬高。
   const reference = 48 / 0.18;
@@ -40,6 +41,7 @@ export function migrateAdventure(adventure) {
     adventure.version = 2; adventure.effects = {};
     for (const loadout of adventure.loadouts) { loadout.weapons = [...adventure.weapons]; loadout.upgrades = Object.keys(adventure.upgrades); }
   }
+  adventure.attackBindings ??= attackBindings(adventure);
   return adventure;
 }
 export function upgradePower(adventure, index = 0, weapon) {
@@ -97,7 +99,6 @@ function applyReward(adventure, pending, choice, survival) {
     adventure.weaponRanks ||= {};
     adventure.weaponRanks[choice.id]=weaponRank(adventure,choice.id)+1;
     if (!adventure.weapons.includes(choice.id)) adventure.weapons.push(choice.id);
-    loadout.weapon = choice.id;
     loadout.weapons ||= [loadout.weapon];
     if (!loadout.weapons.includes(choice.id)) loadout.weapons.push(choice.id);
   } else if (choice.type === 'timed') {
@@ -130,8 +131,8 @@ function finishReward(adventure, journey) {
 export function isValidAdventure(adventure, count) {
   const isUnique = (items, definitions) => Array.isArray(items) && new Set(items).size === items.length && items.every(id => Object.hasOwn(definitions, id));
   return [1,2].includes(adventure?.version) && isValidResources(adventure.resources) && isValidGrowth(adventure.growth) && Number.isInteger(adventure.seed) && adventure.seed >= 0 && adventure.seed <= 0xffffffff
-    && (adventure.cycle === undefined || Number.isSafeInteger(adventure.cycle) && adventure.cycle >= 1)
     && isValidMagic(adventure.magic)
+    && (adventure.cycle === undefined || Number.isSafeInteger(adventure.cycle) && adventure.cycle >= 1)
     && [undefined, 9].includes(adventure.ruleset) && (adventure.difficulty === undefined || Object.hasOwn(DIFFICULTIES, adventure.difficulty))
     && (adventure.locked === undefined || Array.isArray(adventure.locked) && adventure.locked.length <= 60 && adventure.locked.every(key => /^(weapon|upgrade|spell):[a-zA-Z]+$/.test(key)))
     && (adventure.qualities===undefined || adventure.qualities && !Array.isArray(adventure.qualities) && Object.entries(adventure.qualities).every(([key,quality])=>/^(weapon|upgrade|spell|growth|supply|timed|legend):[a-zA-Z]+$/.test(key)&&Object.hasOwn(RARITIES,quality)))
@@ -143,6 +144,7 @@ export function isValidAdventure(adventure, count) {
     && isUnique(adventure.weapons, WEAPONS) && adventure.weapons.length>0
     && (adventure.weaponRanks===undefined || adventure.weaponRanks && !Array.isArray(adventure.weaponRanks) && Object.entries(adventure.weaponRanks).every(([id,rank])=>adventure.weapons.includes(id)&&Number.isInteger(rank)&&rank>=1&&rank<=99))
     && adventure.upgrades && !Array.isArray(adventure.upgrades) && Object.entries(adventure.upgrades).every(([id, rank]) => Object.hasOwn(UPGRADES, id) && Number.isInteger(rank) && rank >= 1 && rank <= (UPGRADES[id].maxRank || 1))
+    && isValidAttackBindings(adventure.attackBindings, adventure)
     && Array.isArray(adventure.loadouts) && adventure.loadouts.length === count && adventure.loadouts.every(l => adventure.weapons.includes(l.weapon) && isUnique(l.upgrades, UPGRADES) && (adventure.version === 2 ? isUnique(l.weapons, WEAPONS) && l.weapons.length > 0 && l.weapons.every(id => adventure.weapons.includes(id)) : l.upgrades.length <= 3) && l.upgrades.every(id => adventure.upgrades[id]));
 }
 export function isValidJourney(journey, count) {
@@ -159,7 +161,7 @@ export function rewardItem(choice, adventure) {
   if(choice.type==='spell'){
     // 第 9 版大招靠打中怪攒能量，说明里的秒数换成要打中几下。
     const spell=SPELLS[choice.id],hint=isRooms?spell.hint.replace(/^战斗充能 \d+ 秒/,`打中怪 ${Math.ceil(spell.charge/CHARGE_PER_HIT)} 下攒满`):spell.hint;
-    return {...spell,category:'attack',hint:`${hint}。${choice.rarity==='legendary'?LEGENDARY_EFFECTS[choice.id]:'重复获得提升大招等级，最高 3 级'}`};
+    return {...spell,category:'attack',hint:`${hint}。可在暂停页绑定。${choice.rarity==='legendary'?LEGENDARY_EFFECTS[choice.id]:'重复获得提升大招等级，最高 3 级'}`};
   }
   if(choice.type==='legend')return {name:'护盾反击',hint:'护盾挡伤时反击周围敌人，冷却 6 秒',image:'monster-leafshield',category:'survival'};
   if(choice.type==='supply'&&choice.id==='life')return {name:choice.rarity==='legendary'?'守护血瓶':'生命血瓶',hint:`增加 1 条命${choice.rarity==='legendary'?'，下次复活清除附近普通敌弹':choice.rarity==='epic'?'，并回血 25':'，当前血量不变'}`,image:'life-potion',category:'survival'};
@@ -170,7 +172,7 @@ export function rewardItem(choice, adventure) {
   const item = (choice.type === 'weapon' ? WEAPONS : UPGRADES)[choice.id];
   if(choice.type==='weapon'&&adventure) {
     const rank=weaponRank(adventure,choice.id),next=rank+1;
-    return {...item,legend:choice.rarity==='legendary'?LEGENDARY_EFFECTS[choice.id]:null,name:rank?`${item.name}叠加`:item.name,hint:rank?`基础数量 ${rank} → ${next}，每枚伤害 ${weaponDamage(choice.id,adventure.growth?.power || 0,rank)} → ${weaponDamage(choice.id,adventure.growth?.power || 0,next)}`:`获得 1 件，与现有武器一起使用。${item.hint}`,category:'attack'};
+    return {...item,legend:choice.rarity==='legendary'?LEGENDARY_EFFECTS[choice.id]:null,name:rank?`${item.name}叠加`:item.name,hint:rank?`基础数量 ${rank} → ${next}，每枚伤害 ${weaponDamage(choice.id,adventure.growth?.power || 0,rank)} → ${weaponDamage(choice.id,adventure.growth?.power || 0,next)}`:`获得 1 件，可在暂停页绑定。${item.hint}`,category:'attack'};
   }
   return choice.type === 'salvage' ? { ...item, name: '重复变宝', hint: `${item.name}已学会，回收得 5 片碎片`, category: 'resource' } : { ...item, category: choice.type === 'weapon' ? 'attack' : upgradeCategory(choice.id) };
 }

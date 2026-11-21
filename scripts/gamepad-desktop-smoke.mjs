@@ -7,6 +7,7 @@ import { writeFile } from 'node:fs/promises';
 import { completeMiniGame } from './helpers/gamepad-mini-games.mjs';
 import { createRoomWorld, spotPosition } from '../shared/room-world.js';
 import { resourcesFor } from '../src/game/expedition.js';
+import { WEAPONS } from '../shared/adventure-catalog.js';
 if (!process.env.GARDEN_DESKTOP_PROFILE) throw new Error('手柄测试必须指定隔离目录');
 await import('../desktop/main.mjs');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -94,6 +95,7 @@ try {
   }
   await setupPad();
   if (process.env.GARDEN_GAMEPAD_CASE === 'completion') { await checkCompletion(); console.log('手柄通关衔接通过'); app.exit(0); return; }
+  if (process.env.GARDEN_GAMEPAD_CASE === 'bindings') { await checkWeaponBindings(); console.log('手柄圆环换装通过'); app.exit(0); return; }
   await evaluate('choose(".home-play")');
   await until(() => evaluate('!!document.querySelector(".level-choices")'), '选关');
   const difficulty = 'document.querySelector(".difficulty-row [aria-pressed=true]").textContent';
@@ -130,7 +132,7 @@ try {
   await evaluate('testPad.axes[0]=0;testPad.buttons[0]={pressed:false,value:0};testPad.buttons[7]={pressed:false,value:0}');
   await wait(100);
   assert.equal(await evaluate('document.documentElement.dataset.inputMode'), 'gamepad');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".room-hud-keys .pad-key"), key => key.textContent)'), ['A', 'X'], '按键提示跟着手柄走，没有大招时不显示 Y');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".room-hud-keys .pad-key"), key => key.textContent)'), ['A', 'X', 'Y', 'B'], '战斗显示三个武器槽，包括空位');
   await evaluate('tap(1)'); await wait(200);
   assert.equal(await evaluate('document.querySelector(".platform-game").dataset.gameStatus'), 'playing', '游玩中 B 不暂停');
   await evaluate('tap(8)');
@@ -144,7 +146,7 @@ try {
   await until(status('playing'), '已高亮的继续按钮按一次 A 就继续');
   await evaluate('tap(9)');
   await until(status('paused'), '再次暂停');
-  await evaluate('choose(".adventure-menu-actions .quiet-button")');
+  await evaluate('choose(".adventure-menu-actions button:nth-child(3)")');
   await until(status('overview'), '暂停里打开本领一览');
   await evaluate('tap(1)');
   await until(status('paused'), 'B 从本领一览回到暂停');
@@ -368,6 +370,51 @@ try {
     await evaluate('tap(0)');
     await until(status('playing'), '结算已高亮的下一关按一次 A 直接出发');
     assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.survival.character`), finishedCharacter, '下一关保留角色');
+  }
+  async function checkWeaponBindings() {
+    win.setContentSize(1280, 720);
+    const fixture = roomFixture('boss'), adventure = fixture.state.adventure;
+    adventure.weapons = ['lightblade', 'bubble', 'moonblade', 'stars', 'seed'];
+    adventure.loadouts[0].weapon = 'lightblade'; adventure.loadouts[0].weapons = [...adventure.weapons];
+    adventure.magic.ranks.snow = 1; adventure.magic.equipped = ['snow']; adventure.magic.charges.snow = 16;
+    adventure.attackBindings = ['lightblade', 'moonblade', 'snow'];
+    const save = `JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state`;
+    await loadFixture(fixture);
+    await until(status('paused'), '测试局暂停');
+    await evaluate('tap(9)'); await until(status('playing'), '手柄继续探险');
+    await evaluate('tap(9)'); await until(status('paused'), 'Menu 暂停');
+    await evaluate('tap(13)');
+    assert.match(await evaluate('document.activeElement.textContent'), /武器搭配/);
+    await evaluate('tap(0)');
+    await until(status('weapon-bindings'), '暂停菜单打开圆环');
+    const elapsed = await evaluate(`${save}.elapsed`);
+    await evaluate('tap(1)');
+    assert.equal(await evaluate('document.querySelector(".weapon-wheel button[aria-pressed=true]")'), null);
+    await evaluate('testPad.axes[0]=Math.sqrt(3)/2;testPad.axes[1]=-.5;waitPadFrames()');
+    await evaluate('testPad.axes[0]=0;testPad.axes[1]=0;waitPadFrames()');
+    assert.equal(await evaluate('document.querySelector(".weapon-wheel button[aria-pressed=true]").getAttribute("aria-label")'), '魔法泡泡');
+    await writeFile(join(process.env.GARDEN_DESKTOP_PROFILE, 'weapon-wheel.png'), (await win.webContents.capturePage()).toPNG());
+    await evaluate('tap(7)');
+    assert.deepEqual(await evaluate(`${save}.adventure.attackBindings`), ['lightblade', 'moonblade', 'snow'], 'RT 在圆环里不会替 X 绑定');
+    await evaluate('tap(3)');
+    assert.deepEqual(await evaluate(`${save}.adventure.attackBindings`), ['lightblade', 'bubble', 'snow']);
+    await evaluate('tap(12);');
+    await evaluate('tap(1)');
+    assert.deepEqual(await evaluate(`${save}.adventure.attackBindings`), ['snow', 'bubble', 'lightblade'], 'B 绑定并交换两格');
+    assert.equal(await evaluate(`${save}.elapsed`), elapsed, '换装全程继续暂停');
+    await evaluate('tap(9)'); await until(status('paused'), 'Menu 返回暂停');
+    await evaluate('tap(0)'); await until(status('playing'), '暂停菜单继续探险');
+    await evaluate('tap(9)'); await until(status('paused'), '重新暂停');
+
+    fixture.state.adventure.weapons = Object.keys(WEAPONS);
+    await loadFixture(fixture); await until(status('paused'), '读取多武器测试存档');
+    await evaluate('tap(13)'); await evaluate('tap(0)');
+    await until(status('weapon-bindings'), '打开多页圆环');
+    assert.equal(await evaluate('document.querySelectorAll(".weapon-wheel button").length'), 8);
+    await evaluate('tap(5)');
+    assert.equal(await evaluate('document.querySelectorAll(".weapon-wheel button").length'), 2);
+    await evaluate('tap(5)');
+    assert.equal(await evaluate('document.querySelectorAll(".weapon-wheel button").length'), 8);
   }
   await checkCompletion();
   console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['方向键走遍菜单、选关、角色、装备和试用', '已高亮菜单一次 A 生效', '移动、跳跃、暂停、本领一览、选项', '断连、重连、防误触、失焦', '设置、全屏、成绩筛选、画展、成就、画册', '应用内备份和恢复', '三个小游戏全部题目、完成和重玩', '花园贴纸', '奖励、补给、死亡、零命重来', '进门、小店购买、通关领奖、结算、直接下一关'], before, after }));

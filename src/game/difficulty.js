@@ -11,10 +11,10 @@ export function difficultyOf(id) { return DIFFICULTIES[id] || DIFFICULTIES.norma
 
 const KEY = 'garden-play-settings-v1';
 const listeners = new Set();
-let settings = { difficulty: DEFAULT_DIFFICULTY, isHelpOn: true, isAutoSpell: true };
+let settings = { difficulty: DEFAULT_DIFFICULTY, isHelpOn: true };
 try {
   const saved = JSON.parse(localStorage.getItem(KEY));
-  if (saved) settings = { difficulty: DIFFICULTIES[saved.difficulty] ? saved.difficulty : DEFAULT_DIFFICULTY, isHelpOn: saved.isHelpOn !== false, isAutoSpell: saved.isAutoSpell !== false };
+  if (saved) settings = { difficulty: DIFFICULTIES[saved.difficulty] ? saved.difficulty : DEFAULT_DIFFICULTY, isHelpOn: saved.isHelpOn !== false };
 } catch { /* 读不到设置时用默认值，不影响游玩。 */ }
 export const getPlaySettings = () => settings;
 export function setPlaySettings(patch) {

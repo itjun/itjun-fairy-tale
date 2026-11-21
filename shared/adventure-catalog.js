@@ -90,7 +90,7 @@ export const UPGRADES = Object.freeze({
   shield: { maxRank: 3, name: '轻碰护罩', hint: '碰到小怪后，保护更久', image: 'magic-bubble', family: 'frost' },
   air: { maxRank: 3, name: '轻盈转向', hint: '在空中轻松飞远一点', image: 'collectible-balloon', family: 'flight' },
   landing: { name: '落地光环', hint: '跳下来时，光环打退小怪', image: 'collectible-rainbow', family: 'power' },
-  companion: { maxRank: 3, name: '同行萤火', hint: '小萤光自动帮忙攻击', image: 'weapon-firefly', family: 'nature' },
+  companion: { maxRank: 3, name: '同行萤火', hint: '小萤光强化下一轮武器的首发，等级越高越快准备好', image: 'weapon-firefly', family: 'nature' },
   haste: { maxRank: 3, name: '轻快脚步', hint: '打败小怪后，跑快一小会儿', image: 'collectible-star', family: 'power' },
 });
 export const FAMILY_LABELS = { power: '光刃强化', bubble: '泡泡强化', flight: '星雨强化', frost: '冰霜强化', nature: '花种强化' };
