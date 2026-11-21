@@ -1,0 +1,100 @@
+{
+  "mode": "derived WAV samples, not four unmodified original game sounds",
+  "source": "../audio/ng3-enemy-break.wav",
+  "source_sha256": "35c2106cfd9d66b2d0d1d460630031ab032bf3b58b98742b7cd3f0c56224a3d3",
+  "sample_rate": 44100,
+  "scope": "design preview only",
+  "weapons": {
+    "saber": {
+      "name": "唐刀",
+      "description": "保留原始音高的短促单次击破，收尾干净。",
+      "times": [
+        0.12
+      ],
+      "recipe": "1.00x, highpass 180 Hz, 200 ms, exponential release",
+      "impact": {
+        "file": "audio/saber-impact.wav",
+        "duration": 0.2,
+        "peak_dbfs": -2.85,
+        "rms_dbfs": -17.62,
+        "sha256": "e76588ae71285b0fa6f6013b807e020383c526f6ec0beadbfa2acd99f5d04700"
+      },
+      "phrase": {
+        "file": "audio/saber-phrase.wav",
+        "duration": 0.4,
+        "peak_dbfs": -2.85,
+        "rms_dbfs": -20.63,
+        "sha256": "3ff82eb38ce4f25a517d007e87ee13cc33ee58cdf88ac536e46b885fc9363438"
+      }
+    },
+    "spear": {
+      "name": "火尖枪",
+      "description": "较亮的火焰抖尾，钻刺两次命中分别发声。",
+      "times": [
+        0.16,
+        0.27
+      ],
+      "recipe": "1.22x, highpass 650 Hz, 160 ms, sample-amplitude flutter",
+      "impact": {
+        "file": "audio/spear-impact.wav",
+        "duration": 0.16,
+        "peak_dbfs": -3.35,
+        "rms_dbfs": -21.6,
+        "sha256": "ea080970c697418a8bd2c8791162b4cd792ed97d321241fcfbd8f13e265d6032"
+      },
+      "phrase": {
+        "file": "audio/spear-phrase.wav",
+        "duration": 0.51,
+        "peak_dbfs": -2.29,
+        "rms_dbfs": -23.61,
+        "sha256": "d5cedcc0a54bfedf6648c16e5d65069ab599191d69eb44a2667183559e7d26ea"
+      }
+    },
+    "sword": {
+      "name": "青锋剑",
+      "description": "更短、更清脆的三连击，每段各一个响点。",
+      "times": [
+        0.065,
+        0.125,
+        0.185
+      ],
+      "recipe": "1.68x, highpass 1200 Hz, 64 ms, short release",
+      "impact": {
+        "file": "audio/sword-impact.wav",
+        "duration": 0.064,
+        "peak_dbfs": -4.15,
+        "rms_dbfs": -20.96,
+        "sha256": "44fc74cdc47c4508849e515c135ba0279783c8b79e697bf6d6af1ab358bf4707"
+      },
+      "phrase": {
+        "file": "audio/sword-phrase.wav",
+        "duration": 0.329,
+        "peak_dbfs": -4.15,
+        "rms_dbfs": -23.3,
+        "sha256": "76fe59bcca1e8535f37e41226c813c5b0c0c27046840bc0d8f6445645a3ed202"
+      }
+    },
+    "halberd": {
+      "name": "方天戟",
+      "description": "低沉的重击与下落余音，落地时只响一次。",
+      "times": [
+        0.28
+      ],
+      "recipe": "0.62x lowpass 1550 Hz + 0.88x lowpass 3600 Hz, 360 ms",
+      "impact": {
+        "file": "audio/halberd-impact.wav",
+        "duration": 0.36,
+        "peak_dbfs": -2.38,
+        "rms_dbfs": -17.5,
+        "sha256": "940eeed25839fbde2c1520a58c764c816e965aaea01925863e0d82822755edaa"
+      },
+      "phrase": {
+        "file": "audio/halberd-phrase.wav",
+        "duration": 0.72,
+        "peak_dbfs": -2.38,
+        "rms_dbfs": -20.51,
+        "sha256": "90a84c72224e59a5a30b8590bf6c3965c31b69c0dd5aca073097472fdec090e5"
+      }
+    }
+  }
+}

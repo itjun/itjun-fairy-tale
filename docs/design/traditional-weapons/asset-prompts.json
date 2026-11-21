@@ -1,0 +1,108 @@
+{
+  "status": "待确认设计；尚未接入游戏",
+  "generator": "imagegen",
+  "transparent_background": true,
+  "assets": [
+    {
+      "id": "dad-player",
+      "mode": "edit",
+      "prompt": "Edit only the clothing color of this exact transparent game sprite. Fill the white shirt with bright cornflower blue crayon #3986D7, leaving the four square black-outlined pockets white. Preserve absolutely all existing silhouette, pose, framing, head, black crayon hair, face, facial features, limbs, coarse black outlines, uneven crayon marks and paper-grain gaps. Do not redesign or smooth it. Full figure, same margins, no crop. True transparent background outside character; white face remains opaque. Single sprite only, no text, no added items.",
+      "reference": "public/assets/dad-player.png",
+      "file": "assets/dad-player.png"
+    },
+    {
+      "id": "dad-attack",
+      "mode": "edit",
+      "prompt": "Edit only the clothing color of this exact transparent game sprite. Fill the white shirt with bright cornflower blue crayon #3986D7, leaving the four square black-outlined pockets white. Preserve absolutely all existing silhouette, pose, framing, head, black crayon hair, face, facial features, limbs, coarse black outlines, uneven crayon marks and paper-grain gaps. Do not redesign or smooth it. Full figure, same margins, no crop. True transparent background outside character; white face remains opaque. Single sprite only, no text, no added items.",
+      "reference": "public/assets/dad-attack.png",
+      "file": "assets/dad-attack.png"
+    },
+    {
+      "id": "mom-player",
+      "mode": "edit",
+      "prompt": "Edit only the clothing color of this exact transparent game sprite. Change the red crayon dress to leafy green crayon #43A56C. Preserve absolutely all existing silhouette, pose, framing, head, black crayon hair, face, facial features, limbs, coarse black outlines, uneven crayon marks and paper-grain gaps. Do not redesign or smooth it. Full figure, same margins, no crop. True transparent background outside character; white face remains opaque. Single sprite only, no text, no added items.",
+      "reference": "public/assets/mom-player.png",
+      "file": "assets/mom-player.png"
+    },
+    {
+      "id": "mom-attack",
+      "mode": "edit",
+      "prompt": "Edit only the clothing color of this exact transparent game sprite. Change the red crayon dress to leafy green crayon #43A56C. Preserve absolutely all existing silhouette, pose, framing, head, black crayon hair, face, facial features, limbs, coarse black outlines, uneven crayon marks and paper-grain gaps. Do not redesign or smooth it. Full figure, same margins, no crop. True transparent background outside character; white face remains opaque. Single sprite only, no text, no added items.",
+      "reference": "public/assets/mom-attack.png",
+      "file": "assets/mom-attack.png"
+    },
+    {
+      "id": "little-player",
+      "mode": "edit",
+      "prompt": "Edit only the clothing color of this exact transparent game sprite. Change the red crayon dress to vivid violet purple crayon #A15CCB. Preserve absolutely all existing silhouette, pose, framing, head, black crayon hair, face, facial features, limbs, coarse black outlines, uneven crayon marks and paper-grain gaps. Do not redesign or smooth it. Full figure, same margins, no crop. True transparent background outside character; white face remains opaque. Single sprite only, no text, no added items.",
+      "reference": "public/assets/little-player.png",
+      "file": "assets/little-player.png"
+    },
+    {
+      "id": "little-attack",
+      "mode": "edit",
+      "prompt": "Edit only the clothing color of this exact transparent game sprite. Change the red crayon dress to vivid violet purple crayon #A15CCB. Preserve absolutely all existing silhouette, pose, framing, head, black crayon hair, face, facial features, limbs, coarse black outlines, uneven crayon marks and paper-grain gaps. Do not redesign or smooth it. Full figure, same margins, no crop. True transparent background outside character; white face remains opaque. Single sprite only, no text, no added items.",
+      "reference": "public/assets/little-attack.png",
+      "file": "assets/little-attack.png"
+    },
+    {
+      "id": "weapon-saber",
+      "mode": "edit",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent crayon game weapon sprite for a children's hand-drawn game design report. Input image 1 is the edit target and texture/style reference. Replace its curved willow-leaf saber with a Chinese Tang dao (唐刀) design. Make the blade COMPLETELY STRAIGHT, slender and single edged: straight flat spine, one visible cutting bevel along the lower edge, an asymmetric angular slanted point, no centered double-edged sword point. Straight dark brown wrapped handle aligned with the blade, about 25% of the full weapon length, a small restrained rectangular brass guard, a simple bronze ring pommel and one short red cloth tie. Keep the same rough thick black crayon outlines, dry colored-pencil grain, soft gray-blue steel and muted brown/brass/red palette as the reference. Keep the same horizontal side-view composition with handle at LEFT and blade tip at RIGHT, isolated centered full weapon with safe transparent margins, approximately 3:1 canvas. Preserve a true transparent background. Only one weapon, no scabbard, no person, no lettering. Do not curve the blade or handle. No oval katana guard, no fantasy glow, no photographic rendering, no neon colors. This is a restrained playful Tang-dao-inspired game design, not a historical museum reconstruction.",
+      "reference": "$CODEX_HOME/generated_images/01a1e7bd-3fe0-7022-8f6e-7afae52202f1/exec-e02c31b6-7a5f-4472-8201-bdcf4f950452.png",
+      "file": "assets/weapon-saber.png"
+    },
+    {
+      "id": "weapon-spear",
+      "mode": "edit",
+      "prompt": "Use case: precise-object-edit. Asset type: transparent crayon weapon sprite for the existing children's hand-drawn game design report. Input image 1 is the edit target and style reference. Replace this red-tasseled spear with a Chinese myth-inspired Huojianqiang FIRE-TIPPED SPEAR (火尖枪). Keep the long slender STRAIGHT shaft and full horizontal side-view silhouette, butt at LEFT and point at RIGHT, same safe margins and approximately 3:1 canvas. Change the shaft to muted lacquer red with a few small brass bands. At the right make a compact pointed flame-shaped spearhead with a gray-steel core and distinct orange-red and golden-yellow flame tongues hugging the pointed head. Retain a small red tie immediately beneath the spearhead. The flame head is at most 20% of the full weapon length; the long slender shaft is prominent. Match the reference rough thick black crayon outlines, dry colored pencil texture and uneven handmade strokes. Restrained visible warm flame colors, no neon glow or photographic fire. Keep transparent background genuinely transparent. One isolated weapon only, no person, no wheels, no text, no scabbard, no border, no floor, no motion streak background.",
+      "reference": "$CODEX_HOME/generated_images/01a1e7bd-3fe0-7022-8f6e-7afae52202f1/exec-2537029a-8e36-4ecf-9cce-5d2a41bd618e.png",
+      "file": "assets/weapon-spear.png"
+    },
+    {
+      "id": "weapon-sword",
+      "mode": "generate from style reference",
+      "prompt": "Create a SINGLE game weapon sprite on a true transparent background, drawn with the rough black crayon outlines and dry colored pencil grain of the reference character drawing. Only the weapon, no person. Recognizably traditional Chinese, elegant readable silhouette, restrained colors: pale cool steel blade, dark wood or dark jade handle, small muted brass fittings and ONE small red accent. NO neon rainbow, NO candy shape, NO fat inflated blade, NO Japanese katana fittings. Horizontal side view, grip at left, tip at right, centered with generous safe margin. Flat hand drawing with imperfect childlike strokes, but faithful weapon proportions. No backdrop, text, border, glow or motion trail. A traditional Chinese jian double edged straight sword, absolutely straight symmetrical tapering pale steel blade with a subtle blue central ridge. Blade 72% of length. Small symmetrical brass crossguard in Chinese cloud form, short deep jade green wrapped hilt, modest brass pommel and a short red tassel trailing below it at the far left. Fine long pointed silhouette; not a saber or katana.",
+      "reference": "assets/dad-player.png",
+      "file": "assets/weapon-sword.png"
+    },
+    {
+      "id": "weapon-halberd",
+      "mode": "generate from style reference",
+      "prompt": "Create a SINGLE game weapon sprite on a true transparent background, drawn with the rough black crayon outlines and dry colored pencil grain of the reference character drawing. Only the weapon, no person. Recognizably traditional Chinese, elegant readable silhouette, restrained colors: pale cool steel blade, dark wood or dark jade handle, small muted brass fittings and ONE small red accent. NO neon rainbow, NO candy shape, NO fat inflated blade, NO Japanese katana fittings. Horizontal side view, grip at left, tip at right, centered with generous safe margin. Flat hand drawing with imperfect childlike strokes, but faithful weapon proportions. No backdrop, text, border, glow or motion trail. A traditional Chinese fangtianji halberd. Long thin dark wood shaft with small brass bands. At the right end a central pointed steel spear blade and TWO symmetrical crescent side blades connected to the shaft by short braces, so the traditional fangtianji silhouette is immediately recognizable. Weapon head occupies only 28% of total length, the rest is long thin shaft. Muted gray-blue steel head, tiny red cloth tied beneath the head. No giant fantasy blade, no neon.",
+      "reference": "assets/dad-player.png",
+      "file": "assets/weapon-halberd.png"
+    },
+    {
+      "id": "effect-wind-fire-wheel",
+      "mode": "generate from style reference",
+      "prompt": "Use case: stylized-concept. Asset type: one reusable transparent game effect sprite, a WIND-FIRE WHEEL (风火轮) to appear under a character's foot. Input image 1 is STYLE REFERENCE ONLY: match its rough thick black crayon outline, dry colored pencil grain, imperfect childlike strokes, simple friendly game shapes. Do not include the character. Draw exactly ONE circular wheel in flat straight-on side view, centered in a square canvas with generous margins. A clear warm gold circular rim, three curved red-gold spokes curling around a small circular hub, surrounded by 7-9 small orange-red flame tongues flowing tangentially in the same clockwise direction. Make it read as a magical Chinese wind-fire wheel, not a car tire, sun face, flower, bicycle, explosion or floating fireball. The wheel should remain sharply readable when small. The open spaces between spokes and outside flames must be true transparency. Use black crayon contours and warm red, orange and ochre yellow, dry paper-grain gaps INSIDE colored strokes; no smooth digital glow, no shiny 3D, no pale rectangular paper backdrop, no text, no shadow, no character or footwear. Only one isolated circular flaming wheel; the application will duplicate it into a pair and animate its rotation.",
+      "reference": "assets/little-attack.png",
+      "file": "assets/effect-wind-fire-wheel.png"
+    },
+    {
+      "id": "effect-crescent-slash",
+      "mode": "generate from motion and style references",
+      "prompt": "Use case: stylized-concept. Asset type: a SINGLE transparent crescent MELEE SLASH EFFECT sprite for a child's crayon side-scrolling game. Image 1 is a MOTION-SHAPE REFERENCE: use only the bright white crescent-shaped close-range sword-swing streak highlighted in its red rectangle, not the sword, people, pixels, level, red box or UI. Image 2 is the DRAWING-STYLE reference: rough handmade crayon/pencil grain and imperfect confident strokes. Draw one bold luminous-looking white and pale icy-blue CRESCENT SWEEP, convex side facing RIGHT and concave opening facing LEFT toward the wielder. Both tips taper to fine points at upper-left and lower-left; thickest and brightest portion at the middle-right. This reads as one instantaneous curved sword-swing trail, a quick broad white blade of motion, not a physical moon blade or a flying projectile. Slight dark slate-blue broken pencil contour so it remains readable on cream paper, pale cyan edge, opaque white center with subtle dry-crayon grain. No central ring or disc, no handle, no sword, no stars, no sparks, no characters, no letters, no background halo, no photorealism, no pixel-art recreation. Entire isolated arc centered with generous margins on a true transparent square canvas; inner empty concavity and outside are transparent. Keep the curve clean and easy to read at small game size, no trailing wisps away from the main slash.",
+      "references": [
+        "references/nes-melee-reference.png",
+        "assets/little-attack.png"
+      ],
+      "file": "assets/effect-crescent-slash.png"
+    }
+  ],
+  "weapon_effect_variants": [
+    {
+      "id": "effect-sword-slash",
+      "prompt": "Use case: style-transfer. Asset type: transparent game melee effect sprite for a child's crayon platformer design report. Image 1 is the approved style reference, not an object to keep identical. Preserve its bright white core, coarse colored pencil/crayon outlines, paper-grain strokes, and sharp tapered endpoints. Create ONE isolated effect, transparent background, no weapon, no character, no text, no scene, no shadows. Keep ample transparent padding. The effect faces RIGHT, with the open side to the LEFT. Create a delicate, narrow, sharp mint-green-and-white crescent slash for a fast Chinese straight sword. Much thinner than the reference, a short steeply diagonal cutting stroke, two fine small trailing pencil streaks close alongside the inner curve. The silhouette is slender and restrained, not a thick broad C. It should read as a single fast precise slice."
+    },
+    {
+      "id": "effect-halberd-slash",
+      "prompt": "Use case: style-transfer. Asset type: transparent game melee effect sprite for a child's crayon platformer design report. Image 1 is the approved style reference, not an object to keep identical. Preserve its bright white core, coarse colored pencil/crayon outlines, paper-grain strokes, and sharp tapered endpoints. Create ONE isolated effect, transparent background, no weapon, no character, no text, no scene, no shadows. Keep ample transparent padding. The effect faces RIGHT, with the open side to the LEFT. Create a large sweeping, broad white crescent edged with indigo/slate blue and a little pale lavender for a heavy Chinese halberd. A generous C curve almost a semicircle, thick center, sharply tapered ends; add ONE short translucent offset trailing arc on the inner left side to communicate the weight of a single sweep, not two hits. Clearly heavier and more open than the reference. No sparkles."
+    },
+    {
+      "id": "effect-spear-thrust",
+      "prompt": "Use case: style-transfer. Asset type: transparent game melee effect sprite for a child's crayon platformer design report. Image 1 is the approved style reference, not an object to keep identical. Preserve its bright white core, coarse colored pencil/crayon outlines, paper-grain strokes, and sharp tapered endpoints. Create ONE isolated effect, transparent background, no weapon, no character, no text, no scene, no shadows. Keep ample transparent padding. The effect faces RIGHT, with the open side to the LEFT. Create a compact fiery crescent shock arc at the tip of a Chinese fire spear thrust. A small narrow vertical curved blade of light pointing right, white-yellow core with orange and vermilion crayon outline. Three short tapered horizontal flame strokes trail to the LEFT from its middle, giving forward thrust. Whole silhouette horizontally elongated but quite short vertically; not a wide vertical slash. No wheel, no spear."
+    }
+  ]
+}

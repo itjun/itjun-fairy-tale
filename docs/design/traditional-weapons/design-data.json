@@ -1,0 +1,251 @@
+{
+  "status": "待确认，未接入游戏",
+  "date": "2026-11-17",
+  "characters": [
+    {
+      "id": "dad",
+      "name": "爸爸",
+      "color": "#3986d7",
+      "colorName": "蓝色",
+      "height": 2.65,
+      "melee": "halberd",
+      "reason": "护盾提供一次容错，适合有蓄力的大范围劈扫。",
+      "preserve": "短发、方形上衣、四个方口袋"
+    },
+    {
+      "id": "mom",
+      "name": "妈妈",
+      "color": "#43a56c",
+      "colorName": "绿色",
+      "height": 2.5,
+      "melee": "saber",
+      "reason": "横斩兼顾近处小怪，每四轮触发原有花朵减速。",
+      "preserve": "圆发髻、两侧卷发、三角裙"
+    },
+    {
+      "id": "sister",
+      "name": "姐姐",
+      "color": "#ed3e57",
+      "colorName": "红色",
+      "height": 2.2,
+      "melee": "sword",
+      "reason": "快剑容易衔接跳跃；原有星雨天赋继续按四轮攻击触发。",
+      "preserve": "侧分刘海、两侧卷发、原红裙"
+    },
+    {
+      "id": "little",
+      "name": "妹妹",
+      "color": "#a15ccb",
+      "colorName": "紫色",
+      "height": 1.9,
+      "melee": "spear",
+      "reason": "用更高的二段跳换位置，再向前刺击；选用火尖枪时脚下带风火轮。",
+      "preserve": "高高的头发、短裙、最小身形"
+    }
+  ],
+  "meleeFeedback": {
+    "reference": "references/nes-melee-reference.png",
+    "hitPause": 0.04,
+    "hitFlash": 0.09,
+    "description": "用户已确认月牙斩迹方向和砍中、打倒敌人的击破音；四种武器采用不同形状、方向、范围与停留时间。命中播放 FC 原版击破音，挥空不响。"
+  },
+  "effects": [
+    {
+      "id": "crescent-slash",
+      "name": "月牙刀光",
+      "image": "effect-crescent-slash",
+      "weapons": [
+        "saber"
+      ],
+      "life": 0.12,
+      "description": "已获用户确认的唐刀宽月牙刀光基准。"
+    },
+    {
+      "id": "wind-fire",
+      "name": "风火轮",
+      "weapon": "spear",
+      "image": "effect-wind-fire-wheel",
+      "diameter": 0.3,
+      "idleRotation": 1.2,
+      "actionRotation": 0.6,
+      "trailLifetime": 0.25,
+      "maxTrail": 0.45,
+      "description": "装备火尖枪即出现一对，四位角色通用；双轮位于脚下，选中和站立时缓转，出招时加速并拉出短火尾。移动、跳跃时随脚部位置变化。",
+      "balance": "当前按外观特效提案，不另加伤害、移速、跳跃高度、飞行或无敌；枪的基础数值与原天赋保持不变。"
+    },
+    {
+      "id": "spear-slash",
+      "name": "火焰尖弧",
+      "image": "effect-spear-thrust",
+      "weapons": [
+        "spear"
+      ],
+      "life": 0.1,
+      "description": "枪尖的橙金窄火弧，短火线向后拖；最长 1.55 身高、上下各 0.22 身高，脚下保留双风火轮。"
+    },
+    {
+      "id": "sword-slash",
+      "name": "细短斜月牙",
+      "image": "effect-sword-slash",
+      "weapons": [
+        "sword"
+      ],
+      "life": 0.08,
+      "description": "青白细月牙，斜向上快速闪过；70° 小扇形，覆盖窄、收招快。"
+    },
+    {
+      "id": "halberd-slash",
+      "name": "大弧重扫",
+      "image": "effect-halberd-slash",
+      "weapons": [
+        "halberd"
+      ],
+      "life": 0.16,
+      "description": "蓝紫宽弧与一道淡残迹，扫过前上方 150°；范围最大，残迹不额外结算伤害。"
+    }
+  ],
+  "weapons": [
+    {
+      "id": "saber",
+      "type": "刀",
+      "name": "唐刀",
+      "verb": "横斩",
+      "image": "weapon-saber",
+      "damage": 72,
+      "interval": 0.5,
+      "windup": 0.06,
+      "active": 0.18,
+      "recovery": 0.26,
+      "comboGap": 0.24,
+      "reach": 0.95,
+      "arc": 110,
+      "targets": 3,
+      "height": 0.6,
+      "color": "#956e39",
+      "shape": "刀身平直、单侧开刃、斜切刀尖；长直柄、小型方护手，环首系一小段红绸。",
+      "role": "均衡清怪",
+      "strength": "近处有几只小怪时，一次横斩可覆盖前方扇形。",
+      "tradeoff": "距离较短，要先接近；身后的敌人不在基础范围内。",
+      "legend": "回风斩",
+      "legendDetail": "每三轮追加一次后向横斩，伤害为本刀的 50%，本轮多占用 0.15 秒。",
+      "animation": "白色宽月牙，浅蓝彩笔边；横向扫过前方 110°，适合近身清怪。 斩迹贴着武器攻击区域短暂出现，命中时有停顿和局部闪光。",
+      "slash": {
+        "image": "effect-crescent-slash",
+        "name": "宽月牙横斩",
+        "life": 0.12,
+        "center": 0,
+        "width": 1.2,
+        "height": 1.7,
+        "description": "白色宽月牙，浅蓝彩笔边；横向扫过前方 110°，适合近身清怪。"
+      }
+    },
+    {
+      "id": "spear",
+      "type": "枪",
+      "name": "火尖枪",
+      "verb": "直刺",
+      "image": "weapon-spear",
+      "damage": 96,
+      "interval": 0.7,
+      "windup": 0.1,
+      "active": 0.2,
+      "recovery": 0.4,
+      "comboGap": 0.32,
+      "reach": 1.55,
+      "arc": 0,
+      "targets": 1,
+      "height": 0.22,
+      "color": "#a44740",
+      "shape": "细长朱红枪杆、金色箍环；钢色枪尖包着橙金火舌，选用后脚下出现成对风火轮。",
+      "role": "远距单点",
+      "strength": "四种近战中最远，适合隔一点距离刺击直线上的敌人。",
+      "tradeoff": "上下覆盖窄，飞行怪要跳起来瞄准；基础只命中最近一名目标。",
+      "legend": "破阵枪",
+      "legendDetail": "可穿过第一名未格挡的敌人，再命中一名敌人；第二名受到 50% 伤害，护盾仍会截住本次直刺。",
+      "animation": "枪尖的橙金窄火弧，短火线向后拖；最长 1.55 身高、上下各 0.22 身高，脚下保留双风火轮。 斩迹贴着武器攻击区域短暂出现，命中时有停顿和局部闪光。",
+      "slash": {
+        "image": "effect-spear-thrust",
+        "name": "火焰尖弧",
+        "life": 0.1,
+        "center": 0,
+        "width": 0.65,
+        "height": 0.44,
+        "description": "枪尖的橙金窄火弧，短火线向后拖；最长 1.55 身高、上下各 0.22 身高，脚下保留双风火轮。"
+      }
+    },
+    {
+      "id": "sword",
+      "type": "剑",
+      "name": "青锋剑",
+      "verb": "快击",
+      "image": "weapon-sword",
+      "damage": 42,
+      "interval": 0.3,
+      "windup": 0.03,
+      "active": 0.11,
+      "recovery": 0.16,
+      "comboGap": 0.16,
+      "reach": 0.8,
+      "arc": 70,
+      "targets": 1,
+      "height": 0.42,
+      "color": "#386f65",
+      "shape": "双刃笔直、剑尖居中；小型对称护手、深绿握柄与短剑穗。",
+      "role": "灵活快攻",
+      "strength": "起手和收招最短，容易边跳边打，适合追着一个目标连续攻击。",
+      "tradeoff": "攻击距离最短，基础单次伤害最低，不负责大范围清怪。",
+      "legend": "连环快剑",
+      "legendDetail": "每四轮追加一记前向快刺，伤害为本剑的 60%，本轮多占用 0.10 秒。",
+      "animation": "青白细月牙，斜向上快速闪过；70° 小扇形，覆盖窄、收招快。 斩迹贴着武器攻击区域短暂出现，命中时有停顿和局部闪光。",
+      "slash": {
+        "image": "effect-sword-slash",
+        "name": "细短斜月牙",
+        "life": 0.08,
+        "center": -20,
+        "width": 1.05,
+        "height": 1.2,
+        "description": "青白细月牙，斜向上快速闪过；70° 小扇形，覆盖窄、收招快。"
+      }
+    },
+    {
+      "id": "halberd",
+      "type": "戟",
+      "name": "方天戟",
+      "verb": "劈扫",
+      "image": "weapon-halberd",
+      "damage": 126,
+      "interval": 0.9,
+      "windup": 0.18,
+      "active": 0.26,
+      "recovery": 0.46,
+      "comboGap": 0.4,
+      "reach": 1.3,
+      "arc": 150,
+      "targets": 4,
+      "height": 1.1,
+      "color": "#5d6e83",
+      "shape": "长木杆、中央戟尖与两侧月牙刃；头部占比克制，握持点靠近杆身中后段。",
+      "role": "范围重击",
+      "strength": "覆盖前上方和身前，单次伤害最高，适合高低平台与多只小怪。",
+      "tradeoff": "起手和收招最慢；挥空后要等这一轮结束，不能靠连按取消。",
+      "legend": "开山戟",
+      "legendDetail": "对护甲、硬壳和精英的有效伤害增加 20%，对首领增加 10%；不绕过格挡与首领承伤上限。",
+      "animation": "蓝紫宽弧与一道淡残迹，扫过前上方 150°；范围最大，残迹不额外结算伤害。 斩迹贴着武器攻击区域短暂出现，命中时有停顿和局部闪光。",
+      "slash": {
+        "image": "effect-halberd-slash",
+        "name": "大弧重扫",
+        "life": 0.16,
+        "center": -15,
+        "width": 1.25,
+        "height": 1.9,
+        "description": "蓝紫宽弧与一道淡残迹，扫过前上方 150°；范围最大，残迹不额外结算伤害。"
+      }
+    }
+  ],
+  "audio": {
+    "file": "audio/ng3-enemy-break.wav",
+    "source": "https://nesninja.com/game/nes/ninja-gaiden-iii-the-ancient-ship-of-doom/music",
+    "label": "FC《忍者龙剑传 III》敌人击破音效",
+    "description": "原版音效数据经 NES 声音芯片模拟重放，仅裁去前后静音；不使用旧合成音，不改音高。"
+  }
+}
