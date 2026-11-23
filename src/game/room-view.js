@@ -1,3 +1,4 @@
+import { addFieldViews } from './field-views.js';
 import { addForestViews } from './forest-view.js';
 import * as THREE from 'three';
 import { DOOR_REWARDS, TILE_COLORS, doorPosition, spotPosition } from '../../shared/room-world.js';
@@ -15,6 +16,7 @@ export class RoomViews {
     this.engine = engine;
     this.items = [];
     const world = engine.world;
+    if (world.field) addFieldViews(this);
     if (world.forest) addForestViews(this);
     for (const door of world.doors) {
       const spot = doorPosition(world, door);

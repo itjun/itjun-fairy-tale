@@ -16,6 +16,7 @@ const RESCUE_STATUS = ['待寻找', '找到线索', '桥已通', '听到鸟鸣',
 const KIND_MARKS = { intro: '起', battle: '战', mechanism: '机', puzzle: '宝', shop: '店', elite: '精', boss: '王' };
 
 function roomLine(rooms) {
+  if (rooms.fieldHint) return rooms.fieldHint;
   if (rooms.forest) return rooms.forest.hint;
   if (rooms.isClimbing || rooms.canDescend || rooms.isDroppingFromGrip || rooms.areaId) return rooms.traversalHint;
   if (rooms.isCleared) return rooms.kind === 'boss' ? '打赢了，往右走到终点' : rooms.kind === 'shop' ? '买完就跳到发光的门上' : '门亮了，跳过去';

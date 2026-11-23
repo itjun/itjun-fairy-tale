@@ -1,3 +1,4 @@
+import { validField, hasMark } from '../../shared/trails/field-progress.js';
 import { isValidProjectiles } from './projectile-state.js';
 import { isValidSurvival, migrateSurvival } from './characters.js';
 import { createRoomWorld } from '../../shared/room-world.js';
@@ -70,6 +71,11 @@ export function readAdventure(storage=localStorage) {
     if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
     // 房间进度要和地图对得上，人也得站在当前这间房里。
     if (!isValidRoomState(state.rooms, world) || state.players.some(p => world.platforms[p.safeId].roomId !== state.rooms.roomId)) return null;
+    if (world.field) {
+      if (!validField(world,state.rooms,state.elapsed)) return null;
+      const safe = [...state.players.map(p=>p.safeId),state.revival?.platformId].filter(id=>id!=null);
+      if (safe.some(id=>world.platforms[id].fieldGate && !hasMark(world.rooms[world.platforms[id].roomId],state.rooms.field,world.platforms[id].fieldGate))) return null;
+    }
     if (world.forest && (state.rooms.forest.crown !== 5 || state.rooms.forest.roots !== 5)) {
       const boss = state.enemies[world.rooms[0].bossId - 1];
       if (!boss.isDormant || boss.isDefeated || state.rooms.cleared.length) return null;

@@ -1,3 +1,4 @@
+import { fieldStages } from './trails/themes.js';
 import { collectionPoints } from './collectibles.js';
 // requiredFlowers / flowers 保留旧版字段名，统一表示宝物数量，兼容既有 SQLite 成绩。
 export const LEVELS = Object.freeze([
@@ -50,8 +51,10 @@ export const FOREST_RESCUE = Object.freeze({
   id: 'forest-rescue', chapterName: '树冠救援', structure: 'forest-rescue',
   subtitle: '带两只猫头鹰宝宝回巢', story: '树冠和树根各传来一声呼唤。先去哪边，由你决定。',
 });
-export const PLAYABLE_WORLDS = Object.freeze(WORLD_ACTS.map(stage => stage.themeId === 'forest' ? FOREST_RESCUE : stage));
-export function findStage(id) { if (id === FOREST_RESCUE.id) return FOREST_RESCUE; return STAGES.find(stage => stage.id === id) || WORLD_ACTS.find(stage => stage.id === id); }
+const NEW_WORLDS = [FOREST_RESCUE, ...fieldStages(WORLD_ACTS)];
+export const WORLD_MAPS = Object.freeze([...WORLD_ACTS, ...NEW_WORLDS]);
+export const PLAYABLE_WORLDS = Object.freeze(WORLD_ACTS.map(stage => NEW_WORLDS.find(map=>map.themeId===stage.themeId) || stage));
+export function findStage(id) { return WORLD_MAPS.find(stage=>stage.id===id) || STAGES.find(stage=>stage.id===id); }
 export function findLevel(id) { return LEVELS.find(level => level.id === id) || findStage(id); }
 export function themeFor(level) { return LEVELS.find(theme => theme.id === (level.themeId || level.id)); }
 export function calculateScore(flowers, isCompleted, level) { return (typeof flowers === 'number' ? flowers * 10 : collectionPoints(flowers)) + (isCompleted ? level.bonus : 0); }

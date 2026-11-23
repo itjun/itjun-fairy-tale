@@ -18,6 +18,9 @@ function clearRoom(world, rooms, defeatedIds) {
   const room = world.rooms[rooms.roomId];
   for (const id of room.enemyIds) defeat(world.enemies[id - 1], defeatedIds);
   if (room.bossId) defeat(world.enemies[room.bossId - 1], defeatedIds);
+  if (world.field) {
+    for (const stop of room.stops) rooms.field[room.id+'/'+stop.key] = 10;
+  }
   rooms.cleared.push(room.id); rooms.stars[room.id] = 3;
   return room;
 }
