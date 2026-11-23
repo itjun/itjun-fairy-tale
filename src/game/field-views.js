@@ -1,3 +1,4 @@
+import { paintWind } from './wind-streams.js';
 import { paintTide } from './tidal-water.js';
 import { trailArt, trailMaterial } from './trail-art.js';
 import { canUse, hasMark, fieldStopReady } from '../../shared/trails/field-progress.js';
@@ -15,6 +16,7 @@ export function addFieldViews(views) {
   for(const r of w.rooms) {
     const watch=update=>views.items.push({roomId:r.id,update});
     if (r.tide) paintTide(views,r);
+    if (r.wind) paintWind(views,r);
     for(const decor of r.props) {
       const obj=sprite(decor.icon,decor.x,decor.y+decor.height*.47,decor.width,decor.height,-1.7);
       watch((_,here)=>{obj.visible=here;});

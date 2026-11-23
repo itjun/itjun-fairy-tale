@@ -1,3 +1,4 @@
+import { pushInWind } from '../../shared/trails/wind.js';
 import { fieldHint, stepField, syncField } from '../../shared/trails/field-progress.js';
 import { fieldImages } from './field-views.js';
 import { forestHint, stepForestRescue } from './forest-rescue.js';
@@ -708,6 +709,7 @@ export class GardenEngine {
       if (isBraking) player.vy = -3;
       player.fallPeak = wasGrounded || wasClimbing || isBraking || player.vy > 0 ? player.y : Math.max(player.fallPeak ?? player.y, player.y);
       const isManualHorizontal = ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'].some(key => this.keys.has(key)) || this.touch.has('left') || this.touch.has('right');
+      if (activeRoom.wind) pushInWind(activeRoom,this.roomState.field,player,STEP);
       const result = stepTraversal(player, { direction: isManualHorizontal ? Number(right) - Number(left) : (this.gamepadDirection || 0), vertical: Number(up) - Number(down), speedMultiplier, jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, this.platforms, STEP, { isFiniteLife: true, ...this.roomBounds() }, activeRoom.traversal);
       this.jumps[index] = false;
       if (result.isJumped || result.isDropped || player.grip) player.fallPeak = player.y;
