@@ -8,7 +8,7 @@ export class TraversalViews {
   constructor(engine) {
     const gripMaterial = engine.spriteMaterial('desert-grip');
     const isDesert = engine.world.themeId === 'desert';
-    const cavePaper = engine.spriteMaterial(isDesert ? 'desert-cave-interior' : 'cave-paper');
+    const cavePaper = engine.spriteMaterial(engine.world.forest ? 'forest-root-hall' : isDesert ? 'desert-cave-interior' : 'cave-paper');
     this.caveBackdrop = engine.sprite(cavePaper, 0, 0, 1, 1, -15);
     this.caveBackdrop.visible = false;
     const materialFor = new Map([['desert-cave-mouth', engine.spriteMaterial('desert-cave-mouth')]]);
@@ -28,7 +28,7 @@ export class TraversalViews {
         if (cave && item.y < room.fallY) inside.push({ mesh, caveId: item.caveId });
         else outside.push(mesh);
       }
-      if (cave && !isDesert) {
+      if (cave && !isDesert && !engine.world.forest) {
         const width = cave.right - cave.left;
         inside.push({ mesh: engine.sprite(artMaterial('adventure-root-cave'), (cave.left + cave.right) / 2, cave.floorY + 4, width + 2.5, 10, -1.65) });
       }

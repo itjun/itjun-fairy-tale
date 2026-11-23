@@ -1,7 +1,7 @@
 const KINDS=['stars','bubble','moonblade','flame','blade','boomerang','seed','firefly','lightblade','fire','snow','thunder','rain'];
 const LOOPS=['flame','fire','snow','thunder','rain'];
 const WEAPON_BANK = './audio/combat/fc-ninja-gaiden';
-export const AUDIO_FILES=[...KINDS.flatMap(id=>['fire','hit','defeat'].flatMap(event=>[0,1,2].map(n=>`${id}-${event}-${n}`))),...LOOPS.flatMap(id=>[`${id}-loop`,`${id}-end`]),'block','player-hurt','life-lost','boss-warning','boss-defeat','jump','flower','checkpoint','skill'];
+export const AUDIO_FILES=[...KINDS.flatMap(id=>['fire','hit','defeat'].flatMap(event=>[0,1,2].map(n=>`${id}-${event}-${n}`))),...LOOPS.flatMap(id=>[`${id}-loop`,`${id}-end`]),'block','player-hurt','life-lost','boss-warning','boss-defeat','jump','flower','checkpoint','skill','owl-call','owl-home'];
 export function soundPriority(event){return /boss-warning|player-hurt|life-lost/.test(event)?4:/block|:cast|:clash|boss-defeat/.test(event)?3:/:defeat|:hit/.test(event)?2:1;}
 export class CombatAudio {
   constructor(){this.context=null;this.buffers=new Map();this.voices=[];this.loops=new Map();this.last=new Map();this.variants=new Map();this.isMuted=false;this.isDisposed=false;}

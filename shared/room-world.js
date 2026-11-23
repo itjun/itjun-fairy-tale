@@ -1,6 +1,7 @@
 import { randomGenerator } from './random.js';
 import { applyCycleHealth } from './adventure-cycle.js';
-import { WORLD_ACTS, themeFor } from './levels.js';
+import { buildForestRescue } from './forest-rescue.js';
+import { WORLD_ACTS, FOREST_RESCUE, themeFor } from './levels.js';
 import { LEVEL_COLLECTIBLES } from './collectibles.js';
 import { ADVENTURE_GENERATION_VERSION, EXPANDED_THEME_MONSTERS, MONSTERS } from './adventure-catalog.js';
 import { bossBaseline } from './boss-health.js';
@@ -307,9 +308,13 @@ function fillMechanism(world, stage, room, random) {
 }
 
 function buildBoss(world, builder, stage, room) {
-  const theme = BOSS_THEMES[world.themeId];
   const floor = builder.next(0, 32, 1.1, { isCheckpoint: true, isBossFloor: true, isOneWay: false });
   for (const [x, level] of [[-10, 1], [-5.5, 2], [10, 1]]) builder.place(floor.x + x, floor.y + LAYER * level, 6);
+  return { floor, boss: placeBoss(world, stage, room, floor) };
+}
+
+function placeBoss(world, stage, room, floor) {
+  const theme = BOSS_THEMES[world.themeId];
   // 前半段只用第一招，半血后两招轮着来。
   const skills = bossSkills(world.themeId);
   const hp = bossBaseline(stage);
@@ -323,13 +328,13 @@ function buildBoss(world, builder, stage, room) {
   };
   world.enemies.push(boss);
   room.bossId = boss.id;
-  return { floor, boss };
+  return boss;
 }
 
 // 一章是开场房、三层各两间候选房和首领房。门负责把人送到下一间，种子决定门后是什么。
 export function createRoomWorld(seed, selected, cycle = 1) {
   const requestedId = typeof selected === 'string' ? selected : selected.id;
-  const stage = WORLD_ACTS.find(item => item.id === requestedId);
+  const stage = requestedId === FOREST_RESCUE.id ? FOREST_RESCUE : WORLD_ACTS.find(item => item.id === requestedId);
   if (!stage) throw new Error('找不到这个世界关');
   const theme = themeFor(stage);
   const random = randomGenerator((seed ^ Math.imul(stage.worldIndex + 1, 0x2c1b3c6d)) >>> 0);
@@ -340,6 +345,11 @@ export function createRoomWorld(seed, selected, cycle = 1) {
     rooms: [], doors: [],
   };
   const builder = createBuilder(world, theme, random);
+  if (stage === FOREST_RESCUE) {
+    buildForestRescue(world, stage, builder, placeBoss);
+    applyCycleHealth(world, cycle);
+    return world;
+  }
   const layers = [[{ kind: 'intro', reward: null }], ...planDoors(stage, random), [{ kind: 'boss', reward: null }]];
   let left = 0;
   for (const [depth, layer] of layers.entries()) {

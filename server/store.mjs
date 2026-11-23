@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { findLevel, calculateScore, hasCompleted, WORLD_ACTS } from '../shared/levels.js';
+import { findLevel, calculateScore, hasCompleted, WORLD_ACTS, FOREST_RESCUE } from '../shared/levels.js';
 import { collectionForPlatforms } from '../shared/collectibles.js';
 import { campaignScore } from '../shared/campaign.js';
 import { createRoomWorld } from '../shared/room-world.js';
@@ -37,7 +37,7 @@ export function validateRun(input, isHistory = false) {
     return validateRetired(input, base);
   }
   const generationVersion = scoringVersion === 3 ? ADVENTURE_GENERATION_VERSION : 0;
-  if (scoringVersion === 3 && !WORLD_ACTS.includes(level)) throw new InputError('新地图需要选择世界关');
+  if (scoringVersion === 3 && level !== FOREST_RESCUE && !WORLD_ACTS.includes(level)) throw new InputError('新地图需要选择世界关');
   const world = scoringVersion === 3 ? createRoomWorld(seed, level) : null;
   const treasureCount = world?.treasures.length ?? level.platforms;
   const flowers = integer(input.flowers, 0, treasureCount, '小花数量');

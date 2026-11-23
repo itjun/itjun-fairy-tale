@@ -70,6 +70,10 @@ export function readAdventure(storage=localStorage) {
     if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
     // 房间进度要和地图对得上，人也得站在当前这间房里。
     if (!isValidRoomState(state.rooms, world) || state.players.some(p => world.platforms[p.safeId].roomId !== state.rooms.roomId)) return null;
+    if (world.forest && (state.rooms.forest.crown !== 5 || state.rooms.forest.roots !== 5)) {
+      const boss = state.enemies[world.rooms[0].bossId - 1];
+      if (!boss.isDormant || boss.isDefeated || state.rooms.cleared.length) return null;
+    }
     if(!isValidProjectiles(state.projectiles,world))return null;
     if (!isValidCombatLoot(state.combatLoot,world,state.defeatedIds)) return null;
     if (state.combatLoot?.pendingId!=null && (state.survival.phase!=='alive'||state.isCompleted||state.journey.pending)) return null;

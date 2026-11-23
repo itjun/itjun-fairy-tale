@@ -44,7 +44,14 @@ export const WORLD_ACTS = Object.freeze(LEVELS.map((level, worldIndex) => {
     index: worldIndex, roomCount: 3, bonus: level.bonus + 50,
   };
 }));
-export function findStage(id) { return STAGES.find(stage => stage.id === id) || WORLD_ACTS.find(stage => stage.id === id); }
+// 独立关卡编号让进行中的旧森林和历史成绩继续使用原来的地形与物品编号。
+export const FOREST_RESCUE = Object.freeze({
+  ...WORLD_ACTS.find(stage => stage.themeId === 'forest'),
+  id: 'forest-rescue', chapterName: '树冠救援', structure: 'forest-rescue',
+  subtitle: '带两只猫头鹰宝宝回巢', story: '树冠和树根各传来一声呼唤。先去哪边，由你决定。',
+});
+export const PLAYABLE_WORLDS = Object.freeze(WORLD_ACTS.map(stage => stage.themeId === 'forest' ? FOREST_RESCUE : stage));
+export function findStage(id) { if (id === FOREST_RESCUE.id) return FOREST_RESCUE; return STAGES.find(stage => stage.id === id) || WORLD_ACTS.find(stage => stage.id === id); }
 export function findLevel(id) { return LEVELS.find(level => level.id === id) || findStage(id); }
 export function themeFor(level) { return LEVELS.find(theme => theme.id === (level.themeId || level.id)); }
 export function calculateScore(flowers, isCompleted, level) { return (typeof flowers === 'number' ? flowers * 10 : collectionPoints(flowers)) + (isCompleted ? level.bonus : 0); }

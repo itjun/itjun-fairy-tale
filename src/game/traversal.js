@@ -14,7 +14,7 @@ export function caveForPlayer(room, player) {
 export function caveMouthAt(room, player) {
   if (!player.isGrounded || player.crawl) return null;
   const cave = caveForPlayer(room, player) ?? room.traversal?.cave;
-  return cave?.mouths.find(mouth => mouth.platformId === player.ground?.id && Math.abs(mouth.x - player.x) <= 1.38) ?? null;
+  return cave?.mouths.find(mouth => !mouth.isClosed && mouth.platformId === player.ground?.id && Math.abs(mouth.x - player.x) <= 1.38) ?? null;
 }
 
 export function beginCrawl(player, mouth) {

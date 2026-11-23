@@ -12,9 +12,11 @@ import { AttackSlotContent } from './AttackSlots.jsx';
 import './rooms.css';
 
 // 进度条上每间房用一个字，孩子一眼能认出来。
+const RESCUE_STATUS = ['待寻找', '找到线索', '桥已通', '听到鸟鸣', '跟随中', '已回巢'];
 const KIND_MARKS = { intro: '起', battle: '战', mechanism: '机', puzzle: '宝', shop: '店', elite: '精', boss: '王' };
 
 function roomLine(rooms) {
+  if (rooms.forest) return rooms.forest.hint;
   if (rooms.isClimbing || rooms.canDescend || rooms.isDroppingFromGrip || rooms.areaId) return rooms.traversalHint;
   if (rooms.isCleared) return rooms.kind === 'boss' ? '打赢了，往右走到终点' : rooms.kind === 'shop' ? '买完就跳到发光的门上' : '门亮了，跳过去';
   if (['battle', 'elite'].includes(rooms.kind)) return `第 ${rooms.wave} / ${rooms.waves} 波，还剩 ${rooms.left} 只`;
@@ -40,11 +42,16 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
       </div>
     </aside>
     <aside className="room-hud-path" aria-label="这一章的房间">
-      <ol>{rooms.layers.map((layer, index) => <li key={index} data-kind={layer.kind || 'unknown'} aria-current={index === rooms.depth || undefined}>
+      {rooms.forest ? <ol className="forest-family" aria-label="幼鸟救援进度">
+        {['crown', 'roots'].map((side, index) => <li key={side} data-home={rooms.forest[side] === 5}>
+          <img src="./assets/forest-owlet.png" alt=""/><strong>{index ? '树根' : '树冠'}</strong>
+          <small>{RESCUE_STATUS[rooms.forest[side]]}</small>
+        </li>)}
+      </ol> : <ol>{rooms.layers.map((layer, index) => <li key={index} data-kind={layer.kind || 'unknown'} aria-current={index === rooms.depth || undefined}>
         <b>{KIND_MARKS[layer.kind] || '？'}</b>
         <span aria-label={`${layer.stars} 颗星`}>{[0, 1, 2].map(star => <Star key={star} size={13} weight={star < layer.stars ? 'fill' : 'regular'} />)}</span>
-      </li>)}</ol>
-      <p><strong>第 {stats.adventure?.cycle || 1} 轮　{rooms.name}</strong>{line && line !== stats.message && <span>{line}</span>}</p>
+      </li>)}</ol>}
+      <p><strong>第 {stats.adventure?.cycle || 1} 轮　{rooms.name}</strong>{line && (rooms.forest || line !== stats.message) && <span>{line}</span>}</p>
       {isPlaying && stats.enemyGuide?.isNearBarrier && <small className="room-barrier-hint">打完这片小怪，栅栏就会打开</small>}
     </aside>
     {isPlaying && stats.enemyGuide && <div className="room-enemy-guide" data-enemy-id={stats.enemyGuide.id} data-edge={stats.enemyGuide.isAtEdge} style={{ left: `${stats.enemyGuide.x}%`, top: `${stats.enemyGuide.y}%` }}>
@@ -101,7 +108,11 @@ export function RunOverview({ stats, onBack }) {
         </div>;
       })}</div>
     </section>
-    {rooms && <section aria-label="这一章的门">
+    {rooms?.forest && <section aria-label="树冠救援">
+      <h2>树冠救援</h2><p>树冠幼鸟 · {RESCUE_STATUS[rooms.forest.crown]}　树根幼鸟 · {RESCUE_STATUS[rooms.forest.roots]}</p>
+      <p>{rooms.forest.hint}</p>
+    </section>}
+    {rooms && !rooms.forest && <section aria-label="这一章的门">
       <h2>这一章的门</h2>
       <ol className="overview-path">{rooms.layers.map((layer, index) => <li key={index} aria-current={index === rooms.depth || undefined}><b>{KIND_MARKS[layer.kind] || '？'}</b>{layer.kind ? ROOM_KINDS[layer.kind].name : '还没选'}{layer.stars > 0 && <small>{layer.stars} 颗星</small>}</li>)}</ol>
       {rooms.doors.length > 0 && <p className="option-note">{rooms.isCleared ? '门亮着' : '清完这间房，门才会亮'}。前面有{rooms.doors.length === 2 ? '两扇门，一扇在高处，一扇在低处，跳到哪扇就进哪扇' : '一扇门，跳上去就能进'}。</p>}

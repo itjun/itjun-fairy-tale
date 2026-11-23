@@ -1,5 +1,7 @@
 import { DOOR_REWARDS, SHOP_STALLS, doorPosition, spotPosition } from '../../shared/room-world.js';
 
+import { newForestProgress, isValidForestProgress } from './forest-rescue.js';
+
 // 房间进度：在哪间房、第几波、门开没开、星星和连击。只由固定游玩步长推进，随局保存。
 export const COMBO_WINDOW = 3;
 export const COMBO_REWARD_EVERY = 3;
@@ -12,7 +14,7 @@ function newPuzzle(room) {
   return null;
 }
 export function newRoomState(world) {
-  return { roomId: 0, wave: 0, path: [0], cleared: [], stars: {}, isHurt: false, isFallen: false, downs: 0, combo: 0, comboLeft: 0, drops: [], bought: [], puzzle: newPuzzle(world.rooms[0]) };
+  return { ...(world.forest ? { forest: newForestProgress(world) } : {}), roomId: 0, wave: 0, path: [0], cleared: [], stars: {}, isHurt: false, isFallen: false, downs: 0, combo: 0, comboLeft: 0, drops: [], bought: [], puzzle: newPuzzle(world.rooms[0]) };
 }
 export function currentRoom(world, state) { return world.rooms[state.roomId]; }
 export function isRoomCleared(state, roomId = state.roomId) { return state.cleared.includes(roomId); }
@@ -162,6 +164,7 @@ export function isValidRoomState(state, world) {
   const isFlag = value => typeof value === 'boolean';
   const isCount = (value, max) => Number.isInteger(value) && value >= 0 && value <= max;
   if (!state || !Array.isArray(state.path) || !Array.isArray(state.cleared) || !Array.isArray(state.drops) || !Array.isArray(state.bought) || !state.stars || Array.isArray(state.stars)) return false;
+  if (world.forest && !isValidForestProgress(state.forest)) return false;
   const room = world.rooms[state.roomId];
   if (!room || state.path[0] !== 0 || state.path.at(-1) !== state.roomId || state.path.length > world.zones.length) return false;
   if (state.path.some((id, index) => world.rooms[id]?.depth !== index)) return false;

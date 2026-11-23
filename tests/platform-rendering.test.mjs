@@ -7,6 +7,7 @@ import { WORLD_ACTS } from '../shared/levels.js';
 import { createRoomWorld } from '../shared/room-world.js';
 import { GardenEngine, PLATFORM_CROPS, TERRAIN_CROPS, THIN_ART } from '../src/game/engine.js';
 import { LAYER } from '../shared/room-terrain.js';
+import { addForestViews } from '../src/game/forest-view.js';
 
 async function material(name) {
   const { width, height } = await sharp(fileURLToPath(new URL(`../public/assets/${name}.png`, import.meta.url))).metadata();
@@ -31,12 +32,60 @@ const materials = await loadMaterials();
 function render(world) {
   const game = Object.assign(Object.create(GardenEngine.prototype), { ...materials,
     world: { ...world, hazards: [], supplies: [], treasures: [], enemies: [], springs: [], switches: [], decorations: [], zones: [], bossArenas: [] },
-    level: { id: world.themeId }, platforms: world.platforms, scene: new THREE.Scene(), platformViews: new Map(),
+    level: { id: world.themeId }, platforms: world.platforms, scene: new THREE.Scene(), platformViews: new Map(), resources: [],
     planeGeometry: new THREE.PlaneGeometry(1, 1), boxGeometry: new THREE.BoxGeometry(1, 1, 1) });
   game.buildWorld(); game.scene.updateMatrixWorld(true);
   return game;
 }
 const overlapX = (a, b) => Math.min(a.x + a.width / 2, b.x + b.width / 2) - Math.max(a.x - a.width / 2, b.x - b.width / 2);
+
+test('树根贴住巢边地面，树洞入口只有一张图并随洞口状态显示', () => {
+  const world = createRoomWorld(42, 'forest-rescue'), game = render(world);
+  const player = { safe: world.start };
+  Object.assign(game, { players: [player], spriteMaterial(name) { return new THREE.MeshBasicMaterial({ name }); } });
+  const views = { engine: game, items: [], glow: () => new THREE.Object3D(), paper: () => ({ mesh: new THREE.Object3D(), draw() {} }) };
+  addForestViews(views);
+  const state = { forest: { crown: 0, roots: 0, lights: 0 } };
+  const update = () => views.items.forEach(item => item.update(state));
+  update();
+  const room = world.rooms[0], mouth = room.traversal.cave.mouths[0];
+  const tree = game.scene.children.find(mesh => mesh.material?.name === 'forest-hollow');
+  assert.ok(tree?.visible && Math.abs(tree.position.y - tree.scale.y / 2 - world.start.y) < .15);
+  const entrances = game.scene.children.filter(mesh => mesh.position.x === mouth.x && ['adventure-root-cave', 'desert-cave-mouth'].includes(mesh.material?.name));
+  assert.equal(entrances.length, 1);
+  assert.ok(entrances[0].visible);
+  assert.ok(!room.traversal.art.some(item => item.image === 'adventure-root-cave' && item.x === mouth.x && item.y > room.fallY));
+  mouth.isClosed = true;
+  update();
+  assert.equal(entrances[0].visible, false);
+  player.safe = world.platforms[world.forest.rootEntryId];
+  update();
+  assert.equal(tree.visible, false);
+});
+
+test('树冠救援的地面和静止叶台在落脚面内侧没有贴图缺口', async () => {
+  const world = createRoomWorld(42, 'forest-rescue'), game = render(world);
+  const leaf = world.platforms.find(p => p.skin === 'leaf' && !p.isMoving);
+  for (const [platform, image] of [[world.start, 'terrain-bank'], [leaf, 'lift-leaf']]) {
+    const { data, info } = await sharp(fileURLToPath(new URL(`../public/assets/${image}.png`, import.meta.url)))
+      .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const view = game.platformViews.get(platform.id);
+    // 在台面下沿水平方向采样实际 PNG 的透明度，端点内侧应当连成一整块。
+    for (let percent = 10; percent <= 90; percent++) {
+      const x = platform.x + platform.width * (percent / 100 - .5);
+      const ray = new THREE.Raycaster(new THREE.Vector3(x, platform.y - .18, 2), new THREE.Vector3(0, 0, -1));
+      const opaque = ray.intersectObject(view).some(({ uv, object }) => {
+        const map = object.material.map;
+        map.updateMatrix();
+        map.transformUv(uv);
+        const i = Math.min(info.width - 1, Math.floor(uv.x * info.width));
+        const j = Math.min(info.height - 1, Math.floor(uv.y * info.height));
+        return data[(j * info.width + i) * 4 + 3] > 127;
+      });
+      assert.ok(opaque, `${image} 在台面 ${percent}% 处断开`);
+    }
+  }
+});
 
 test('上下两层的平台贴图不盖住对方的落脚面：上层的图离下层台面留得出小怪的高度，下层的图顶不到上层台面', () => {
   // 拼出来的贴图最厚 THIN_ART；冰面和传送带是固定厚度的一整条，厚 1.1。

@@ -126,3 +126,15 @@ html[data-input-mode="gamepad"] #root .room-touch { display:none; }
 }
 @media(max-width:700px) { .room-hud-path { top:86px; } .room-hud-path p span { display:none; } .platform-game[data-rooms=true] .boss-health { top:190px; width:80%; } }
 @media(prefers-reduced-motion:reduce) { .room-fade,.album-toast,.room-hud-keys .is-ready,#root .room-hud-side .room-hud-combo { animation:none; } .room-fade { display:none; } }
+
+.room-hud-path .forest-family { gap: .7rem; }
+.room-hud-path .forest-family li { display: grid; grid-template-columns: 1.8rem auto; grid-template-rows: auto auto; align-items: center; column-gap: .2rem; color: #543f29; }
+.room-hud-path .forest-family li::after, .room-hud-path .forest-family li::before { display: none; }
+.forest-family img { grid-row: span 2; width: 1.8rem; }
+.forest-family strong, .forest-family small { font-size: .8rem; line-height: 1.1; }
+.forest-family li[data-home=true] { color: #285c38; }
+.platform-game[data-level=forest-rescue] .room-hud-path p { flex-wrap:wrap; gap:0 .6em; white-space:normal; }
+@media(max-width:700px) {
+  .platform-game[data-level=forest-rescue] .room-hud-path { width:min(92vw,28rem); }
+  .platform-game[data-level=forest-rescue] .room-hud-path p span { display:inline; }
+}

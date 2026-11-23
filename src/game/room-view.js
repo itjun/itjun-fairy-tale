@@ -1,3 +1,4 @@
+import { addForestViews } from './forest-view.js';
 import * as THREE from 'three';
 import { DOOR_REWARDS, TILE_COLORS, doorPosition, spotPosition } from '../../shared/room-world.js';
 import { ELITE_TRAITS } from '../../shared/monster-roles.js';
@@ -14,6 +15,7 @@ export class RoomViews {
     this.engine = engine;
     this.items = [];
     const world = engine.world;
+    if (world.forest) addForestViews(this);
     for (const door of world.doors) {
       const spot = doorPosition(world, door);
       const gate = engine.sprite(engine.material(engine.bossGateMaterial.clone()), spot.x, spot.y + 1.7, 3.3, 3.3, -0.3);

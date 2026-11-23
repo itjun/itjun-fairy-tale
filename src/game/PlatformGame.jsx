@@ -18,7 +18,7 @@ import { readAdventure, writeAdventure } from './save.js';
 import { COLLECTIBLES, LEVEL_COLLECTIBLES } from './collectibles.js';
 import { RewardPanel } from './AdventurePanels.jsx';
 import './adventure.css';
-import { WORLD_ACTS } from '../../shared/levels.js';
+import { PLAYABLE_WORLDS as WORLD_ACTS, findStage } from '../../shared/levels.js';
 import { carryToNextWorld } from '../../shared/adventure-cycle.js';
 import { queueRun, flushScores, saveOnLeave } from '../scores/client.js';
 import './game.css';
@@ -46,10 +46,12 @@ export function PlatformGame({ onExit, initialSound = true }) {
   const [isSound, setIsSound] = useState(initialSound);
   const [seed, setSeed] = useState(() => saved.current?.run.seed ?? makeSeed());
   const count = 1;
-  const [levelIndex, setLevelIndex] = useState(() => Math.max(0, WORLD_ACTS.findIndex(item => item.id === initialSaved?.run.levelId)));
+  const [levelId, setLevelId] = useState(() => initialSaved?.run.levelId || WORLD_ACTS[0].id);
+  const level = findStage(levelId);
+  const levelIndex = level.worldIndex;
+  const setLevelIndex = index => setLevelId(WORLD_ACTS[index].id);
   const [markedIndex, setMarkedIndex] = useState(levelIndex);
   useEffect(() => { setMarkedIndex(levelIndex); }, [levelIndex]);
-  const level = WORLD_ACTS[levelIndex];
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
   const [sync, setSync] = useState({ isSaved: true, message: '出发后自动记录积分' });
@@ -258,7 +260,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
     {status==='playing'&&stats.bossTarget&&<div className="boss-target" aria-hidden="true" style={{left:`${stats.bossTarget.x}%`,top:`${stats.bossTarget.y}%`}}><img src="./assets/enemy-burst.png" alt=""/><span>躲开这里</span></div>}
     <div className="damage-popups" aria-hidden="true">{stats.damageNumbers?.map(hit=><span key={hit.id} className={hit.isPlayer?'damage-number player-damage':'damage-number'} style={{left:`${Math.max(3,Math.min(95,hit.x))}%`,top:`max(var(--damage-min-top,22%),${Math.min(85,hit.y)}%)`}}>{hit.damage?`−${hit.damage}`:'格挡'}{hit.count>1&&<small>×{hit.count}</small>}{hit.damage>0&&hit.blocked>0&&<small>减伤 {hit.blocked}</small>}</span>)}</div>
     {status === 'playing' && stats.guide && <div className="treasure-guide"><img src="./assets/collectible-star.png" alt=""/>{stats.guide.direction}</div>}
-    {stats.message && !stats.boss?.warning && !stats.boss?.casting && <div className="adventure-message" role="status">{stats.message}</div>}
+    {stats.message && stats.message !== stats.rooms?.forest?.hint && !stats.boss?.warning && !stats.boss?.casting && <div className="adventure-message" role="status">{stats.message}</div>}
     {status === 'reward' && stats.pendingReward && <RewardPanel key={`${stats.pendingReward.id}:${stats.pendingReward.player}:${stats.pendingReward.rerolls || 0}`} reward={stats.pendingReward} adventure={stats.adventure} onChoose={selectReward} onRecycle={recyclePending} onReroll={rerollPending} onExit={exit}/>}
     {status === 'camp' && <CharacterCamp character={character} build={starterBuild} locked={locked} isSound={isSound} onBuild={build=>setStarterBuilds(previous=>({...previous,[character]:build}))} onSelect={id => { setCharacter(id); engine.current.selectCharacter(id); }} onBack={() => { enterCamp.current = false; changeStatus('ready'); }} onStart={()=>{if(engine.current.configureStarter(starterBuild,getPlaySettings().difficulty,locked))start();}}/>}
     {status==='life-loot'&&stats.pendingLifeLoot!==null&&<LifeLootPanel key={stats.pendingLifeLoot} enemyId={stats.pendingLifeLoot} adventure={stats.adventure} survival={stats.survival} onChoose={chooseLifeLoot} onLeave={leaveLifeLoot} onExit={exit}/>}
@@ -281,7 +283,7 @@ export function PlatformGame({ onExit, initialSound = true }) {
         <p className="level-source">{WORLD_ACTS[markedIndex].sources.length ? `这一关组合了原画 ${WORLD_ACTS[markedIndex].sources.join('、')} 的元素。` : WORLD_ACTS[markedIndex].story}</p>
         <div className="collectible-preview" aria-label="这一关的宝物">{LEVEL_COLLECTIBLES[WORLD_ACTS[markedIndex].themeId].map(id=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt=""/>{COLLECTIBLES[id].name} <b>{COLLECTIBLES[id].points} 分</b></span>)}</div>
         <div className="difficulty-row"><span>难度</span><div className="option-chips" aria-label="难度" data-gamepad-tabs="换难度">{Object.entries(DIFFICULTIES).map(([id, item]) => <button key={id} aria-pressed={settings.difficulty === id} onClick={() => setPlaySettings({ difficulty: id })}>{item.name}</button>)}</div><small>{DIFFICULTIES[settings.difficulty].hint}。出发后这次冒险不能换。</small></div>
-        {!isGamepad && <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> 武器和大招</span><span><kbd>W</kbd> 在小店买</span></div>}<small className="game-reassurance">一章是四间房加一场首领。清完一间，跳到发光的门上。初始 {INITIAL_LIVES} 条命，血条用完后选继续或重来。</small>
+        {!isGamepad && <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> 武器和大招</span><span><kbd>W</kbd> 在小店买</span></div>}<small className="game-reassurance">{WORLD_ACTS[markedIndex].structure === 'forest-rescue' ? '沿枝头找树冠幼鸟，钻进树洞找树根幼鸟。带它们回巢后，守住大树。' : '一章是四间房加一场首领。清完一间，跳到发光的门上。'}初始 {INITIAL_LIVES} 条命，血条用完后选继续或重来。</small>
       </>}
       <div className="adventure-menu-actions">
         {['ready','paused'].includes(status)&&<button className="primary-button" data-gamepad-resume={status === 'paused' || undefined} data-gamepad-back={status === 'paused' || undefined} onClick={() => status === 'ready' ? changeStatus('camp') : start()}><Play size={21} weight="fill"/>{status==='paused'?'继续探险':'选择角色'}<ArrowRight size={21}/></button>}

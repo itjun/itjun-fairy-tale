@@ -69,6 +69,7 @@ export function stepBosses(world, player, dt, elapsed, shots, adventure) {
   for (const arena of world.bossArenas || []) {
     const boss=world.enemies[arena.bossId-1];
     if (boss.isDefeated) { for(const shot of shots)if(shot.bossId===boss.id)shot.isActive=false;continue; }
+    if (arena.isLocked) continue;
     if (boss.isDormant) {
       const previous=world.bossArenas[arena.id-1];
       if (previous && !world.enemies[previous.bossId-1].isDefeated || player.x < arena.left || player.x > arena.right || Math.abs(player.y-arena.y)>9) continue;
