@@ -1,3 +1,4 @@
+import { paintSunlight } from './oasis-light.js';
 import { paintTracks } from './toy-tracks.js';
 import { paintWind } from './wind-streams.js';
 import { paintTide } from './tidal-water.js';
@@ -16,12 +17,13 @@ export function addFieldViews(views) {
   };
   for(const r of w.rooms) {
     const watch=update=>views.items.push({roomId:r.id,update});
+    if (r.beams) paintSunlight(views,r);
     if (r.moving.some(m=>m.rail)) paintTracks(views,r);
     if (r.tide) paintTide(views,r);
     if (r.wind) paintWind(views,r);
     for(const decor of r.props) {
       const obj=sprite(decor.icon,decor.x,decor.y+decor.height*.47,decor.width,decor.height,-1.7);
-      watch((_,here)=>{obj.visible=here;});
+      watch((state,here)=>{obj.visible=here && (!decor.after || hasMark(r,state.field,decor.after));});
     }
     for(const s of r.stops) {
       const p=w.platforms[s.platformId], size=s.size||2.25;

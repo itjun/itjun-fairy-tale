@@ -7,8 +7,10 @@ import { fieldThemes } from '../shared/trails/themes.js';
 import { fieldComplete, fieldMotion, stepField, syncField, validField } from '../shared/trails/field-progress.js';
 import { newRoomState, stepRoom } from '../src/game/rooms.js';
 import { createPlayer, platformY, stepPlayer } from '../src/game/physics.js';
+import { beginCrawl, caveMouthAt, stepTraversal } from '../src/game/traversal.js';
 import { readAdventure } from '../src/game/save.js';
 import { roomFixture } from './helpers/adventure-fixtures.mjs';
+import { headless } from './helpers/headless-engine.mjs';
 import { openStore } from '../server/store.mjs';
 
 function jump(from,to,tiles,r,state) {
@@ -24,27 +26,54 @@ function jump(from,to,tiles,r,state) {
       const direction=Math.abs(to.x-p.x)<.06?0:Math.sign(to.x-p.x);
       stepPlayer(p,{direction,jump:second>=0&&(i===0||i===second),drop:second===-1&&i===0},tiles,dt,{minX:r.left,maxX:r.right,minY:r.fallY,isFiniteLife:true});
       if(p.ground===to)return true;
-      if(left&&p.isGrounded||p.y<r.fallY)break;
+      if(left&&p.isGrounded||p.y<(from.isCave?r.traversal.cave.floorY-4:r.fallY))break;
       left ||= !p.isGrounded;
     }
   }
   return false;
 }
 
+function climbFrom(w,r,from,wall,tiles) {
+  const takeoff=wall.x+wall.side*.3;
+  if(from.isCave || Math.abs(takeoff-from.x)>from.width/2 || from.y<wall.minY-1.5 || from.y>wall.maxY)return false;
+  const p=createPlayer(from,takeoff-from.x);
+  for(let i=0;i<850;i++){
+    stepTraversal(p,{direction:p.grip?0:-wall.side,vertical:1,jump:i===0},tiles,w.platforms,1/120,
+      {minX:r.left,maxX:r.right,minY:r.fallY,isFiniteLife:true},r.traversal);
+    if(p.ground?.id===wall.topId)return true;
+  }
+  return false;
+}
+function throughMouth(w,r,from,mouth,tiles) {
+  const p=createPlayer(from,mouth.x-from.x);
+  if(caveMouthAt(r,p)!==mouth)return false;
+  beginCrawl(p,mouth);
+  for(let i=0;i<44;i++)stepTraversal(p,{direction:0,vertical:0},tiles,w.platforms,1/120,
+    {minX:r.left,maxX:r.right,minY:r.fallY,isFiniteLife:true},r.traversal);
+  return p.ground?.id===mouth.targetId;
+}
 function reachable(w,r,state,start,goal,elapsed) {
   const tiles=r.platformIds.map(id=>w.platforms[id]).filter(p=>p.isEnabled!==false);
   const todo=[start],seen=new Set(todo);
   while(todo.length) {
     const from=todo.shift();
     if(from===goal)return true;
-    for(const to of tiles) {
+    const layer=tiles.filter(t=>t.caveId===from.caveId);
+    const enqueue=target=>{if(!seen.has(target)){seen.add(target);todo.push(target);}};
+    for(const wall of r.traversal?.walls||[]) {
+      if(!seen.has(w.platforms[wall.topId]) && climbFrom(w,r,from,wall,layer))enqueue(w.platforms[wall.topId]);
+    }
+    for(const mouth of r.traversal?.cave?.mouths||[]) {
+      if(mouth.platformId===from.id && throughMouth(w,r,from,mouth,layer))enqueue(w.platforms[mouth.targetId]);
+    }
+    for(const to of layer) {
       if(seen.has(to))continue;
       const moving=r.moving.filter(m=>m.platformId===from.id||m.platformId===to.id);
       const times=moving.length?Array.from({length:13},(_,i)=>elapsed+i*moving[0].period/12):[elapsed];
       if(times.some(t=>{
         syncField(w,state,t);
         for(const p of tiles){p.deltaX=0;p.deltaY=0;}
-        return jump(from,to,tiles,r,state);
+        return jump(from,to,layer,r,state);
       })) {seen.add(to);todo.push(to);}
     }
   }
@@ -72,6 +101,32 @@ test('纸鸢上升风实际托升普通角色，关闭风筒时保持普通跳�
     return peak;
   }
   assert.ok(fly({})<5);assert.ok(fly({'0/kite':1})>10);
+});
+test('在提水斗上退出再进入，保持本次升降进度、站位与岸上复活点',()=>{
+  const id='desert-oasis-springs',w=createRoomWorld(42,id),room=w.rooms.find(r=>r.name==='古井提水架');
+  const fx=roomFixture('room',id,{seed:42,roomId:room.id});
+  const g=headless('room',id);g.restoreState(fx.state);
+  const lift=room.moving[0],rider=g.players[0];
+  g.roomState.field[room.id+'/weight']=13;g.roomState.field[room.id+'/water']=16;g.elapsed=20;
+  syncField(g.world,g.roomState,g.elapsed);const deck=g.platforms[lift.platformId];
+  Object.assign(rider,{x:deck.x+.7,y:deck.y,ground:deck,isGrounded:true});
+  const originalSafe=rider.safe.id,saved=g.exportState();
+  const storage={getItem:()=>JSON.stringify({run:fx.run,state:saved}),removeItem(){}};
+  assert.ok(readAdventure(storage));g.restoreState(saved);
+  assert.equal(rider.ground,deck);assert.ok(Math.abs(rider.x-deck.x-.7)<1e-6);assert.equal(rider.safe.id,originalSafe);
+  saved.players[0].ride.offset=93;assert.equal(readAdventure(storage),null);
+});
+test('绿洲从岩脚抓壁爬上日镜，暗河入口和两个出口均能钻通',()=>{
+  const w=createRoomWorld(42,'desert-oasis-springs'),r=w.rooms[0],wall=r.traversal.walls[0];
+  assert.ok(r.platformIds.map(i=>w.platforms[i]).some(t=>climbFrom(w,r,t,wall,w.platforms)));
+  for(const cr of w.rooms.filter(r=>r.traversal?.cave)){
+    const cave=cr.traversal.cave;
+    for(const mouth of cave.mouths) {
+      const from=w.platforms[mouth.platformId];
+      assert.ok(throughMouth(w,cr,from,mouth,cr.platformIds.map(i=>w.platforms[i]).filter(t=>t.caveId===from.caveId)));
+      assert.notEqual(from.caveId,w.platforms[mouth.targetId].caveId);
+    }
+  }
 });
 test('列车在岔口锁定路线，红灯检修时等人回车再开',()=>{
   const w=createRoomWorld(42,'cartoon-toy-rail'),s=newRoomState(w);

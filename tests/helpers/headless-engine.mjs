@@ -1,4 +1,4 @@
-import { WORLD_ACTS } from '../../shared/levels.js';
+import { WORLD_ACTS, findStage } from '../../shared/levels.js';
 import { createRoomWorld } from '../../shared/room-world.js';
 import { GardenEngine } from '../../src/game/engine.js';
 import { createPlayer } from '../../src/game/physics.js';
@@ -6,7 +6,7 @@ import { roomFixture } from './adventure-fixtures.mjs';
 
 // 不起画面的引擎：从固定存档恢复，只跑规则。画面相关的东西用空壳顶上。
 export function headless(mode = 'boss', levelId = WORLD_ACTS[0].id) {
-  const fixture = roomFixture(mode, levelId), stage = WORLD_ACTS.find(act => act.id === levelId), world = createRoomWorld(fixture.run.seed, stage);
+  const fixture = roomFixture(mode, levelId), stage = findStage(levelId), world = createRoomWorld(fixture.run.seed, stage);
   const game = Object.assign(Object.create(GardenEngine.prototype), {
     world, platforms: world.platforms, stage, seed: fixture.run.seed, levelKey: `${levelId}:${fixture.run.seed}`,
     players: [createPlayer(world.start)], isPaused: false, keys: new Set(), touch: new Set(), gamepad: new Set(), jumps: [false],

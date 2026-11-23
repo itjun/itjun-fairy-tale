@@ -71,6 +71,12 @@ export function readAdventure(storage=localStorage) {
     if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
     // 房间进度要和地图对得上，人也得站在当前这间房里。
     if (!isValidRoomState(state.rooms, world) || state.players.some(p => world.platforms[p.safeId].roomId !== state.rooms.roomId)) return null;
+    for (const {ride} of state.players) {
+      if (ride===undefined) continue;
+      const deck=world.platforms[ride?.id];
+      if (!world.field || !Number.isInteger(ride?.id) || !deck?.isMoving || deck.roomId!==state.rooms.roomId ||
+          !Number.isFinite(ride.offset) || Math.abs(ride.offset)>deck.width/2+.29) return null;
+    }
     if (world.field) {
       if (!validField(world,state.rooms,state.elapsed)) return null;
       const safe = [...state.players.map(p=>p.safeId),state.revival?.platformId].filter(id=>id!=null);

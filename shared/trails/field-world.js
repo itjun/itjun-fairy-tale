@@ -59,7 +59,7 @@ function roomBuilder(world, builder, stage, name, kind, theme) {
     return p;
   }
   function finish(start,exit) {
-    const tiles=room.platformIds.map(i=>world.platforms[i]);
+    const tiles=room.platformIds.map(i=>world.platforms[i]).filter(t=>!t.isCave);
     Object.assign(room,{startId:start.id,exitId:exit.id,exitPlatformIds:[exit.id],
       left:Math.min(...tiles.map(p=>p.x-p.width/2)),right:Math.max(...tiles.map(p=>p.x+p.width/2)),
       bottom:Math.min(...tiles.map(p=>p.y)),top:Math.max(...tiles.map(p=>p.y))+3});

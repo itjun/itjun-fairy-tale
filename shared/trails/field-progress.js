@@ -69,6 +69,16 @@ export function fieldHint(world,rooms,player,time) {
   const next=active.sort((a,b)=>distance(a)-distance(b))[0];
   if(!next)return room.clue || '看看附近的机关';
   const p=world.platforms[next.platformId],dx=p.x-player.x,dy=p.y-player.y;
+  const cave=room.traversal?.cave;
+  if(cave && !!player.safe?.isCave !== !!p.isCave) {
+    const mouths=cave.mouths.filter(m=>world.platforms[m.platformId].caveId===player.safe?.caveId);
+    const nearest=mouths.sort((a,b)=>Math.abs(a.x-player.x)-Math.abs(b.x-player.x))[0];
+    if(nearest) {
+      const cue=Math.abs(nearest.x-player.x)<2?'↑':nearest.x>player.x?'→':'←';
+      return cue+(p.isCave?' 找到提灯，向上进洞':' 到提灯下，向上回到地面');
+    }
+  }
+  if (player.grip?.point?.side) return '↑ 沿凸石往上爬到岩台';
   const arrow=Math.abs(dx)>5 ? (dx>0?'→':'←') : Math.abs(dy)>2?(dy>0?'↑':'↓'):'';
   const hint=next.wait && !fieldStopReady(room,marks,next,time)?next.wait:(next.hint||next.label);
   return [room.recipe,arrow+' '+hint].filter(Boolean).join('　');

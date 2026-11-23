@@ -909,6 +909,7 @@ export class GardenEngine {
       brokenIcicles: this.world.hazards.filter(hazard => hazard.isBroken).map(hazard => hazard.id),
       enemies:this.world.enemies.map(saveEnemy),
       players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),
+        ...(this.world.field && p.isGrounded && p.ground?.isMoving ? {ride:{id:p.ground.id,offset:p.x-p.ground.x}} : {}),
         attackRemaining: Math.max(0, (p.nextAttackAt || 0) - this.elapsed),
         companionRemaining: Math.max(0, (p.nextCompanion || 0) - this.elapsed),
         weaponCycles:{...p.weaponCycles},weaponShots:Object.fromEntries(Object.entries(p.weaponShots || {}).map(([id,value])=>[id,Math.max(0,value-this.elapsed)]))}))};
@@ -942,6 +943,10 @@ export class GardenEngine {
     this.players.forEach((p,i)=>{
       const saved=state.players[i];
       rescue(p,this.platforms[saved.safeId],saved.safeX);p.recoveries=saved.recoveries;p.facing=saved.facing;
+      if (saved.ride && this.world.field) {
+        const deck=this.platforms[saved.ride.id];
+        Object.assign(p,{ground:deck,x:deck.x+saved.ride.offset,y:deck.y});
+      }
       if(saved.protection!==undefined)p.protection=saved.protection;
       p.nextShot=this.elapsed+(saved.shotRemaining || 0);p.inkUntil=this.elapsed+(saved.inkRemaining || 0);
       const attackRemaining = saved.attackRemaining ?? Math.max(0, ...Object.values(saved.weaponShots || {}));
