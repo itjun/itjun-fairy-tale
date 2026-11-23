@@ -11,7 +11,7 @@ function roomBuilder(world, builder, stage, name, kind, theme) {
   world.rooms.push(room);
   builder.state.zoneId = id;
   function tile(x, y, width=8, extra={}) {
-    const p = builder.add(origin+x, y, width, {roomId:id, ...extra});
+    const p = builder.add(origin+x, y, width, {roomId:id, ...(theme.theme==='beach' ? {skin:'sand'} : {}), ...extra});
     room.platformIds.push(p.id); room.path.push(p.id);
     return p;
   }

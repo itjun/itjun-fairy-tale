@@ -48,6 +48,19 @@ function reachable(w,r,state,start,goal,elapsed) {
   }
   return false;
 }
+test('海蚀洞随潮封口，退潮取芯，涨潮筏能载人到高台',()=>{
+  const w=createRoomWorld(42,'beach-tide-lights'),s=newRoomState(w);
+  const r=w.rooms.find(r=>r.tide?.mouth);s.roomId=r.id;
+  const {x,y}=r.tide.mouth,person={x:x-.25,y,vx:2,isGrounded:false};
+  stepField(w,s,person,6);assert.equal(person.x,x-1.3);
+  Object.assign(person,{x:x-.25,vx:2});stepField(w,s,person,12);assert.equal(person.x,x-.25);
+  const wharf=w.rooms.find(r=>r.name==='潮汐码头'),boat=wharf.moving[0];
+  s.roomId=wharf.id;s.field[wharf.id+'/rope']=0;
+  assert.equal(fieldMotion(wharf,boat,s.field,0),0);assert.equal(fieldMotion(wharf,boat,s.field,6),1);
+  const pad=w.platforms[boat.platformId];syncField(w,s,0);const rider=createPlayer(pad);
+  for(let i=1;i<=720;i++){syncField(w,s,i/120);stepPlayer(rider,{direction:0},[pad],1/120,{minX:wharf.left,maxX:wharf.right,minY:wharf.fallY,isFiniteLife:true});}
+  assert.equal(rider.ground,pad);assert.ok(rider.y>7.9);
+});
 for(const theme of fieldThemes) test(theme.title+'：两组种子逐段走到每个机关，开门并读回存档',()=>{
   const store=openStore(':memory:');
   try {

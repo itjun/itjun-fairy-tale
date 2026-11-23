@@ -125,7 +125,7 @@ export class GardenEngine {
     try {
       const loader = new THREE.TextureLoader();
       const surfaceImage = this.level.surface || 'grass-texture';
-      const landscape = ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image;
+      const landscape = this.world.field === 'beach' ? 'paper-texture' : ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image;
       const isDesert = this.level.id === 'desert';
       const poseNames = Object.keys(CHARACTERS).flatMap(character => ['climb', 'crawl'].map(pose => `${character}-${pose}`));
       this.isNewLandscape = landscape === 'landscape-new-drawing';
@@ -185,6 +185,7 @@ export class GardenEngine {
       this.newTowerMaterial = spriteMaterial('new-drawing-tower'); this.newFlowersMaterial = spriteMaterial('new-drawing-flowers');
       const background = textureFor(landscape);
       const gardenMaterial = this.material(new THREE.MeshBasicMaterial({ map: background, side: THREE.DoubleSide, forceSinglePass: true, transparent: true, opacity: landscape === this.level.image ? 0.55 : 1 }));
+      if (this.world.field==='beach') { gardenMaterial.color.set('#fff1d2'); gardenMaterial.opacity=.38; }
       this.backdrops = [0].map(() => {
         const mesh = new THREE.Mesh(this.planeGeometry, gardenMaterial);
         mesh.scale.set(44, 44 * background.image.height / background.image.width, 1); mesh.position.set(0, 6, -18);

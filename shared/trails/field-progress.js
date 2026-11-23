@@ -3,9 +3,11 @@ export const hasMark = (room,marks,key) => Object.hasOwn(marks,idOf(room,key));
 export const canUse = (room,marks,stop) => stop.after.every(key=>hasMark(room,marks,key));
 export const fieldComplete = (room,marks) => room.stops.every(s=>!s.goal || hasMark(room,marks,s.key));
 
+export const tideHeight = (time,period) => (1-Math.cos(2*Math.PI*time/period))/2;
 export function fieldMotion(room,m,marks,time) {
   const start=m.after ? marks[idOf(room,m.after)] : 0;
   if (start === undefined) return 0;
+  if (m.tide) return tideHeight(time,m.period);
   const elapsed=Math.max(0,time-start);
   if (m.once) return Math.min(1,elapsed/m.period);
   // Dwell at both landings to make boarding possible with either controller.
@@ -32,13 +34,17 @@ export function fieldStopReady(room,marks,stop,time) {
     if(Math.abs(fieldMotion(room,moving,marks,time)-stop.atDock)>.065) return false;
   }
   if(stop.tide) {
-    const water=(1-Math.cos(2*Math.PI*time/room.tide.period))/2;
+    const water=tideHeight(time,room.tide.period);
     return stop.tide==='low'?water<.32:water>.68;
   }
   return true;
 }
 export function stepField(world,rooms,player,time) {
   const room=world.rooms[rooms.roomId], marks=rooms.field;
+  const waterGate=room.tide?.mouth;
+  if(waterGate && tideHeight(time,room.tide.period)>.48 && player.vx>0 && player.x<waterGate.x && player.x>waterGate.x-1.3 && Math.abs(player.y-waterGate.y)<2.4) {
+    player.x=waterGate.x-1.3;player.vx=0;
+  }
   if(!player.isGrounded) return null;
   for(const stop of room.stops) {
     if(hasMark(room,marks,stop.key) || stop.platformId!==player.ground?.id || !fieldStopReady(room,marks,stop,time))continue;

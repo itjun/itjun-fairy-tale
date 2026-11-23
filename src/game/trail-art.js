@@ -4,6 +4,18 @@ const ink='#554232';
 // Draw interactive equipment on transparent paper in the same heavy outline as
 // the original drawings. Coordinates are shared by foreground and moving pieces.
 const drawings={
+  'tidal-boat'(a) {
+    a.poly([[19,95],[173,94],[147,115],[48,115]],'#d39869');
+    a.line([[96,95],[96,17]]);a.poly([[90,22],[51,83],[91,82]],'#f3cc85');
+    a.poly([[102,35],[102,83],[150,83]],'#e59e98');
+  },
+  'tidal-gauge'(a) {
+    a.box(69,5,62,129,'#fff4c9');
+    for(let i=0;i<5;i++){a.box(70,9+i*24,22,10,i%2?'#e99b60':'#cb696e');a.line([[97,16+i*24],[124,16+i*24]],ink,2);}
+  },
+  'tidal-cloud'(a) {
+    a.poly([[15,99],[12,84],[21,68],[44,64],[47,48],[60,37],[79,39],[92,45],[101,29],[119,21],[140,23],[151,33],[157,53],[171,58],[181,71],[185,88],[174,100],[140,104],[102,101],[72,106],[44,101]],'#d5eaf2');
+  },
   'kitchen-oven'(a) {
     a.poly([[29,118],[29,74],[40,48],[61,34],[95,29],[128,34],[150,51],[162,78],[163,119]],'#e79c70');
     a.box(119,15,18,27,'#cb7759');a.box(115,10,26,9,'#ecc7a4');
