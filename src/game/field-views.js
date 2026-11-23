@@ -1,3 +1,4 @@
+import { paintTracks } from './toy-tracks.js';
 import { paintWind } from './wind-streams.js';
 import { paintTide } from './tidal-water.js';
 import { trailArt, trailMaterial } from './trail-art.js';
@@ -15,6 +16,7 @@ export function addFieldViews(views) {
   };
   for(const r of w.rooms) {
     const watch=update=>views.items.push({roomId:r.id,update});
+    if (r.moving.some(m=>m.rail)) paintTracks(views,r);
     if (r.tide) paintTide(views,r);
     if (r.wind) paintWind(views,r);
     for(const decor of r.props) {
@@ -31,7 +33,11 @@ export function addFieldViews(views) {
         const marks=state.field, player=g.players[0], done=hasMark(r,marks,s.key);
         const carrying=done && s.carryUntil && !hasMark(r,marks,s.carryUntil);
         const close=here && Math.abs(player.x-p.x)<12 && Math.abs(player.y-p.y)<9;
-        item.visible=here && (!done || !!carrying || !!s.keep || !!s.display);
+        const shared=r.stops.filter(other=>other.platformId===s.platformId);
+        const current=shared.find(other=>!hasMark(r,marks,other.key) && canUse(r,marks,other))
+          || shared.find(other=>!hasMark(r,marks,other.key)) || shared.at(-1);
+        const show=shared.length===1 || current===s;
+        item.visible=here && (show || carrying) && (!done || !!carrying || !!s.keep || !!s.display);
         const ready=canUse(r,marks,s),available=fieldStopReady(r,marks,s,g.elapsed);
         const offset=s.offset||0;
         if(carrying) {
@@ -41,8 +47,8 @@ export function addFieldViews(views) {
         } else {
           item.scale.set(size,size,1);item.position.set(p.x+offset,p.y+size*.53+(ready&&!done&&!g.isReducedMotion?Math.sin(g.elapsed*2.3)*.095:0),.62);
         }
-        halo.visible=close && available && !done;halo.scale.set(2.8,2.8,1);halo.position.set(p.x+offset,p.y+1.05,.38);
-        sign.mesh.visible=close && (!done || s.keep || s.display);
+        halo.visible=close && show && available && !done;halo.scale.set(2.8,2.8,1);halo.position.set(p.x+offset,p.y+1.05,.38);
+        sign.mesh.visible=close && show && (!done || s.keep || s.display);
         if(sign.mesh.visible) {
           const text=done?'✓ '+(s.short||s.label):!ready?(s.locked||'先看上方线索'):available?(s.short||s.label):(s.wait||s.label);
           sign.mesh.position.set(p.x+offset,p.y+size+1.22,1.1);
@@ -53,7 +59,13 @@ export function addFieldViews(views) {
     }
     for(const m of r.moving.filter(m=>m.icon)) {
       const p=w.platforms[m.platformId],body=sprite(m.icon,p.x,p.y,m.width||p.width,m.height||2,.24);
-      watch((_,here)=>{body.visible=here;body.position.set(p.x,p.y-(m.below??.5),.24);});
+      watch((_,here)=>{
+        body.visible=here;body.position.set(p.x,p.y-(m.below??.5),.24);
+        if (m.rail) {
+          g.platformViews.get(p.id).visible=false;
+          body.scale.x=Math.abs(body.scale.x)*Math.sign(m.toX-m.x);
+        }
+      });
     }
   }
 }

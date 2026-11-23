@@ -1,3 +1,4 @@
+import { railHeight, selectedRail } from './railway.js';
 const idOf = (room,key) => room.id+'/'+key;
 export const hasMark = (room,marks,key) => Object.hasOwn(marks,idOf(room,key));
 export const canUse = (room,marks,stop) => stop.after.every(key=>hasMark(room,marks,key));
@@ -9,6 +10,11 @@ export function fieldMotion(room,m,marks,time) {
   if (start === undefined) return 0;
   if (m.tide) return tideHeight(time,m.period);
   const elapsed=Math.max(0,time-start);
+  if (m.hold && elapsed >= m.hold*m.period) {
+    const resume=marks[idOf(room,m.unlock)];
+    if (resume===undefined) return m.hold;
+    return Math.min(1,m.hold+Math.max(0,time-Math.max(resume,start+m.hold*m.period))/m.period);
+  }
   if (m.once) return Math.min(1,elapsed/m.period);
   // Dwell at both landings to make boarding possible with either controller.
   const phase=((elapsed+(m.phase||0))/m.period)%1;
@@ -23,7 +29,8 @@ export function syncField(world,rooms,time) {
   }
   for(const m of room.moving) {
     const p=world.platforms[m.platformId],u=fieldMotion(room,m,marks,time);
-    const x=m.x+(m.toX-m.x)*u,y=m.y+(m.toY-m.y)*u;
+    const x=m.x+(m.toX-m.x)*u;
+    const y=m.rail ? railHeight(selectedRail(room,m,marks),x) : m.y+(m.toY-m.y)*u;
     p.deltaX=x-p.x;p.deltaY=y-p.y;p.x=x;p.y=y;
   }
 }
@@ -31,7 +38,7 @@ export function fieldStopReady(room,marks,stop,time) {
   if(!canUse(room,marks,stop)) return false;
   if(stop.atDock!==undefined) {
     const moving=room.moving.find(m=>m.platformId===stop.platformId);
-    if(Math.abs(fieldMotion(room,moving,marks,time)-stop.atDock)>.065) return false;
+    if(Math.abs(fieldMotion(room,moving,marks,time)-stop.atDock)>(moving.rail ? .001 : .065)) return false;
   }
   if(stop.tide) {
     const water=tideHeight(time,room.tide.period);

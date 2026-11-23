@@ -73,6 +73,27 @@ test('纸鸢上升风实际托升普通角色，关闭风筒时保持普通跳�
   }
   assert.ok(fly({})<5);assert.ok(fly({'0/kite':1})>10);
 });
+test('列车在岔口锁定路线，红灯检修时等人回车再开',()=>{
+  const w=createRoomWorld(42,'cartoon-toy-rail'),s=newRoomState(w);
+  const fork=w.rooms.find(r=>r.moving.some(m=>m.alt)),train=fork.moving[0];
+  const pad=w.platforms[train.platformId];s.roomId=fork.id;
+  const key=k=>fork.id+'/'+k;
+  s.field[key(train.after)]=100;
+  syncField(w,s,106);const low=pad.y;
+  s.field[key(train.switchKey)]=106;syncField(w,s,106);assert.equal(pad.y,low);
+  s.field[key(train.switchKey)]=99;syncField(w,s,106);assert.ok(pad.y>=low+6);
+  const repair=w.rooms.find(r=>r.moving.some(m=>m.hold)),m=repair.moving[0];
+  s.roomId=repair.id;s.field[repair.id+'/'+m.after]=100;
+  syncField(w,s,100);const engine=w.platforms[m.platformId],child=createPlayer(engine);
+  for(let i=1;i<=1800;i++){
+    syncField(w,s,100+i/120);stepPlayer(child,{direction:0},repair.platformIds.map(id=>w.platforms[id]),1/120,{minX:repair.left,maxX:repair.right,minY:repair.fallY,isFiniteLife:true});
+  }
+  assert.equal(child.ground,engine);assert.ok(Math.abs(engine.x-(m.x+m.toX)/2)<.001);
+  s.field[repair.id+'/'+m.unlock]=115;
+  syncField(w,s,115);assert.equal(child.x,engine.x);
+  syncField(w,s,116);assert.ok(engine.x>child.x);
+  syncField(w,s,127);assert.equal(engine.x,m.toX);
+});
 for(const theme of fieldThemes) test(theme.title+'：两组种子逐段走到每个机关，开门并读回存档',()=>{
   const store=openStore(':memory:');
   try {
