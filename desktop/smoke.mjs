@@ -127,7 +127,7 @@ export async function runSmoke({ win, requestClose }) {
   await writeFile(join(profile, 'room.png'), (await capture()).toPNG());
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button"), button => button.textContent.trim())'), ['继续探险', '武器搭配', '本领一览', '选项', '回到我的花园']);
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button"), button => button.textContent.trim())'), ['继续探险', '武器搭配', '本领一览', '选项', '切换关卡', '回到我的花园']);
   await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button")).find(b=>b.textContent.trim()==="本领一览").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "overview"');
   assert.equal(await evaluate('document.querySelectorAll(".platform-game [role=dialog], .platform-game .adventure-overlay").length'),0,'本领一览是整页，不是弹窗');

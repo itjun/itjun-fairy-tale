@@ -58,7 +58,7 @@ export function App() {
   const [mode, setMode] = useState(null);
   const [optionsCategory, setOptionsCategory] = useState('game');
   const [isGarden, setIsGarden] = useState(false);
-  const [isAdventure, setIsAdventure] = useState(false);
+  const [adventureEntry, setAdventureEntry] = useState(null);
   const [savedAdventure,setSavedAdventure] = useState(readAdventure);
   const [isScores, setIsScores] = useState(false);
   useEffect(() => { flushScores(); }, []);
@@ -174,12 +174,13 @@ export function App() {
   const activeQuest = quests.find(q => q.id === mode);
   if (activeQuest) return <Suspense fallback={<div className="loading-adventure">正在打开小冒险…</div>}><MiniGame session={progress.miniGames[activeQuest.id]} onChange={saveMiniSession} onExit={() => { setMode(questReturnMode.current); window.speechSynthesis?.cancel(); }} onReplay={() => openQuest(activeQuest.id)} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} onChime={chime} isSaved={isSaved} /></Suspense>;
   if (isScores) return <Suspense fallback={<div className="loading-adventure">正在翻开成绩本…</div>}><ScoreHistory onClose={() => setIsScores(false)} /></Suspense>;
-  if (isAdventure) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame initialSound={isSound} onExit={() => { setIsAdventure(false); setSavedAdventure(readAdventure()); }} /></Suspense>;
+  if (adventureEntry) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame entry={adventureEntry} initialSound={isSound} onExit={() => { setAdventureEntry(null); setSavedAdventure(readAdventure()); }} /></Suspense>;
   return <div className={isGarden ? 'app-shell' : 'app-shell home-shell'}>
     <DesktopRestState />
     <div hidden={isHomePage}>
     {!isGarden ? <HomeMenu savedAdventure={savedAdventure} isActive={!mode}
-      onAdventure={() => { window.speechSynthesis?.cancel(); setIsAdventure(true); }}
+      onAdventure={() => { window.speechSynthesis?.cancel(); setAdventureEntry('continue'); }}
+      onChooseWorld={() => { window.speechSynthesis?.cancel(); setAdventureEntry('worlds'); }}
       onNewAdventure={() => { isStartingAdventureRef.current = false; setMode('new-adventure'); }}
       onAlbum={() => setMode('album')}
       onMiniGames={() => setMode('mini-games')}
@@ -210,12 +211,12 @@ export function App() {
       <button className="quiet-button" onClick={() => { closeModal(); setIsGarden(true); }}><Icon as={Flower} />我的花园</button>
     </HomePage>}
     {mode === 'new-adventure' && <Modal title="开始新的跳台探险？" onClose={closeModal}>
-      <p className="modal-subtitle">当前探险会结束，成绩保留。重新选择角色，从第一个世界出发。</p>
+      <p className="modal-subtitle">当前这一局会结束，成绩和其他关卡的进度会保留。你可以重新选关和角色。</p>
       <div className="reset-actions"><button className="quiet-button" onClick={closeModal}>继续现在的冒险</button><button className="primary-button" onClick={() => {
         if (!savedAdventure || isStartingAdventureRef.current) return;
         isStartingAdventureRef.current = true;
         queueRun({ ...savedAdventure.run, status: 'ended', revision: savedAdventure.run.revision + 1 });
-        clearAdventure(); setSavedAdventure(null); closeModal(); setIsAdventure(true);
+        clearAdventure(); setSavedAdventure(null); closeModal(); setAdventureEntry('new');
       }}>开始新冒险</button></div>
     </Modal>}
     {!isSaved && <p role="alert" className="home-save-warning">这次进度暂时无法保存，请先到选项备份花园。</p>}

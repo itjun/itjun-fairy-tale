@@ -94,6 +94,7 @@ try {
     await evaluate('waitPadFrames()');
   }
   await setupPad();
+  if (process.env.GARDEN_GAMEPAD_CASE === 'worlds') { await checkWorldSwitch(); console.log('手柄换关及重开续玩通过'); app.exit(0); return; }
   if (process.env.GARDEN_GAMEPAD_CASE === 'completion') { await checkCompletion(); console.log('手柄通关衔接通过'); app.exit(0); return; }
   if (process.env.GARDEN_GAMEPAD_CASE === 'bindings') { await checkWeaponBindings(); console.log('手柄圆环换装通过'); app.exit(0); return; }
   await evaluate('choose(".home-play")');
@@ -365,6 +366,53 @@ try {
   await evaluate('tap(12)');
   await until(() => evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.rooms.bought.includes(${JSON.stringify(`${shop.id}:heal`)})`), '手柄按上购买');
   assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.survival.hp`), 90, '购买恢复血量');
+  async function checkWorldSwitch() {
+    const first = roomFixture('room', 'rainbow-waterways', { roomId: 3 });
+    const current = () => evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)}))`);
+    await loadFixture(first);
+    await until(status('paused'), '第一关中途存档');
+    await evaluate('choose("[data-switch-world]")');
+    await until(status('worlds'), '暂停选关');
+    await evaluate('tap(1)');
+    await until(status('paused'), 'B 取消换关');
+    await evaluate('choose("[data-switch-world]")');
+    await evaluate('choose("[data-world=family]")');
+    await until(status('camp'), '新世界选角色');
+    await evaluate('tap(1)');
+    await until(status('worlds'), '营地返回换关页');
+    await evaluate('tap(1)');
+    await until(status('paused'), '取消出发回到原来的第一关');
+    assert.equal((await current()).run.id, first.run.id);
+    await evaluate('choose("[data-switch-world]")');
+    await evaluate('choose("[data-world=family]")');
+    await until(status('camp'), '再次进入新世界营地');
+    await evaluate('choose(".character-depart")');
+    await until(status('playing'), '第二关出发');
+    await evaluate('tap(9)');
+    await until(status('paused'), '保存第二关');
+    const second = await current();
+    assert.notEqual(second.run.id, first.run.id);
+    await win.loadURL('garden://app/');
+    await until(() => evaluate('!!document.querySelector(".home-play")'), '重开首页');
+    await focusWindow(); await setupPad();
+    await evaluate('choose(".home-play")');
+    await until(status('paused'), '首页继续最近的第二关');
+    await evaluate('choose("[data-switch-world]")');
+    await evaluate('choose("[data-world=rainbow]")');
+    await until(status('playing'), '恢复第一关');
+    const resumed = await current();
+    assert.equal(resumed.run.id, first.run.id);
+    assert.equal(resumed.run.seed, first.run.seed);
+    assert.deepEqual(resumed.state.rooms.path, first.state.rooms.path);
+    assert.equal(resumed.state.players[0].safeId, first.state.players[0].safeId);
+    assert.deepEqual(resumed.state.collectedIds, first.state.collectedIds);
+    await evaluate('tap(9)');
+    await until(status('paused'), '第一关再暂停');
+    await evaluate('choose("[data-switch-world]")');
+    await evaluate('choose("[data-world=family]")');
+    await until(status('playing'), '恢复第二关');
+    assert.equal((await current()).run.id, second.run.id);
+  }
   async function checkCompletion() {
     await loadFixture(roomFixture('finish'));
     await until(status('paused'), '首领打赢后存档');
@@ -425,6 +473,7 @@ try {
     assert.equal(await evaluate('document.querySelectorAll(".weapon-wheel button").length'), 8);
   }
   await checkCompletion();
+  await checkWorldSwitch();
   console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['方向键走遍菜单、选关、角色、装备和试用', '已高亮菜单一次 A 生效', '移动、跳跃、暂停、本领一览、选项', '断连、重连、防误触、失焦', '设置、全屏、成绩筛选、画展、成就、画册', '应用内备份和恢复', '三个小游戏全部题目、完成和重玩', '花园贴纸', '奖励、补给、死亡、零命重来', '进门、小店购买、通关领奖、结算、直接下一关'], before, after }));
   app.exit(0);
 } catch (error) {
