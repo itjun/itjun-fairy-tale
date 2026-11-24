@@ -81,7 +81,7 @@ export function fieldHint(world,rooms,player,time) {
     const nearest=mouths.sort((a,b)=>Math.abs(a.x-player.x)-Math.abs(b.x-player.x))[0];
     if(nearest) {
       const cue=Math.abs(nearest.x-player.x)<2?'↑':nearest.x>player.x?'→':'←';
-      return cue+(p.isCave?' 找到提灯，向上进洞':' 到提灯下，向上回到地面');
+      return cue+(p.isCave?' 走到金色神灯下，向上进洞':' 走到神灯下，向上出洞');
     }
   }
   if (player.grip?.point?.side) return '↑ 沿凸石往上爬到岩台';

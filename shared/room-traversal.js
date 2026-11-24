@@ -5,7 +5,7 @@ const DESERT_ROOMS = [
   ['砂岩峡谷', '朝蓝绿色标记跳，抓住后往上爬'],
   ['攀岩墙', '用方向换抓点，远一点的抓点可以跳过去'],
   ['风车遗迹', '抓住石柱或横梁，再跳到下一处'],
-  ['绿洲洞窟', '走近提灯的洞口，往上推就能钻进去'],
+  ['绿洲洞窟', '走到洞口的神灯下，向上进洞'],
   ['沙漠首领场', '两边的抓点可以帮你换层躲招'],
 ];
 
@@ -127,7 +127,7 @@ export function finishTraversal(world, appendPlatform) {
     const path = room.path.map(id => world.platforms[id]);
     const end = path.find(p => p.x - start.x >= 19 && p.width >= 5 && p.isEnabled !== false && !p.isMoving && !p.isCrumbling && !p.isSeesaw && !p.slope);
     if (!end) continue;
-    const route = traversal(room, '', '朝标记跳可以抓住，靠近提灯可钻进洞');
+    const route = traversal(room, '', '朝标记跳就能抓住。到神灯下，向上进洞');
     addCave(world, room, route, [start, end], appendPlatform);
     const step = path.find((p, i) => i > 0 && p.x > start.x + 8 && p.y - path[i-1].y >= 1.7 && p.width >= 4 && p.isEnabled !== false && !p.isMoving && !p.isCrumbling && !p.isSeesaw && !p.slope);
     if (step) {

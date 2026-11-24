@@ -2,7 +2,7 @@ const jug='oasis-jug', mirror='oasis-mirror', basin='oasis-well';
 const sand={skin:'sand'};
 
 function traversal(p) {
-  return p.room.traversal ||= {name:p.room.name,hint:'朝色石起跳抓壁，往上爬；提灯下向上进洞',walls:[],grips:[],art:[]};
+  return p.room.traversal ||= {name:p.room.name,hint:'朝彩色石头跳，抓住后往上爬。到神灯下，向上进洞',walls:[],grips:[],art:[]};
 }
 function cliff(p,base,x,height) {
   const summit=p.tile(x,height,8,sand), route=traversal(p);
@@ -49,7 +49,7 @@ function first(p) {
 function underground(p) {
   const road=path(p,[[0,1,13],[22,1],[42,-1],[68,0],[93,1],[116,1],[141,2]]);
   const cave=springCave(p,road[1],road[4],'蓝泉岩洞');
-  p.station('map',road[1],'oasis-map','读提灯旁的水纹',{keep:true});
+  p.station('map',road[1],'oasis-map','看看神灯旁的水纹',{keep:true});
   jugAt(p,cave.well,['map'],'pour');altar(p,road[5],['water'],'把洞泉送进石槽');
   p.prize(road[3]);p.finish(road[0],road[6]);
 }
@@ -83,7 +83,7 @@ function carved(p) {
 function caravan(p) {
   const road=path(p,[[0,0,14],[19,0],[37,0,11],[60,1],[85,1],[110,-1],[133,0,11],[155,0],[177,2]]);
   const top=cliff(p,road[2],43,13),cave=springCave(p,road[3],road[5],'最后的泉室');
-  p.station('look',top,mirror,'从高处找提灯洞口',{keep:true});beam(p,'look',top,road[3]);
+  p.station('look',top,mirror,'用镜子找神灯',{keep:true});beam(p,'look',top,road[3]);
   jugAt(p,cave.well,['look'],'pour');
   const waterTower=cliff(p,road[6],139,13);
   altar(p,waterTower,['water'],'给驼队打开引水闸');
@@ -91,8 +91,8 @@ function caravan(p) {
   p.prize(road[7]);p.finish(road[0],p.tile(203,5,12,sand));
 }
 export const oasisSprings={id:'desert-oasis-springs',theme:'desert',title:'攀岩寻泉',subtitle:'爬上日镜岩，钻进暗河，把水带回绿洲',
-  story:'岩壁上有可以抓的凸石。爬高看看太阳照向哪里，跟着提灯在洞里找水。',landmark:'oasis-palm',
+  story:'岩壁上有可以抓的凸石。爬上高台，看看镜子把阳光照到哪里。洞口挂着金色的神灯，走进去找泉水吧。',landmark:'oasis-palm',
   monsters:['sandcastle','burrow','crab'],arena:'绿洲泉门',chapters(random){
-    const middle=[['提灯探泉',underground],['日镜峡谷',mirrors]];if(random()<.5)middle.reverse();
+    const middle=[['跟着神灯找泉水',underground],['日镜峡谷',mirrors]];if(random()<.5)middle.reverse();
     return [['日镜驿站',first],...middle,['商路哨口',null],['古井提水架',shaduf],['暗河水纹',carved],['驼队引水渠',caravan]];
   }};

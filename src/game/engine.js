@@ -213,7 +213,7 @@ export class GardenEngine {
       this.isReady = true; this.callbacks.onReady();
       const room = currentRoom(this.world, this.roomState);
       const cave = caveForPlayer(room, this.players[0]);
-      this.publish(this.world.field && room.stops.length ? fieldHint(this.world,this.roomState,this.players[0],this.elapsed) : this.world.expedition && room.goals?.length ? storyHint(room,this.roomState.story) : this.world.valley ? valleyHint(this.world, this.roomState, this.players[0]) : this.world.forest ? forestHint(this.world, this.roomState.forest, this.players[0]) : cave?.name ? `继续探索${cave.name}` : cave ? '走到提灯下可以出洞' : room.traversal?.name ? room.traversal.hint : '清完一间房，跳到发光的门上。');
+      this.publish(this.world.field && room.stops.length ? fieldHint(this.world,this.roomState,this.players[0],this.elapsed) : this.world.expedition && room.goals?.length ? storyHint(room,this.roomState.story) : this.world.valley ? valleyHint(this.world, this.roomState, this.players[0]) : this.world.forest ? forestHint(this.world, this.roomState.forest, this.players[0]) : cave?.name ? `继续探索${cave.name}` : cave ? '走到神灯下，向上出洞' : room.traversal?.name ? room.traversal.hint : '清完一间房，跳到发光的门上。');
     } catch (error) {
       if (!this.isDisposed) this.callbacks.onError('彩笔素材还没准备好。请检查文件是否完整，再试一次。');
       console.error('花园素材加载失败', error);
@@ -654,7 +654,7 @@ export class GardenEngine {
     const canDescend = !!climbEntryAt(traversal, player);
     const isDroppingFromGrip = !!player.launch?.isDrop;
     const cave = caveForPlayer(room, player);
-    const traversalHint = cave ? (cave.id ? '翻过洞内高低石台，提灯下可以出洞' : '走到提灯下可以再钻出去')
+    const traversalHint = cave ? (cave.id ? '跳过石台，走到神灯下，向上出洞' : '走到神灯下，向上出洞')
       : isClimbing ? player.grip.point.isLedge ? '再跳一次，或向下加跳松手' : '上下攀爬，向下加跳松手'
       : isDroppingFromGrip ? '朝岩壁移动，或向上抓住' : canDescend ? '向下抓住岩壁' : traversal?.name ? traversal.hint : '';
     return {
