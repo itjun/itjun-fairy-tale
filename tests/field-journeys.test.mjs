@@ -188,3 +188,14 @@ for(const theme of fieldThemes) test(theme.title+'：两组种子逐段走到每
     }
   } finally {store.close();}
 });
+
+test('暗河水纹沿途和洞内都能遇到守卫，洞口、机关和出生点留空', () => {
+  const world = createRoomWorld(42, 'desert-oasis-springs');
+  const room = world.rooms.find(r => r.name === '暗河水纹');
+  const homes = room.enemyIds.map(id => world.platforms[world.enemies[id - 1].platformId]);
+  assert.ok(homes.filter(p => p.isCave).length >= 2);
+  assert.ok(homes.filter(p => !p.isCave).length >= 6);
+  const safe = [room.startId, room.exitId, ...room.stops.map(s => s.platformId),
+    ...room.traversal.cave.mouths.map(m => m.platformId)];
+  assert.ok(homes.every(p => !safe.includes(p.id)));
+});

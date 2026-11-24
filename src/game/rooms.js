@@ -152,6 +152,10 @@ export function doorAt(world, state, player) {
 }
 export function enterDoor(world, state, door) {
   const room = world.rooms[door.targetRoomId];
+  for (const id of room.enemyIds) {
+    const enemy = world.enemies[id - 1];
+    if (enemy.isReinforcement && enemy.wave === 0 && !enemy.isDefeated) enemy.isDormant = false;
+  }
   Object.assign(state, { roomId: room.id, wave: 0, isHurt: false, isFallen: false, downs: 0, puzzle: newPuzzle(room) });
   state.path.push(room.id);
   return room;

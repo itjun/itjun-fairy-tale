@@ -1,4 +1,5 @@
 import { buildFieldWorld } from './trails/field-world.js';
+import { addTrailEnemies } from './trails/trail-enemies.js';
 import { randomGenerator } from './random.js';
 import { applyCycleHealth } from './adventure-cycle.js';
 import { buildForestRescue } from './forest-rescue.js';
@@ -348,15 +349,12 @@ export function createRoomWorld(seed, selected, cycle = 1) {
     rooms: [], doors: [],
   };
   const builder = createBuilder(world, theme, random);
-  if (stage.structure === 'field-journey') {
-    buildFieldWorld(world, stage, builder, placeBoss);
-    applyCycleHealth(world, cycle);
-    return world;
-  }
-  if ([FOREST_RESCUE,FLOWER_VALLEY,WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION].includes(stage)) {
-    if (stage === FOREST_RESCUE) buildForestRescue(world, stage, builder, placeBoss);
+  if (stage.structure === 'field-journey' || [FOREST_RESCUE,FLOWER_VALLEY,WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION].includes(stage)) {
+    if (stage.structure === 'field-journey') buildFieldWorld(world, stage, builder, placeBoss);
+    else if (stage === FOREST_RESCUE) buildForestRescue(world, stage, builder, placeBoss);
     else if (stage === FLOWER_VALLEY || stage === WATERWAYS) buildFlowerValley(world, stage, builder, placeBoss, stage === WATERWAYS);
     else buildStoryWorld(world, stage, builder, placeBoss);
+    if (stage !== FLOWER_VALLEY) addTrailEnemies(world, stage, random);
     applyCycleHealth(world, cycle);
     return world;
   }
