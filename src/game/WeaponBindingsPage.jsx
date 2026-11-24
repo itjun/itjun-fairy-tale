@@ -72,7 +72,7 @@ export function WeaponBindingsPage({ adventure, isGamepad, onBack, onBind }) {
     <header>
       <h1 id="weapon-bindings-title" ref={heading} tabIndex={-1}>武器搭配</h1>
       <button type="button" className="quiet-button" onClick={onBack}>
-        {isGamepad ? <PadKey name="menu" /> : <ArrowLeft size={22} />}返回更多
+        {isGamepad ? <PadKey name="menu" /> : <ArrowLeft size={22} />}返回暂停
       </button>
     </header>
     <div className="weapon-wheel" role="group" aria-label="已获得的武器和大招">

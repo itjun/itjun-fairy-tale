@@ -174,7 +174,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     }
   }, [status]);
   useEffect(() => {
-    window.gardenDesktop?.updateSafe(['ready', 'worlds', 'camp', 'paused', 'pause-more', 'fallen', 'completed', 'ended'].includes(status));
+    window.gardenDesktop?.updateSafe(['ready', 'worlds', 'camp', 'paused', 'fallen', 'completed', 'ended'].includes(status));
     return () => window.gardenDesktop?.updateSafe(false);
   }, [status]);
   useEffect(() => {
@@ -221,12 +221,12 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     pickerOrigin.current = current;
     changeStatus('worlds');
   }
-  function openPausePage(page, focus) {
+  function returnToPause(focus) {
     pauseFocus.current = focus;
-    changeStatus(page);
+    changeStatus('paused');
   }
   function openPauseTool(tool) {
-    if (tool === 'overview') openOverview('pause-more');
+    if (tool === 'overview') openOverview('paused');
     else {
       if (tool === 'options') setOptionsCategory('game');
       changeStatus(tool);
@@ -252,7 +252,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
   function backFromWorldPicker() {
     const origin = pickerOrigin.current;
     if (!origin) { exit(); return; }
-    if (run.current?.id === origin.run.id) openPausePage('paused', 'worlds');
+    if (run.current?.id === origin.run.id) returnToPause('worlds');
     else chooseWorld({ level: findStage(origin.run.levelId), saved: origin }, false);
   }
   function retryLoad() {
@@ -289,7 +289,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
   const isResult = status === 'completed';
   const isCycleComplete = isResult && levelIndex === WORLD_ACTS.length - 1;
   const isPickingWorld = status === 'ready' || status === 'worlds';
-  const isPauseBook = status === 'paused' || status === 'pause-more';
+  const isPauseBook = status === 'paused';
   const isAdventureDialog = isPickingWorld || isPauseBook || ['reward','camp','life-loot','fallen','ended','overview','options','weapon-bindings'].includes(status);
   const isGamepad = gamepadState.mode === 'gamepad';
   const locked = lockedItems(readAlbum());
@@ -310,7 +310,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     engine.current.pause(true); changeStatus('overview');
     if (from === 'playing') persist(engine.current.snapshot(), 'paused');
   }
-  function closeOverview() { if (overviewFrom.current === 'playing') start(); else openPausePage('pause-more', 'overview'); }
+  function closeOverview() { if (overviewFrom.current === 'playing') start(); else returnToPause('overview'); }
   function equipWeapon(slot, id) {
     const game = engine.current;
     if (statusRef.current === 'weapon-bindings' && game?.equipAttack(slot, id)) persist(game.snapshot(), 'paused');
@@ -351,14 +351,12 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
       if(run.current){const record=snapshotRun(game.snapshot(),'paused');if(record)queueRun({...record,status:'ended',revision:record.revision+1});}
       restart(0);return true;
     }}/>}
-    {isPauseBook && <PauseBook game={engine.current} more={status === 'pause-more'} focusOnOpen={pauseFocus}
+    {isPauseBook && <PauseBook game={engine.current} focusOnOpen={pauseFocus}
       hasAdventure={!!stats.adventure} error={pauseSaveError} onResume={start} onWorlds={openWorldPicker}
-      onGarden={() => { if (savePausedAdventure()) onExit(); }} onTool={openPauseTool}
-      onMore={() => openPausePage('pause-more', stats.adventure ? 'weapon-bindings' : 'options')}
-      onBack={() => openPausePage('paused', 'more')} />}
-    {status === 'overview' && stats.adventure && <RunOverview stats={stats} onBack={closeOverview} backLabel={overviewFrom.current === 'playing' ? '继续玩' : '返回更多'} />}
-    {status === 'weapon-bindings' && stats.adventure && <WeaponBindingsPage adventure={stats.adventure} isGamepad={isGamepad} onBind={equipWeapon} onBack={() => openPausePage('pause-more', 'weapon-bindings')} />}
-    {status === 'options' && <OptionsPage category={optionsCategory} onCategory={setOptionsCategory} onBack={() => openPausePage('pause-more', 'options')} backLabel="返回更多" isSound={isSound} onSound={toggleSound} runDifficulty={stats.adventure?.difficulty || 'normal'} />}
+      onGarden={() => { if (savePausedAdventure()) onExit(); }} onTool={openPauseTool} />}
+    {status === 'overview' && stats.adventure && <RunOverview stats={stats} onBack={closeOverview} backLabel={overviewFrom.current === 'playing' ? '继续玩' : '返回暂停'} />}
+    {status === 'weapon-bindings' && stats.adventure && <WeaponBindingsPage adventure={stats.adventure} isGamepad={isGamepad} onBind={equipWeapon} onBack={() => returnToPause('weapon-bindings')} />}
+    {status === 'options' && <OptionsPage category={optionsCategory} onCategory={setOptionsCategory} onBack={() => returnToPause('options')} backLabel="返回暂停" isSound={isSound} onSound={toggleSound} runDifficulty={stats.adventure?.difficulty || 'normal'} />}
     {status !== 'playing' && !isAdventureDialog && <div className="adventure-overlay"><section ref={menu} onKeyDown={trapMenuFocus} className="adventure-menu" role="dialog" aria-modal="true" aria-labelledby="adventure-heading">
       <span className="adventure-kicker">带着画里的自己，去看更大的世界</span>
       <h2 id="adventure-heading">{status === 'loading' ? '彩笔世界准备中…' : status === 'error' ? '画面需要一点帮助' : status === 'completed' ? `${level.chapterName || level.name}，挑战成功！` : status === 'ended' ? '生命用完了，这次冒险结束' : status === 'fallen' ? `扣掉一条命，还剩 ${stats.survival?.lives} 条` : '选一个小世界，出发吧'}</h2>

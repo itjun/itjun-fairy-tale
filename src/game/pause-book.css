@@ -85,11 +85,11 @@
 }
 #root .pause-menu-page h1 {
   display: table;
-  margin: 0 0 clamp(16px, 6vh, 76px);
+  margin: 0 0 clamp(12px, 3vh, 42px);
   padding: 0 .08em .12em;
   border-bottom: .055em solid #df8156;
   border-radius: 0 0 32% 12% / 0 0 12% 5%;
-  font-size: clamp(45px, min(11.6vw, 20vh), 202px);
+  font-size: clamp(45px, min(9vw, 14vh), 160px);
   font-weight: bold;
   line-height: 1.1;
   letter-spacing: .04em;
@@ -99,12 +99,12 @@
 }
 .pause-actions {
   display: grid;
-  gap: clamp(4px, 1.8vh, 26px);
+  gap: clamp(4px, 1vh, 16px);
 }
 .pause-actions button {
   width: 100%;
   padding: .27em .27em;
-  font-size: clamp(23px, min(4.6vw, 8vh), 88px);
+  font-size: clamp(23px, min(3.9vw, 6vh), 72px);
   text-align: left;
   -webkit-text-stroke: .012em currentColor;
   white-space: nowrap;

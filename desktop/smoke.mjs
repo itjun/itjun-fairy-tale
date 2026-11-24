@@ -135,7 +135,8 @@ export async function runSmoke({ win, requestClose }) {
   await writeFile(join(profile, 'room.png'), (await capture()).toPNG());
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".pause-book button"), button => button.textContent.trim())'), ['继续玩', '换世界', '回花园', '更多']);
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".pause-actions button"), button => button.textContent.trim())'), ['换世界', '回花园', '武器搭配', '本领一览', '选项']);
+  assert.equal(await evaluate('document.activeElement.dataset.pauseAction'), 'resume');
   // 模拟本机存档写满。离开关卡的两个入口都必须留在画册里，让孩子可以重试。
   await evaluate(`(() => {
     const setItem = Storage.prototype.setItem;
@@ -149,21 +150,17 @@ export async function runSmoke({ win, requestClose }) {
     } finally { Storage.prototype.setItem = setItem; }
   })()`);
   await until('!!document.querySelector(".pause-book [role=alert]")');
-  await evaluate('document.querySelector("[data-pause-action=more]").click()');
-  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "pause-more"');
   await evaluate('document.querySelector("[data-pause-action=overview]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "overview"');
   assert.equal(await evaluate('document.querySelectorAll(".platform-game [role=dialog], .platform-game .adventure-overlay").length'),0,'本领一览是整页，不是弹窗');
   await writeFile(join(profile, 'overview.png'), (await capture()).toPNG());
   await evaluate('document.querySelector(".run-overview .home-back").click()');
-  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "pause-more"');
+  await until('document.activeElement.dataset.pauseAction === "overview"');
   await evaluate('document.querySelector("[data-pause-action=options]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "options"');
   await writeFile(join(profile, 'game-options.png'), (await capture()).toPNG());
   await evaluate('document.querySelector(".home-options .home-back").click()');
-  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "pause-more"');
-  await evaluate('document.querySelector("[data-pause-action=back]").click()');
-  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
+  await until('document.activeElement.dataset.pauseAction === "options"');
   // 稀疏宝物不保证出现在任意随机路线；用固定局的真实宝物验证键盘拾取。
   await evaluate('document.querySelector("[data-pause-action=garden]").click()');
   await until('!!document.querySelector(".home-play")');
