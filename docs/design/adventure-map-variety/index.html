@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>花园王国 · 冒险地图改版计划</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: #28271f; background: #faf8ef; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 16px; line-height: 1.8; }
+    main { width: min(1100px, 100% - 48px); margin: 0 auto; padding: 50px 0 65px; }
+    header { max-width: 55em; }
+    h1, h2, h3, p, figure { margin: 0; }
+    h1, h2, h3 { line-height: 1.3; text-wrap: balance; }
+    h1 { font-family: "Songti SC", SimSun, serif; font-size: clamp(34px, 5.1vw, 60px); letter-spacing: -.04em; }
+    h2 { font-size: clamp(25px, 3.1vw, 35px); }
+    h3 { font-size: 22px; }
+    p + p { margin-top: .6em; }
+    .meta, figcaption, .source { font-size: 14px; color: #605d50; }
+    .meta { margin-bottom: 12px; }
+    .intro { margin-top: 17px; max-width: 47em; font-size: 19px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 18px; }
+    a { color: #195f4a; text-underline-offset: 4px; }
+    a:focus-visible { outline: 3px solid #b8562e; outline-offset: 4px; }
+    section { margin-top: 42px; }
+    section > h2 { margin-bottom: 14px; }
+    .rationale, .details { max-width: 52em; }
+    .scene { display: grid; grid-template-columns: minmax(0, 1.37fr) minmax(0, 1fr); gap: 25px; align-items: start; padding: 23px 0; border-top: 1px solid #cecbbb; }
+    .scene figure a { display: block; }
+    img { display: block; width: 100%; height: auto; }
+    figcaption { margin-top: 5px; }
+    .scene h3 { margin: 3px 0 10px; }
+    .scene p { line-height: 1.72; }
+    ol, ul { padding-left: 1.45em; }
+    li { margin-bottom: .6em; }
+    .source { margin-top: 12px; }
+    footer { border-top: 1px solid #cecbbb; margin-top: 35px; padding-top: 18px; }
+    @media (max-width: 790px) { main { width: min(100% - 32px, 660px); padding-top: 28px; } .scene { grid-template-columns: 1fr; gap: 12px; } }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @media print { main { width: 100%; padding: 0; } nav { display: none; } body { background: white; } .scene { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="meta">花园王国　·　2026 年 11 月 23 日　·　三个世界已可试玩</p>
+    <h1>冒险地图改版计划</h1>
+    <p class="intro">踩水槽让叶子长成桥，搭上钟楼的橙色指针，或从雪脊赶在雪球前面切换岔轨。三个世界各有八个可玩的区段。</p>
+    <nav aria-label="计划目录"><a href="#why">重复从哪里来</a><a href="#ideas">三种玩法草图</a><a href="#pilot">八段怎么玩</a><a href="#check">怎么玩出差别</a></nav>
+  </header>
+
+  <section id="why" class="rationale">
+    <h2>为什么换了世界还像同一关</h2>
+    <p>改版前，给工作区的九个可选世界各生成了 12 张地图。除新版蘑菇森林外，另外八个世界的 96 张图都是同一个连接方式：进第一间房，在接下来的三层各选一间，最后进入首领房。两扇门后确实会出现不同的怪、宝箱和小店，但无论选哪扇，下一次仍在同一层选门。</p>
+    <p>这 96 张图连开场中段都是上下双层地形。通用战斗房又按三个战区、每区两波推进。沙漠已有攀岩和独立洞窟；新版森林更进一步，孩子能决定先上树还是先钻树根，救到幼鸟后会想找一条回巢的近路。</p>
+    <p class="source">抽样来自本地地图生成器，种子 1～12。观察的是地图连接和段落顺序；儿童游玩感受留给试玩验证。</p>
+  </section>
+
+  <section id="ideas">
+    <h2>三种玩法草图</h2>
+    <p>三幅图都取材于现有世界和彩笔人物。它们表示玩家做决定的那一刻，点击可看大图。</p>
+    <article class="scene">
+      <figure><a href="flower-bridge.webp"><img src="flower-bridge.webp" alt="姐姐踩动雨水槽，一股水流向向日葵的根；巨叶通往上层，荷叶通往下层。" width="1672" height="941"></a><figcaption>彩虹花园 · 孩子亲手造路</figcaption></figure>
+      <div><h3>花开成路</h3><p>城堡就在河对岸。踩动分水槽，灌溉向日葵，叶子依次展开，孩子可以沿花茎跳上山脊。把水引进池塘，荷叶浮起，便能走水边穿过桥洞。</p><p>高路能提前看清下一处分水口，低路落脚宽、可以慢慢观察。两路都能到城堡。轻松档第一次试水时，水槽、花根和第一片新叶都在同一屏。</p></div>
+    </article>
+    <article class="scene">
+      <figure><a href="clock-tower.webp"><img src="clock-tower.webp" alt="剖开的钟楼里，姐姐站在宽大的橙色指针上，指针即将与右边阳台齐平，下方挂着安全网。" width="1672" height="941"></a><figcaption>家人小镇 · 看准时机换层</figcaption></figure>
+      <div><h3>搭指针敲钟</h3><p>从街上就能看见塔顶的钟。跳上慢慢摆动的大指针，经过低阳台时可以先下去，穿过屋顶绕上楼；也可以留在指针上，到高窗再跳走。登顶敲钟后，街上的吊桥放下，接通镇广场。</p><p>塔心和窗台是固定地标。指针每次靠站会短暂停住，跳早了会落进下方软网。适合喜欢等一个好时机、一下跳准的孩子。</p></div>
+    </article>
+    <article class="scene">
+      <figure><a href="snowball-run.webp"><img src="snowball-run.webp" alt="雪球从左上沿雪沟滚下，即将撞开蓝色冰壁，姐姐可以从上方雪脊先行。" width="1672" height="941"></a><figcaption>雪人乐园 · 先观察，再追上一颗雪球</figcaption></figure>
+      <div><h3>放雪球开道</h3><p>从山顶推下大雪球，跟着它走谷底，能看它撞开薄冰，露出山洞。熟悉地形后，可以沿上坡抄近路，抢在球前踩下岔轨板，把球送往另一面冰墙，打开通往山口的第二条路。</p><p>没赶上也能走刚撞开的洞，雪球停在雪窝。下一段由孩子自己放球，镜头跟着人物。三种方案里，这一关的动作最快，最需要试玩校准坡长和球速。</p></div>
+    </article>
+  </section>
+
+  <section id="pilot" class="details">
+    <h2>三个世界，各有八段</h2>
+    <ol>
+      <li><strong>第 1 世界「花开成路 · 水乡长旅」</strong>从分水河谷出发，钻入低处的苗圃找泉眼，在双渠水磨换乘木筏。经过城堡桥头的守卫，再从花粉山脊送粉、从蓄水池底开闸向上折返，最后穿过果园，去花王庭院挑战首领。开场可以先养高叶或先浮起荷叶，两种布局会改变后面的折返顺序。</li>
+      <li><strong>第 2 世界「搭指针敲钟」</strong>从街口试搭一根指针，随后穿行屋顶与暗巷、在两根指针之间换乘。过报时街守卫，去两边阳台接力敲钟，再从低巷登上钟楼，敲响大钟铺开吊桥。从屋脊一路越过街巷，到广场钟庭挑战首领。摆针会返回，落入软网后有路重试。</li>
+      <li><strong>第 6 世界「放雪球开道」</strong>在松林放下第一颗雪球，去冰湖两侧找冰晶，或先从雪脊赶到岔轨，把雪球送进藏宝侧洞。过冰川哨站后，找到小企鹅并带回巢里，从山脚取回星光点亮山灯，再用两颗雪球接力打开山口，到雪山守望台挑战首领。</li>
+    </ol>
+    <p>新冒险可以直接选第 1、2、6 世界。三个新世界各用独立的关卡标识，旧冒险继续原来的地图。开过的水渠、敲过的钟、雪球的位置和已发现的洞会随当前冒险保存。</p>
+  </section>
+
+  <section id="check" class="details">
+    <h2>玩到什么程度值得推广</h2>
+    <ul>
+      <li><strong>第一次玩：</strong>给孩子手柄，大人先不解释。观察她能否注意到水流、主动试一次水槽，然后走上自己打开的路。看不懂时，先改水流和叶片的展开表现。</li>
+      <li><strong>第二次玩：</strong>换另一幅底图，观察她会不会依据眼前的断岸或高渠改变走法。能说出“这次要先上去放水”，或用手柄直接演示，都算看懂了。</li>
+      <li><strong>路线与续关：</strong>四位角色用基础跳跃和初始装备都能通主线；每种底图验证两路、错过落点后的返回，以及改水后暂停、复活和读档。检查已开通路和已领奖励，分别记录模拟输入与实体 Xbox 的结果。</li>
+    </ul>
+  </section>
+  <footer>从游戏首页进入“新冒险”，选择彩虹花园、家人小镇或雪人乐园即可试玩。</footer>
+</main>
+</body>
+</html>
