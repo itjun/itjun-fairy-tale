@@ -1,6 +1,7 @@
 import { pushInWind } from '../../shared/trails/wind.js';
 import { fieldHint, stepField, syncField } from '../../shared/trails/field-progress.js';
 import { fieldImages } from './field-views.js';
+import { trailMaterial } from './trail-art.js';
 import { advanceStory, syncStory, storyHint } from '../../shared/story-mechanisms.js';
 import { storyImages } from './story-views.js';
 import { VALLEY_IMAGES, WATER_NOTICES, valleyHint } from './flower-valley-view.js';
@@ -177,7 +178,8 @@ export class GardenEngine {
       this.enemyShotMaterials=Object.fromEntries([...new Set(this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image)))].map(name=>[name,spriteMaterial(name)]));
       this.lifeMaterial = spriteMaterial('life-potion');this.medkitMaterial=spriteMaterial('supply-medkit');
       this.bossGateMaterial=spriteMaterial('boss-gate');this.bossChestMaterial=spriteMaterial('boss-chest');
-      this.trapMaterials = {pendulum:spriteMaterial('trap-pendulum'),thorns:spriteMaterial('trap-thorns'),steam:spriteMaterial('trap-steam'),geyser:spriteMaterial('trap-steam'),icicle:spriteMaterial('monster-icicle')};
+      this.trapMaterials = {pendulum:spriteMaterial('trap-pendulum'),thorns:spriteMaterial('trap-thorns'),steam:spriteMaterial('trap-steam'),icicle:spriteMaterial('monster-icicle')};
+      if (this.world.hazards.some(h=>h.kind==='geyser')) this.trapMaterials.geyser=trailMaterial(this,'water-geyser');
       this.terrainMaterials = Object.fromEntries(['bank','cookie','rock','blocks'].map(kind=>[kind,spriteMaterial(`terrain-${kind}`)]));
       this.terrainMaterials.cloud = spriteMaterial('platform-cloud');
       if (isDesert) this.terrainMaterials.sand = spriteMaterial('terrain-sand');
@@ -319,9 +321,10 @@ export class GardenEngine {
       this.enemyViews.set(enemy.id, this.sprite(this.material((this.bossMaterials[enemy.image] || this.enemyMaterials[enemy.kind]).clone()), enemy.x, enemy.y + enemy.height / 2, 1.4, enemy.height, 0.5));
       this.enemyMarkers.set(enemy.id, [this.sprite(this.starMaterial,enemy.x-0.25,enemy.y+2,0.35,0.35),this.sprite(this.starMaterial,enemy.x+0.25,enemy.y+2,0.35,0.35)]);
     }
+    this.springViews = new Map();
     for (const spring of this.world.springs) {
       const material = this.world.forest ? this.collectibleMaterials.mushroom : this.springMaterial;
-      this.sprite(material, spring.x, spring.y + .42, 2.1, 1.45, .35);
+      this.springViews.set(spring,this.sprite(material, spring.x, spring.y + .42, 2.1, 1.45, .35));
     }
     for (const sw of this.world.switches) this.switchViews.set(sw.id,this.sprite(this.material(this.starMaterial.clone()),sw.x,sw.y+0.18,1.1,0.55,0.8));
     for (const d of this.world.decorations) {
@@ -545,7 +548,6 @@ export class GardenEngine {
       const event = stepForestRescue(world, state.forest, player);
       if (event) {
         this.callbacks.onSound(event.sound);
-        this.skillEffects.burst(player.x, player.y + 1, this.elapsed, true);
         this.publish(event.message);
         this.callbacks.onLifeChange?.(this.snapshot());
       }
@@ -835,7 +837,10 @@ export class GardenEngine {
       for (const sw of this.world.switches) if (!sw.isOpen && player.ground?.id === sw.platformId && Math.abs(player.x-sw.x)<1) {
         sw.isOpen=true; this.platforms[sw.bridgeId].isEnabled=true; this.publish('星星亮了，小桥打开啦！');
       }
-      for (const spring of this.world.springs) if (touchSpring(player, spring)) { this.callbacks.onSound('jump'); this.publish('弹簧花送你跳高高！'); }
+      for (const spring of this.world.springs) if (touchSpring(player, spring)) {
+        this.springViews.get(spring).userData.pressedAt=this.elapsed;
+        this.callbacks.onSound('jump'); this.publish('弹簧花送你跳高高！');
+      }
       for (const enemy of enemies.filter(e => !e.isDormant)) {
         const contact = touchEnemy(player, enemy, previousY, this.elapsed);
         if (contact === 'stomp' || contact === 'hit') { this.recordHit({enemy,isDefeated:contact==='stomp',damage:enemy.lastDamage,blocked:enemy.lastBlocked});this.callbacks.onSound('hit'); }
@@ -1106,7 +1111,18 @@ export class GardenEngine {
         }
         mesh.material.color.set(state.isWarning ? '#ffd367' : '#ffffff');
       }
-      for (const sw of this.world.switches) this.switchViews.get(sw.id).material.color.set(sw.isOpen ? '#b6f4a2' : '#ffffff');
+      for (const [spring,mesh] of this.springViews) {
+        if (mesh.userData.pressedAt===undefined) continue;
+        const age=this.elapsed-mesh.userData.pressedAt;
+        const rebound=this.isReducedMotion ? (age<.18?-.5:0) : age<.5 ? -Math.cos(age*16)*Math.exp(-age*6)*.75 : 0;
+        mesh.scale.y=1.45+rebound;mesh.position.y=spring.y+.42+rebound/2;
+        if(age>=.5) delete mesh.userData.pressedAt;
+      }
+      for (const sw of this.world.switches) {
+        const pad=this.switchViews.get(sw.id);
+        pad.material.color.set(sw.isOpen ? '#b6f4a2' : '#ffffff');
+        pad.scale.y=sw.isOpen?.27:.55;pad.position.y=sw.y+(sw.isOpen?.04:.18);
+      }
       this.skillEffects.update(this.waves,this.players,this.elapsed,this.cameraX,this.camera.right,
         [this.waves[0]?.firingWeapon || attackBindings(this.adventure).find(id => WEAPONS[id]) || 'blade']);
       this.skillEffects.updateMagic(this.adventure.magic?.active || []);

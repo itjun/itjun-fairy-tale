@@ -103,7 +103,11 @@ export class RoomViews {
         sign.mesh.visible = isCurrent;
         for (const pad of pads) {
           pad.mesh.visible = isCurrent;
-          pad.mesh.material.opacity = puzzle.order.indexOf(pad.tile.color) < step ? 1 : 0.55;
+          const isLatched=puzzle.order.indexOf(pad.tile.color)<step;
+          const isPressed=isLatched || isCurrent && engine.players[0].ground?.id===pad.tile.platformId;
+          pad.mesh.material.opacity=isLatched ? 1 : .55;
+          pad.mesh.scale.y=isPressed ? .2 : .5;
+          pad.mesh.position.y=world.platforms[pad.tile.platformId].y+pad.mesh.scale.y/2-.03;
         }
         sign.draw(`${step}`, context => {
           this.text(context, '按顺序踩', 96, 92, 38);
@@ -127,6 +131,10 @@ export class RoomViews {
         for (const card of cards) {
           card.sign.mesh.visible = isCurrent;
           const isMatched = isDone || isCurrent && state.puzzle.matched.includes(card.index), isOpen = isMatched || isCurrent && state.puzzle.open.includes(card.index);
+          if(isCurrent && card.wasOpen!==undefined && card.wasOpen!==isOpen) card.turnedAt=engine.elapsed;
+          card.wasOpen=isCurrent?isOpen:undefined;
+          const turn=engine.elapsed-(card.turnedAt??-1);
+          card.sign.mesh.scale.x=1.5*(engine.isReducedMotion || turn>=.24 ? 1 : .15+.85*Math.abs(Math.cos(Math.PI*turn/.24)));
           card.sign.draw(`${isOpen}:${isMatched}`, (context, width, height) => {
             if (isOpen) context.drawImage(engine.textureFor(CARD_FACES[card.face]).image, 16, 32, width - 32, width - 32);
             else this.text(context, '？', width / 2, height / 2 + 26, 72, '#b98a5a');

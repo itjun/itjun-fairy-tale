@@ -45,10 +45,30 @@ export function addForestViews(views) {
       const p = world.platforms[stop.platformId];
       const icons = side === 'roots' ? ['collectible-star', 'bridge-rope', 'desert-cave-mouth'] : ['spring-flower', 'bridge-rope', 'forest-vine'];
       const item = index < FOLLOWING - 1 ? sprite(icons[index], p.x, p.y + 1, 2.25, 1.8) : null;
+      const lamp = side==='roots' && index===0 ? views.glow(p.x,p.y+1) : null;
+      let wasDone, changedAt;
       const sign = views.paper(p.x, p.y + 3.1, 4.9, 1.05, 370, 82);
       update((progress, player) => {
         const near = Math.abs(player.x - p.x) < 25 && Math.abs(player.y - p.y) < 10 && !!player.safe.isCave === (side === 'roots');
-        if (item) item.visible = near && progress[side] >= index;
+        const done=progress[side]>index;
+        if(done && wasDone===false) changedAt=engine.elapsed;
+        wasDone=done;
+        const age=changedAt===undefined?Infinity:engine.elapsed-changedAt;
+        const amount=done?(engine.isReducedMotion?1:Math.min(1,age/.6)):0;
+        if (item) {
+          item.visible=near && progress[side]>=index;
+          if(index===0 && side==='crown') item.rotation.z=done ? (age<2 && !engine.isReducedMotion?Math.sin(age*15)*Math.exp(-age)*.65:.12) : 0;
+          if(index===1) {
+            item.rotation.z=stop.direction*(1-amount)*.95;
+            item.position.x=p.x+stop.direction*amount*1.45;
+            item.scale.x=2.25+amount*2;
+          }
+          if(index===2) {
+            if(side==='crown') {item.scale.y=1.8+amount*2;item.position.y=p.y+1-amount;}
+            else {item.scale.x=2.25*(1-.68*amount);item.position.x=p.x-amount*.75;}
+          }
+        }
+        if(lamp) {lamp.visible=near&&done;lamp.scale.set(4.3,4.3,1);}
         const isWaitingForLights = side === 'roots' && index === 0 && progress.lights !== 7;
         sign.mesh.visible = near && progress[side] === index && !isWaitingForLights;
         if (sign.mesh.visible) sign.draw(stop.action, (ctx, width) => views.text(ctx, stop.action, width / 2, 54, 42, '#79501b'));
