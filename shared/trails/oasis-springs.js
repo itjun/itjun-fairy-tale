@@ -26,8 +26,26 @@ function springCave(p,mouth1,mouth2,name) {
   route.art.push({image:'desert-cave-pool',x:ledges[2].x,y:floor-.6,width:17,height:3.3,caveId:id});
   p.prize(upper[1]);return {well:ledges[2],upper:upper[2]};
 }
-function beam(p,key,a,b) {
-  (p.room.beams ||= []).push({after:key,x:a.x,y:a.y+1.65,endX:b.x,endY:b.y+1.4});
+function lightBridge(p,key,from,to,label,options={}) {
+  p.station(key,from,mirror,label,{keep:true,received:'光桥亮了，走上去吧！',...options,lightTargetId:to.id});
+}
+
+// 光桥排在原地图的平台后面，旧存档的落脚点和机关编号继续有效。
+function addLightBridges(world,builder) {
+  for (const room of world.rooms) for (const stop of room.stops) {
+    if (stop.lightTargetId === undefined) continue;
+    const from = world.platforms[stop.platformId], to = world.platforms[stop.lightTargetId];
+    const high = from.y > to.y ? from : to;
+    const low = high === from ? to : from;
+    const downhill = Math.sign(low.x - high.x);
+    const startX = high.x + downhill * high.width / 2;
+    const endX = low.x, endY = low.y;
+    const platform = builder.add((startX + endX) / 2, (high.y + endY) / 2, Math.abs(endX - startX), {
+      roomId:room.id, zone:room.depth, progress:room.depth, skin:'sunlight',
+      slope:(endY - high.y) / (endX - startX), fieldGate:stop.key, lightTopId:high.id, isEnabled:false,
+    });
+    room.platformIds.push(platform.id);
+  }
 }
 function path(p,nodes) {return p.path(nodes,sand);}
 function jugAt(p,t,dep,deliver,label='装满一壶泉水') {
@@ -41,8 +59,8 @@ function altar(p,t,dep,label) {
 function first(p) {
   const dune=path(p,[[0,0,14],[18,0],[38,0,11],[61,-1],[85,0],[108,1],[134,1]]);
   const top=cliff(p,dune[2],44,12), ledge=path(p,[[56,12],[72,10],[88,7],[100,5]]);
-  p.station('lens',top,mirror,'爬上岩柱转日镜',{hint:'朝岩壁起跳，再向上爬到日镜',keep:true});
-  beam(p,'lens',top,dune[4]);jugAt(p,dune[4],['lens'],'pour','沿光找到泉眼装水');
+  lightBridge(p,'lens',top,dune[4],'爬上岩柱转日镜',{hint:'朝岩壁起跳，再向上爬到日镜'});
+  jugAt(p,dune[4],['lens'],'pour','沿光找到泉眼装水');
   altar(p,dune[6],['water'],'浇开驿站的棕榈');p.prize(ledge[1]);
   p.gate('pour',[[146,3],[158,4]]);p.finish(dune[0],p.tile(171,4,12,sand));
 }
@@ -56,9 +74,9 @@ function underground(p) {
 function mirrors(p) {
   const low=path(p,[[0,0,14],[23,0],[39,0,11],[61,-1],[80,0,11],[103,0],[126,2],[150,2]]);
   const west=cliff(p,low[2],45,11),east=cliff(p,low[4],86,14);
-  p.station('west',west,mirror,'让西镜照向东岩',{keep:true});
-  p.station('east',east,mirror,'对准谷底的蓄水池',{after:['west'],keep:true});
-  beam(p,'west',west,east);beam(p,'east',east,low[5]);jugAt(p,low[5],['east'],'pour');
+  lightBridge(p,'west',west,east,'让西镜照向东岩');
+  lightBridge(p,'east',east,low[5],'对准谷底的蓄水池',{after:['west']});
+  jugAt(p,low[5],['east'],'pour');
   altar(p,low[6],['water'],'灌满小绿洲');p.prize(p.tile(104,12,8,sand));p.finish(low[0],low[7]);
 }
 function shaduf(p) {
@@ -77,13 +95,13 @@ function carved(p) {
   p.station('star',cave.upper,'oasis-map','在洞顶拓下水纹',{carryUntil:'read'});
   p.station('read',cave.well,basin,'按水纹找到暗泉',{after:['star']});
   const top=cliff(p,road[5],121,13);
-  p.station('mirror',top,mirror,'登上岩台照亮出口',{after:['read'],goal:true,keep:true});beam(p,'mirror',top,road[7]);
+  lightBridge(p,'mirror',top,road[7],'登上岩台照亮出口',{after:['read'],goal:true});
   p.prize(road[3]);p.finish(road[0],road[7]);
 }
 function caravan(p) {
   const road=path(p,[[0,0,14],[19,0],[37,0,11],[60,1],[85,1],[110,-1],[133,0,11],[155,0],[177,2]]);
   const top=cliff(p,road[2],43,13),cave=springCave(p,road[3],road[5],'最后的泉室');
-  p.station('look',top,mirror,'用镜子找神灯',{keep:true});beam(p,'look',top,road[3]);
+  lightBridge(p,'look',top,road[3],'用镜子找神灯',{hint:'爬到高台的镜子旁'});
   jugAt(p,cave.well,['look'],'pour');
   const waterTower=cliff(p,road[6],139,13);
   altar(p,waterTower,['water'],'给驼队打开引水闸');
@@ -92,7 +110,7 @@ function caravan(p) {
 }
 export const oasisSprings={id:'desert-oasis-springs',theme:'desert',title:'攀岩寻泉',subtitle:'爬上日镜岩，钻进暗河，把水带回绿洲',
   story:'岩壁上有可以抓的凸石。爬上高台，看看镜子把阳光照到哪里。洞口挂着金色的神灯，走进去找泉水吧。',landmark:'oasis-palm',
-  monsters:['sandcastle','burrow','crab'],arena:'绿洲泉门',chapters(random){
+  finishWorld:addLightBridges,monsters:['sandcastle','burrow','crab'],arena:'绿洲泉门',chapters(random){
     const middle=[['跟着神灯找泉水',underground],['日镜峡谷',mirrors]];if(random()<.5)middle.reverse();
     return [['日镜驿站',first],...middle,['商路哨口',null],['古井提水架',shaduf],['暗河水纹',carved],['驼队引水渠',caravan]];
   }};

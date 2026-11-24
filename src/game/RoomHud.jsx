@@ -16,6 +16,7 @@ const RESCUE_STATUS = ['待寻找', '找到线索', '桥已通', '听到鸟鸣',
 const KIND_MARKS = { intro: '起', battle: '战', mechanism: '机', puzzle: '宝', shop: '店', elite: '精', boss: '王' };
 
 function roomLine(rooms) {
+  if (rooms.isOnLightBridge) return '左右走，按住 ↓ 往下滑';
   if (rooms.fieldHint) return rooms.fieldHint;
   if (rooms.valleyHint && rooms.kind !== 'battle') return rooms.valleyHint;
   if (rooms.forest) return rooms.forest.hint;
@@ -73,7 +74,7 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
       {bindings.map((id, slot) => <span key={slot} className={firingClass(id)}><AttackSlotContent {...{ slot, id, magic, isGamepad }} /></span>)}
     </aside>
     {isPlaying && <div className="touch-controls room-touch" aria-label="触屏操作">
-      <div><button aria-label="向左走" {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label="向右走" {...touchProps('right')}><ArrowRight size={30} /></button>{(rooms.isClimbing || rooms.isDroppingFromGrip) && <button aria-label={rooms.isClimbing ? '往上爬' : '抓住岩壁'} {...touchProps('up')}><ArrowUp size={27} /></button>}<button aria-label={rooms.isClimbing || rooms.canDescend ? '往下爬' : '向下跳台'} {...touchProps('drop')}><ArrowDown size={27} /></button></div>
+      <div><button aria-label="向左走" {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label="向右走" {...touchProps('right')}><ArrowRight size={30} /></button>{(rooms.isClimbing || rooms.isDroppingFromGrip) && <button aria-label={rooms.isClimbing ? '往上爬' : '抓住岩壁'} {...touchProps('up')}><ArrowUp size={27} /></button>}<button aria-label={rooms.isOnLightBridge ? '沿光桥下滑' : rooms.isClimbing || rooms.canDescend ? '往下爬' : '向下跳台'} {...touchProps('drop')}><ArrowDown size={27} /></button></div>
       <div>{rooms.prompt && <button aria-label={rooms.prompt} {...touchProps('enter')}>进</button>}<button className="touch-jump" aria-label="跳跃" {...touchProps('jump')}><ArrowUp size={29} /><span>跳</span></button></div>
       <div className="room-touch-attacks" aria-label="武器快捷键">
         {bindings.map((id, slot) => <button key={slot} className={firingClass(id)} disabled={!id}

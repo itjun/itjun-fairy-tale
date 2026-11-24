@@ -98,6 +98,7 @@ export function buildFieldWorld(world,stage,builder,placeBoss) {
   world.bossArenas.push({id:0,bossId:boss.id,floorId:floor.id,exitId:flag.id,left:floor.x-16,right:floor.x+16,y:0,layout:'platform'});
   world.supplies.push({id:'medkit:0',kind:'medkit',platformId:start.id,x:start.x+1,y:1.2});
   arena.prop(theme.landmark,floor,11,9);arena.finish(start,flag);world.finish=flag;
+  theme.finishWorld?.(world,builder);
   for(const r of world.rooms.slice(0,-1)) {
     const next=world.rooms[r.id+1];
     world.doors.push({id:r.id,roomId:r.id,targetRoomId:next.id,platformId:r.exitId,offsetX:2.5,kind:next.kind,reward:next.reward});

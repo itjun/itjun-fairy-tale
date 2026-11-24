@@ -41,10 +41,15 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   if (input.jump) player.buffer = RULES.buffer;
   else player.buffer = Math.max(0, player.buffer - dt);
   player.coyote = player.isGrounded ? RULES.coyote : Math.max(0, player.coyote - dt);
-  const targetVx = input.direction * RULES.speed * (input.speedMultiplier ?? 1);
+  let targetVx = input.direction * RULES.speed * (input.speedMultiplier ?? 1);
+  if (input.vertical < 0 && player.isGrounded && player.ground?.skin === 'sunlight') {
+    const downhill = -Math.sign(player.ground.slope);
+    const speed = Math.max(0, player.vx * downhill) + 18 * dt;
+    targetVx = downhill * Math.min(RULES.speed * 1.8, speed);
+  }
   player.vx = player.knockTime > 0 ? player.knockVx : player.isGrounded && player.ground?.isIce ? player.vx + Math.max(-12*dt, Math.min(12*dt,targetVx-player.vx)) : targetVx;
   if (player.isGrounded && player.ground?.conveyor) player.x += player.ground.conveyor * dt;
-  if (input.direction) player.facing = Math.sign(input.direction);
+  if (targetVx) player.facing = Math.sign(targetVx);
   let isJumped = false;
   if (player.buffer > 0 && player.coyote > 0) {
     player.vy = RULES.jump; player.buffer = 0; player.coyote = 0; player.isGrounded = false; isJumped = true;
@@ -59,6 +64,7 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
   player.x = Math.max(bounds.minX ?? platforms[0].x - platforms[0].width / 2 + RULES.radius, Math.min(bounds.maxX ?? Infinity, player.x));
   player.vy -= RULES.gravity * dt;
   player.y += player.vy * dt;
+  const previousGround = player.isGrounded ? player.ground : null;
   player.isGrounded = false;
   let landing = support?.isEnabled !== false && support && Math.abs(player.x-support.x)<support.width/2+RULES.radius ? support : null;
   if (player.vy <= 0) {
@@ -66,7 +72,9 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
       if (platform.isEnabled === false || player.dropTime > 0 && platform.id === player.ignoredPlatform) continue;
       // 升降台这一帧往上走了多少，就把它上一帧的台面往下算多少，不然人会从正在上升的台面穿过去。
       const lifted = Math.max(0, Math.min(0.1, platform.deltaY || 0));
-      if (previousY >= platformY(platform,previousX) - lifted - 0.01 && player.y <= platformY(platform,player.x) && Math.abs(player.x - platform.x) < platform.width / 2 + RULES.radius && (!landing || platformY(platform,player.x) > platformY(landing,player.x))) landing = platform;
+      // 从高台边缘往下走时，脚直接贴上相连的光桥。
+      const entersLightBridge = previousGround && platform.lightTopId === previousGround.id;
+      if (previousY >= platformY(platform,previousX) - lifted - 0.01 && (entersLightBridge || player.y <= platformY(platform,player.x)) && Math.abs(player.x - platform.x) < platform.width / 2 + RULES.radius && (!landing || platformY(platform,player.x) > platformY(landing,player.x))) landing = platform;
     }
   }
   player.ground = landing;

@@ -34,6 +34,7 @@ import { stepAdventureEnemies, releaseCandyChildren } from './adventure-enemies.
 import { createPlayer, landingDamage, rescue, revivalPoint } from './physics.js';
 import { beginCrawl, caveForPlayer, caveMouthAt, climbEntryAt, stepTraversal } from './traversal.js';
 import { DESERT_IMAGES, TRAVERSAL_IMAGES, TraversalViews } from './traversal-view.js';
+import { addSunlightDeck } from './oasis-light.js';
 import { campaignScore } from '../../shared/campaign.js';
 import { moveCampaignPlatforms } from './combat.js';
 import { SkillEffects } from './skill-effects.js';
@@ -229,10 +230,12 @@ export class GardenEngine {
     // 下层落脚面稍靠前；每块贴图有固定深度，镜头移动时不再争抢像素。
     const surfaceDepths=new Map([...this.platforms].sort((a,b)=>b.y-a.y||a.id-b.id).map((p,index)=>[p.id,.15+.15*index/(this.platforms.length+1)]));
     // 正下方两层以内还有落脚面的平台，贴图画薄一点，给下面站着的人和怪留出空。
-    const hasFloorBelow=platform=>this.platforms.some(other=>other.id!==platform.id&&!other.isMoving&&other.y<platform.y-.01&&platform.y-other.y<LAYER*2-.2&&Math.min(platform.x+platform.width/2,other.x+other.width/2)-Math.max(platform.x-platform.width/2,other.x-other.width/2)>0);
+    const hasFloorBelow=platform=>this.platforms.some(other=>other.id!==platform.id&&other.skin!=='sunlight'&&!other.isMoving&&other.y<platform.y-.01&&platform.y-other.y<LAYER*2-.2&&Math.min(platform.x+platform.width/2,other.x+other.width/2)-Math.max(platform.x-platform.width/2,other.x-other.width/2)>0);
     for (const platform of this.platforms) {
       const group = new THREE.Group(); group.position.set(platform.x, platform.y, 0);
-      if (platform.handLength || platform.skin==='safety-net' || (this.world.expedition && this.level.id==='snow' && platform.isIce)) {
+      if (platform.skin === 'sunlight') {
+        addSunlightDeck(this, group, platform);
+      } else if (platform.handLength || platform.skin==='safety-net' || (this.world.expedition && this.level.id==='snow' && platform.isIce)) {
         const hand=!!platform.handLength, net=platform.skin==='safety-net';
         const art=hand?'clock-orange-hand':net?'clock-safety-net':'snow-crayon-bank';
         this.storyDecks ||= {};
@@ -381,7 +384,7 @@ export class GardenEngine {
     if (isPressed && action === 'enter') { this.isInteracting = true; return; }
     if (isPressed) {
       const player = this.players[0];
-      if (!this.touch.has(action) && (action === 'jump' || action === 'drop' && !player.grip && !climbEntryAt(currentRoom(this.world, this.roomState).traversal, player))) this.jumps[0] = true;
+      if (!this.touch.has(action) && (action === 'jump' || action === 'drop' && player.ground?.skin !== 'sunlight' && !player.grip && !climbEntryAt(currentRoom(this.world, this.roomState).traversal, player))) this.jumps[0] = true;
       this.touch.add(action);
     }
     else this.touch.delete(action);
@@ -660,7 +663,7 @@ export class GardenEngine {
     return {
       roomId: room.id, depth: room.depth, kind: room.kind, name: cave?.name || traversal?.name || room.name || ROOM_KINDS[room.kind].name, isCleared: isRoomCleared(state), trait: room.trait || null,
       fieldHint:world.field ? fieldHint(world,state,player,this.elapsed) : null,
-      areaId: cave?.id, isClimbing, canDescend, isDroppingFromGrip, traversalHint,
+      areaId: cave?.id, isOnLightBridge:player.ground?.skin === 'sunlight', isClimbing, canDescend, isDroppingFromGrip, traversalHint,
       ...(world.expedition && room.goals?.length ? { valleyHint:storyHint(room,state.story) } : world.valley ? { valleyHint:valleyHint(world,state,player) } : {}),
       ...(world.forest ? { forest: { ...state.forest, hint: forestHint(world, state.forest, player) } } : {}),
       ...roomProgress(world, state, this.difficulty.isExtraWave),
