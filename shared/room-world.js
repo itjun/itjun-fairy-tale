@@ -348,11 +348,12 @@ export function createRoomWorld(seed, selected, cycle = 1) {
     decorations: [], mainPath: [], hazards: [], supplies: [], bossArenas: [],
     rooms: [], doors: [],
   };
-  const builder = createBuilder(world, theme, random);
-  if (stage.structure === 'field-journey' || [FOREST_RESCUE,FLOWER_VALLEY,WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION].includes(stage)) {
+  const builder = createBuilder(world, theme, random, !!stage.baseId);
+  const base = stage.baseId ? WORLD_MAPS.find(map => map.id === stage.baseId) : stage;
+  if (stage.structure === 'field-journey' || [FOREST_RESCUE,FLOWER_VALLEY,WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION].includes(base)) {
     if (stage.structure === 'field-journey') buildFieldWorld(world, stage, builder, placeBoss);
-    else if (stage === FOREST_RESCUE) buildForestRescue(world, stage, builder, placeBoss);
-    else if (stage === FLOWER_VALLEY || stage === WATERWAYS) buildFlowerValley(world, stage, builder, placeBoss, stage === WATERWAYS);
+    else if (base === FOREST_RESCUE) buildForestRescue(world, stage, builder, placeBoss);
+    else if (base === FLOWER_VALLEY || base === WATERWAYS) buildFlowerValley(world, stage, builder, placeBoss, base === WATERWAYS);
     else buildStoryWorld(world, stage, builder, placeBoss);
     if (stage !== FLOWER_VALLEY) addTrailEnemies(world, stage, random);
     applyCycleHealth(world, cycle);

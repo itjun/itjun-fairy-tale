@@ -133,8 +133,8 @@ html[data-input-mode="gamepad"] #root .room-touch { display:none; }
 .forest-family img { grid-row: span 2; width: 1.8rem; }
 .forest-family strong, .forest-family small { font-size: .8rem; line-height: 1.1; }
 .forest-family li[data-home=true] { color: #285c38; }
-.platform-game[data-level=forest-rescue] .room-hud-path p { flex-wrap:wrap; gap:0 .6em; white-space:normal; }
+.platform-game[data-level|=forest-rescue] .room-hud-path p { flex-wrap:wrap; gap:0 .6em; white-space:normal; }
 @media(max-width:700px) {
-  .platform-game[data-level=forest-rescue] .room-hud-path { width:min(92vw,28rem); }
-  .platform-game[data-level=forest-rescue] .room-hud-path p span { display:inline; }
+  .platform-game[data-level|=forest-rescue] .room-hud-path { width:min(92vw,28rem); }
+  .platform-game[data-level|=forest-rescue] .room-hud-path p span { display:inline; }
 }

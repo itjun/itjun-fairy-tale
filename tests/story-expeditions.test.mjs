@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PLAYABLE_WORLDS, WATERWAYS, CLOCK_TOWER, SNOW_EXPEDITION } from '../shared/levels.js';
 import { createRoomWorld } from '../shared/room-world.js';
+import { syncWaterRoutes } from '../shared/flower-valley.js';
+import { syncForestRoutes } from '../shared/forest-rescue.js';
 import { advanceStory, ballPosition, metGoals, movingHand, syncStory } from '../shared/story-mechanisms.js';
 import { newRoomState, stepRoom, isValidRoomState } from '../src/game/rooms.js';
 import { createPlayer, platformY, stepPlayer } from '../src/game/physics.js';
@@ -9,13 +11,14 @@ import { roomFixture } from './helpers/adventure-fixtures.mjs';
 import { readAdventure } from '../src/game/save.js';
 import { openStore } from '../server/store.mjs';
 
-const stages=[WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION], dt=1/120;
+const previous=[WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION];
+const stages=[...previous,...PLAYABLE_WORLDS.filter(s=>previous.some(p=>p.id===s.baseId))], dt=1/120;
 const roomTiles=(world,room)=>room.platformIds.map(id=>world.platforms[id]);
 test('三个世界八个区段分别进入选关、成绩与续关，旧地图继续可读',()=>{
   const store=openStore(':memory:');
   try {
     for(const stage of stages) {
-      assert.equal(PLAYABLE_WORLDS[stage.worldIndex],stage);
+      assert.equal(PLAYABLE_WORLDS[stage.worldIndex].baseId,stage.baseId || stage.id);
       const w=createRoomWorld(1,stage), other=createRoomWorld(2,stage);
       assert.equal(w.rooms.length,8);
       assert.equal(w.rooms.filter(r=>r.reward==='upgrade').length,1);
@@ -159,4 +162,66 @@ test('雪球途中保存后位置一致；错过岔轨可再发一次，破冰�
   advanceStory(w,s,stand(b.release),49);assert.deepEqual(s.story.marks,marks);
   s.path=[0,r.id];s.cleared=[0];s.stars={0:3};
   assert.equal(isValidRoomState(s,w),false);
+});
+
+test('九个新世界的落脚面有净空，战区能逐波清场并跳上高处的终点',()=>{
+  for (const stage of PLAYABLE_WORLDS) {
+    const w=createRoomWorld(42,stage);
+    for (const room of w.rooms) {
+      const tiles=roomTiles(w,room);
+      const fixed=tiles.filter(p=>!p.isMoving && !p.slope && !p.snowDepth);
+      for (const [i,a] of fixed.entries()) for (const b of fixed.slice(i+1)) {
+        if (a.caveId!==b.caveId || Math.abs(a.y-b.y)>=2.4-1e-6) continue;
+        assert.ok(Math.abs(a.x-b.x)-(a.width+b.width)/2>=1.1-1e-6,stage.name+' '+room.name+' '+a.id+' / '+b.id);
+      }
+      const start=w.platforms[room.startId];
+      const near=tiles.filter(p=>p.caveId===start.caveId && Math.abs(p.x-start.x)<26);
+      assert.ok(Math.max(...near.map(p=>p.y))-Math.min(...near.map(p=>p.y))>=2.4-1e-6,stage.name+' '+room.name+' 入口高差');
+      if (!room.encounters) continue;
+      for (const enemyId of room.enemyIds) {
+        const foe=w.enemies[enemyId-1];
+        const gate=room.encounters.find(e=>e.lastWave>=foe.wave);
+        const limit=w.platforms[gate.endId].x+1;
+        const area={...room,right:limit,platformIds:tiles.filter(p=>p.x-p.width/2<=limit).map(p=>p.id)};
+        assert.ok(pathExists(w,area,start,w.platforms[foe.platformId]),stage.name+' 清场 '+foe.id);
+      }
+    }
+    const arena=w.bossArenas[0], floor=w.platforms[arena.floorId], exit=w.platforms[arena.exitId];
+    assert.ok(exit.y-floor.y>=4.8,stage.name+' 首领出口');
+    assert.ok(pathExists(w,w.rooms[floor.roomId],floor,exit),stage.name+' 首领场换层');
+  }
+});
+
+test('新版花谷的上下两条水路和两种出口都走得通',()=>{
+  for (const seed of [1,2]) for (const side of ['flower','pond']) {
+    const w=createRoomWorld(seed,PLAYABLE_WORLDS[0]), room=w.rooms[0], water=newRoomState(w).water;
+    const pad=key=>w.platforms[w.valley.controls.find(c=>c.channel===key).platformId];
+    water.demo=1;
+    syncWaterRoutes(w,water,10);
+    assert.ok(pathExists(w,room,w.start,pad(side)),side+' 踏板');
+    water[side]=3;water.flow=side;
+    syncWaterRoutes(w,water,10);
+    let from=pad(side);
+    if (w.valley.layout==='aqueduct') {
+      assert.ok(pathExists(w,room,from,pad('bridge')),side+' 高渠');
+      water.bridge=6;from=pad('bridge');syncWaterRoutes(w,water,10);
+    }
+    assert.ok(pathExists(w,room,from,w.platforms[room.exitId]),side+' 出口');
+  }
+});
+
+test('新版森林每段折返都可从上一处机关走到下一处',()=>{
+  const w=createRoomWorld(42,PLAYABLE_WORLDS[6]), state=newRoomState(w);
+  for (const side of ['crown','roots']) {
+    const cavern=side==='roots',room=w.rooms[0];
+    const area={...room, ...cavern && {left:room.traversal.cave.left,right:room.traversal.cave.right,fallY:room.traversal.cave.floorY-5},
+      platformIds:room.platformIds.filter(id=>!!w.platforms[id].isCave===cavern)};
+    let at=cavern?w.platforms[w.forest.rootEntryId]:w.start;
+    for (const [i,stop] of w.forest.trails[side].entries()) {
+      state.forest[side]=i;syncForestRoutes(w,state.forest);
+      const target=w.platforms[stop.platformId];
+      assert.ok(pathExists(w,area,at,target),stop.name);
+      at=target;
+    }
+  }
 });

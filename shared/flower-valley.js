@@ -50,10 +50,10 @@ export function buildFlowerValley(world, stage, builder, placeBoss, extended = f
       startId: start.id, exitId: exit.id, platformIds: room.platformIds, minX: left, maxX: right, baseY: 0 });
   }
   begin('mechanism', loop ? '高渠回环' : '双岸河谷');
-  const start = land(0, 0, 12, { isOneWay: false });
+  const start = land(0, stage.baseId ? 4.8 : 0, 12, { isOneWay: false });
   world.start = start;
   control(start, 2, 'demo');
-  grow(9.6, .35, 4.5, 'demo', .24);
+  grow(9.6, stage.baseId ? 2.4 : .35, 4.5, 'demo', .24);
   bed(5.45, -.12, 'demo', 4.4);
   const bank = land(18, 0, 11, { isOneWay: false });
   const near = land(15.8, 1.45, 2.5, { skin: 'water-treadle' });
@@ -94,10 +94,14 @@ export function buildFlowerValley(world, stage, builder, placeBoss, extended = f
     offset = world.rooms.at(-1).right + 54 - 126;
   }
   begin('battle', '城堡桥头', 'upgrade');
-  const approach = land(126, 0, 15, { isCheckpoint: true });
-  const span = land(143, 0, 16, { skin: 'plank' });
+  const approach = land(126, stage.baseId ? 3.5 : 0, 15, { isCheckpoint: true });
+  const span = land(143, stage.baseId ? -2 : 0, 16, { skin: 'plank' });
   const perch = land(144, 2.7, 6, { skin: 'leaf' });
-  const end = land(160.5, 0, 16);
+  const end = land(160.5, stage.baseId ? 5.3 : 0, 16);
+  if (stage.baseId) {
+    land(153.5,.5,5,{skin:'plank'});
+    land(134,5.5,5,{skin:'leaf'});
+  }
   const defenders = random() < .5 ? ['jelly', 'puff', 'flowerpot'] : ['puff', 'flowerpot', 'jelly'];
   for (const [index, home] of [span, perch, end].entries()) {
     const enemy = placeEnemy(world, stage, home, defenders[index], random);
@@ -116,9 +120,13 @@ export function buildFlowerValley(world, stage, builder, placeBoss, extended = f
   begin('boss', '花王庭院');
   const entry = land(223, 0, 10, { isCheckpoint: true });
   const floor = land(245, 0, 32, { isBossFloor: true, isOneWay: false });
-  const flag = land(268, 0, 11, { isFinish: true });
+  const flag = land(268, stage.baseId ? 7.8 : 0, 11, { isFinish: true });
   for (const [x, y] of [[235, 2.7], [242, 5.2], [252, 2.7]]) grow(x, y, 5.5, 'flower', 0);
   for (const x of [241.5, 258.8]) grow(x, 2.4, 6.4, 'pond', 0, 'water-lily');
+  if (stage.baseId) {
+    land(258.8,5.1,6,{skin:'water-leaf'});
+    land(250,8,6,{skin:'water-leaf'});
+  }
   bed(234, 0, 'flower', 6);
   const boss = placeBoss(world, stage, room, floor);
   boss.skills = [{ name: '花田涟漪', kind: 'wave', image: 'magic-bubble', speed: 8 }, ...boss.skills.slice(0, 1)];

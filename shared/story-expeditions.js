@@ -18,6 +18,9 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
     return p;
   }
   function trail(points, skin) { return points.map(([x,y,w=7]) => tile(x,y,w,skin)); }
+  function contour(points, skin, heights) {
+    return trail(stage.baseId ? points.map(([x,,w],i)=>[x,heights[i],w]) : points,skin);
+  }
   function snowbank(points,depth) {
     return points.slice(1).map(([x2,y2],i)=>{
       const [x1,y1]=points[i];
@@ -101,7 +104,7 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
     world.zones.push({id,kind,name,isBoss:kind==='boss',roomIds:[id],startId:start.id,exitId:exit.id,
       platformIds:room.platformIds,minX:room.left,maxX:room.right,baseY:0});
   }
-  return {room,origin,tile,trail,snowbank,treasure,station,gated,enemy,hand,run,spring,ferry,finish,random:builder.random};
+  return {room,origin,layered:!!stage.baseId,tile,trail,contour,snowbank,treasure,station,gated,enemy,hand,run,spring,ferry,finish,random:builder.random};
 }
 
 const leaves = 'water-leaf', lilies = 'water-lily', roof = 'roof', plank = 'plank';
@@ -109,7 +112,7 @@ const water = 'water-gutter', bell = 'clock-golden-bell', gear = 'platform-gear'
 
 function nursery(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
-  const bank=trail([[0,0,13],[13,-1,10],[24,-2,9],[35,-2,9],[46,-1,9],[57,0,9],[68,1,9],[79,0,9],[90,-1,9]],'bank');
+  const bank=p.contour([[0,0,13],[13,-1,10],[24,-2,9],[35,-2,9],[46,-1,9],[57,0,9],[68,1,9],[79,0,9],[90,-1,9]],'bank',[4, 1, -2, -4, -6, -4, -1, 2, 0]);
   const canopy=trail([[16,1.6],[24,4.2],[33,6.8],[42,8],[51,7]],leaves);
   station('spring',bank[4],water,'引来地下泉水');
   const back=gated([[38,1],[31,3.8],[23,6]],'spring',lilies);
@@ -121,7 +124,7 @@ function nursery(p) {
 }
 function watermill(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
-  const stream=trail([[0,0,14],[12,-1,7],[21,-2,8],[31,-3,9],[42,-3,9],[53,-1,9],[64,0,9],[75,-1,9],[86,-2,9],[97,-2,9]],lilies);
+  const stream=p.contour([[0,0,14],[12,-1,7],[21,-2,8],[31,-3,9],[42,-3,9],[53,-1,9],[64,0,9],[75,-1,9],[86,-2,9],[97,-2,9]],lilies,[4, 1, -2, -5, -7, -5, -2, 1, -1, -3]);
   const ridge=trail([[13,2.4],[22,4.8],[31,7.2],[40,7.2],[49,6.6],[58,5.4],[67,4.8],[76,4.8],[85,5.8],[94,7]],leaves);
   station('wheel',stream[4],water,'下渠的水轮转起来了');
   station('sluice',ridge[8],water,'打开高处的闸口');
@@ -133,7 +136,7 @@ function watermill(p) {
 }
 function pollen(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
-  const floor=trail([[0,0,12],[12,0,9],[23,0,9],[34,-1,9],[45,-2,9],[56,-2,9],[67,-1,9],[78,0,9],[89,0,9],[100,1,9],[111,1,9]],'bank');
+  const floor=p.contour([[0,0,12],[12,0,9],[23,0,9],[34,-1,9],[45,-2,9],[56,-2,9],[67,-1,9],[78,0,9],[89,0,9],[100,1,9],[111,1,9]],'bank',[4, 1, -2, -5, -7, -5, -2, 1, -2, 1, 3]);
   const flower=trail([[12,2.6],[20,5.2],[28,7.8],[36,10.4],[44,10.8]],leaves);
   station('pollen',flower.at(-1),'flower','沾上金色花粉');
   const islands=trail([[62,1.6],[70,4],[78,6.6],[86,9.1],[94,9.1]],leaves);
@@ -155,7 +158,7 @@ function cistern(p) {
 }
 function orchard(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
-  const road=trail([[0,0,14],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9],[90,0,9],[101,0,9],[112,0,9]],'bank');
+  const road=p.contour([[0,0,14],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9],[90,0,9],[101,0,9],[112,0,9]],'bank',[5, 2, -1, -4, -6, -4, -1, 2, 5, 2, 0]);
   const high=trail([[17,2.6],[25,5.2],[33,7.8],[42,8.6],[51,8.6]],leaves);
   station('first',high[3],'water-gutter','第一条彩渠有水了');
   const mid=gated([[57,6.2],[66,4.8],[75,3.6],[84,3.6]],'first',lilies);
@@ -174,6 +177,18 @@ export function addGardenChapters(world,stage,builder,secondHalf) {
 
 function towerSchool(p) {
   const {tile,trail,station,hand,treasure,finish}=p;
+  if (p.layered) {
+    const steps=trail([[0,1,13],[13,-2,9],[25,-4,9],[36,-1,8],[47,2,8],[56,5,8]],plank);
+    const awnings=trail([[8,3.6,5.5],[16,6.2,7],[26,8.3,7.5],[37,7,8],[48,5.5,7]],roof);
+    const arm=hand(54,6.5,14,8);
+    station('ride',arm,gear,'搭上了时针',{kind:'ride'});
+    tile(69,1,14,'safety-net');
+    const gallery=trail([[73,11,9],[63,13.6,8],[53,16.2,8],[43,18.8,8],[32,20,11]],roof);
+    station('chime',gallery.at(-1),bell,'折回钟亭敲响晨钟',{after:['ride']});
+    const bridge=p.gated([[44,23,8],[55,24,9],[67,23,9],[79,21,10],[91,18.5,10],[103,16,10],[115,14,10]],'chime',plank);
+    treasure(awnings[2]);treasure(gallery[2]);finish(steps[0],bridge.at(-1));
+    return;
+  }
   const street=trail([[0,0,14],[13,0,9],[24,0,9],[35,0,9]],plank);
   const stairs=trail([[12,2.6],[20,5.2],[28,7.8]],roof);
   const arm=hand(34,7.7,13);
@@ -186,7 +201,7 @@ function towerSchool(p) {
 }
 function rooftops(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
-  const alley=trail([[0,0,14],[14,0,10],[26,0,10],[38,-1,10],[50,-2,10],[62,-2,10],[74,-1,10],[86,0,10],[98,0,10],[110,0,10]],plank);
+  const alley=p.contour([[0,0,14],[14,0,10],[26,0,10],[38,-1,10],[50,-2,10],[62,-2,10],[74,-1,10],[86,0,10],[98,0,10],[110,0,10]],plank,[5, 2, -1, -4, -6, -7, -5, -2, 1, 3]);
   const roofline=trail([[16,2.6],[24,5.2],[32,7.8],[41,9],[50,8.2],[59,7],[68,6.2],[77,6],[86,7.6],[95,9]],roof);
   station('weight',alley[5],gear,'放下钟楼的配重');
   station('latch',roofline[8],bell,'屋顶的窗锁松开了');
@@ -209,7 +224,7 @@ function twinHands(p) {
 }
 function echoGallery(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
-  const floor=trail([[0,0,13],[13,0,10],[25,0,10],[37,0,10],[49,0,10],[61,0,10],[73,0,10],[85,0,10],[97,0,10]],plank);
+  const floor=p.contour([[0,0,13],[13,0,10],[25,0,10],[37,0,10],[49,0,10],[61,0,10],[73,0,10],[85,0,10],[97,0,10]],plank,[5, 2, -1, -4, -7, -4, -1, 2, 0]);
   const west=trail([[14,2.6],[22,5.2],[30,7.8],[38,8.6]],roof);
   const east=trail([[58,2.6],[66,5.2],[74,7.8],[82,8.6]],roof);
   // Each seed determines which of the two balconies sends the first echo.
@@ -221,7 +236,7 @@ function echoGallery(p) {
 }
 function belfry(p) {
   const {tile,trail,station,hand,gated,treasure,finish}=p;
-  const lower=trail([[0,0,13],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9]],plank);
+  const lower=p.contour([[0,0,13],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9]],plank,[5, 2, -1, -4, -7, -5, -2, 0]);
   const steps=trail([[78,2.6],[70,5.2],[62,7.8],[54,10.4],[46,13]],roof);
   const arm=hand(24,13.2,14,7,2);
   station('ride',arm,gear,'转轴接上了钟绳',{kind:'ride'});
@@ -234,7 +249,7 @@ function belfry(p) {
 }
 function clockParade(p) {
   const {tile,trail,station,hand,treasure,finish}=p;
-  const roads=trail([[0,0,14],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9],[90,0,9],[101,0,9]],plank);
+  const roads=p.contour([[0,0,14],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9],[90,0,9],[101,0,9]],plank,[5, 2, -1, -4, -6, -4, -1, 2, 0, -3]);
   const steps=trail([[13,2.5],[21,5],[29,7.5]],roof);
   const arm=hand(35,7.6,14,8);
   station('pass',arm,gear,'搭针越过街巷',{kind:'ride'});
@@ -249,7 +264,7 @@ function clockParade(p) {
 // ball, the upper ridge reaches the switch before it passes the junction.
 function snowChute(p, {key='ice',label,spur=false}) {
   const {tile,trail,station,run,treasure,gated,finish}=p;
-  const start=tile(0,4,14,'ice');
+  const start=tile(0,p.layered?7:4,14,'ice');
   const launch=tile(13,4,10,'ice');
   const low=p.snowbank([[18,4],[24,2],[35,0],[46,-2],[57,-3],[72,-3],[89,-3],[101,-2],[113,0],[118,1]],4.3);
   const high=[
@@ -264,11 +279,14 @@ function snowChute(p, {key='ice',label,spur=false}) {
     treasure(secret[0]);treasure(secret[1]);
   }
   treasure(high[4]);treasure(low[3]);
-  finish(start,tile(125,1,13,'ice'));
+  if (p.layered) {
+    const pass=trail([[123,3.5,8],[133,6.1,8],[143,8.7,9],[154,10,11]],'ice');
+    finish(start,pass.at(-1));
+  } else finish(start,tile(125,1,13,'ice'));
 }
 function starPass(p) {
   const {tile,trail,station,run,gated,treasure,finish}=p;
-  const base=trail([[0,0,13],[13,0,10],[25,0,10],[37,0,10],[49,0,10]],'rock');
+  const base=p.contour([[0,0,13],[13,0,10],[25,0,10],[37,0,10],[49,0,10]],'rock',[5, 2, -1, -4, -7]);
   const climb=trail([[11,2.6],[19,5.2],[27,7.8],[35,10.4],[43,13],[52,14,9]],'ice');
   run('arch',climb.at(-1),[[52,15],[64,12],[76,9],[88,6],[100,3],[110,2]],'山脚的星灯洞打开了');
   const descent=trail([[64,11,10],[76,8,10],[88,5,10],[100,2,10],[112,1,10],[124,1,10]],'ice');
@@ -280,7 +298,7 @@ function starPass(p) {
 }
 function relay(p) {
   const {tile,trail,run,station,gated,treasure,finish}=p;
-  const top=trail([[0,4,13],[13,4,10],[25,2,10],[37,0,10],[49,-2,10],[61,-4,10],[73,-4,10]],'ice');
+  const top=trail([[0,p.layered?7.5:4,13],[13,4,10],[25,2,10],[37,0,10],[49,-2,10],[61,-4,10],[73,-4,10]],'ice');
   run('rose',top[1],[[13,5],[25,3],[37,1],[49,-1],[61,-3],[70,-3]],'冰门打开，通往第二个雪球台');
   const shaft=gated([[76,-1.4],[68,1.2],[76,3.8],[84,6.4],[92,9],[100,11.6]],'rose','ice');
   const shelf=tile(111,12,12,'ice');
@@ -303,7 +321,7 @@ function glacierLake(p) {
 }
 function penguin(p) {
   const {tile,trail,station,gated,run,treasure,finish}=p;
-  const shelf=trail([[0,3,14],[13,3,10],[25,2,10],[37,0,10],[49,-2,10],[61,-3,10],[73,-3,10],[85,-3,10],[97,-2,10],[109,0,10]],'ice');
+  const shelf=trail([[0,p.layered?7:3,14],[13,3,10],[25,2,10],[37,0,10],[49,-2,10],[61,-3,10],[73,-3,10],[85,-3,10],[97,-2,10],[109,0,10]],'ice');
   run('den',shelf[1],[[13,4],[25,3],[37,1],[49,-1],[61,-2],[73,-2],[86,-2]],'冰封的企鹅洞打开了');
   station('chick',shelf[8],'snow-lost-penguin','小企鹅跟上你了',{after:['den']});
   const ledges=trail([[108,2.6],[100,5.2],[92,7.8],[84,9.6],[75,9.6],[66,9.6],[57,9.6],[48,9.6],[39,9.6]],'rock');
@@ -314,7 +332,7 @@ function penguin(p) {
 
 function sentries(p,theme) {
   const {tile,trail,enemy,treasure,finish,room}=p;
-  const path=trail([[0,0,14],[15,0,12],[29,1.2,12],[43,0,12],[57,0,12],[71,1.6,12],[85,0,12],[99,0,12],[113,0,12]],theme==='snow'?'ice':plank);
+  const path=p.contour([[0,0,14],[15,0,12],[29,1.2,12],[43,0,12],[57,0,12],[71,1.6,12],[85,0,12],[99,0,12],[113,0,12]],theme==='snow'?'ice':plank,[4, 1, -2, -5, -2, 1, 4, 1, -2]);
   const high=trail([[30,3.8],[38,6.2],[47,5],[68,4.2],[77,6.6],[86,5.2]],theme==='snow'?'rock':roof);
   for (const [i,home] of [path[1],high[0],path[3],path[5],high[4],path[7]].entries()) {
     const guard = enemy(home,theme==='snow'?['puff','snowball','jelly'][i%3]:['puff','flowerpot','jelly'][i%3]);
@@ -325,8 +343,12 @@ function sentries(p,theme) {
 }
 function arena(world,stage,builder,placeBoss) {
   const p=storyRoom(world,stage,builder,stage.themeId==='snow'?'雪山守望台':'广场钟庭','boss');
-  const start=p.tile(0,0,12), floor=p.tile(24,0,32,undefined,{isBossFloor:true,isOneWay:false}), exit=p.tile(49,0,13,undefined,{isFinish:true});
+  const start=p.tile(0,0,12), floor=p.tile(24,0,32,undefined,{isBossFloor:true,isOneWay:false}), exit=p.tile(49,stage.baseId?7.8:0,13,undefined,{isFinish:true});
   for (const [x,y] of [[14,2.6],[22,5.2],[33,2.6]]) p.tile(x,y,6,stage.themeId==='snow'?'ice':roof);
+  if (stage.baseId) {
+    p.tile(40,5.2,7,stage.themeId==='snow'?'ice':roof);
+    p.tile(29,8,7,stage.themeId==='snow'?'ice':roof);
+  }
   const boss=placeBoss(world,stage,p.room,floor);
   world.bossArenas.push({id:0,bossId:boss.id,floorId:floor.id,exitId:exit.id,left:floor.x-15,right:floor.x+15,y:0,layout:'platform'});
   world.supplies.push({id:'medkit:0',kind:'medkit',platformId:start.id,x:start.x+1,y:1.1});

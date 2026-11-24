@@ -6,6 +6,7 @@ function traversal(p) {
 }
 function cliff(p,base,x,height) {
   const summit=p.tile(x,height,8,sand), route=traversal(p);
+  height=summit.y;
   const face=summit.x-summit.width/2-.18;
   route.walls.push({x:face,minY:base.y+.16,maxY:height-.55,side:-1,topId:summit.id,isNatural:true});
   route.art.push({image:'desert-cliff',x:summit.x,y:(height+base.y)/2-.24,width:8.8,height:height-base.y+.4});
@@ -57,7 +58,8 @@ function altar(p,t,dep,label) {
   p.room.props.at(-1).after='pour';
 }
 function first(p) {
-  const dune=path(p,[[0,0,14],[18,0],[38,0,11],[61,-1],[85,0],[108,1],[134,1]]);
+  const dune=p.mainTrail([[0,0,14],[18,0],[38,0,11],[61,-1],[85,0],[108,1],[134,1]], [-6, 0, 4, -2, -5, 1, 6],[],sand);
+  if (p.stage.baseId) path(p,[[0,-6],[9,-8.6],[19,-10],[28,-7],[35,-4],[41,-1],[38,4]]);
   const top=cliff(p,dune[2],44,12), ledge=path(p,[[56,12],[72,10],[88,7],[100,5]]);
   lightBridge(p,'lens',top,dune[4],'爬上岩柱转日镜',{hint:'朝岩壁起跳，再向上爬到日镜'});
   jugAt(p,dune[4],['lens'],'pour','沿光找到泉眼装水');
@@ -65,14 +67,15 @@ function first(p) {
   p.gate('pour',[[146,3],[158,4]]);p.finish(dune[0],p.tile(171,4,12,sand));
 }
 function underground(p) {
-  const road=path(p,[[0,1,13],[22,1],[42,-1],[68,0],[93,1],[116,1],[141,2]]);
+  const road=p.mainTrail([[0,1,13],[22,1],[42,-1],[68,0],[93,1],[116,1],[141,2]], [-4, 3, 8, 11, 2, -3, 4],[3],sand);
+  if (p.stage.baseId) path(p,[[42,8],[52,11],[60,14],[68,11]]);
   const cave=springCave(p,road[1],road[4],'蓝泉岩洞');
   p.station('map',road[1],'oasis-map','看看神灯旁的水纹',{keep:true});
   jugAt(p,cave.well,['map'],'pour');altar(p,road[5],['water'],'把洞泉送进石槽');
   p.prize(road[3]);p.finish(road[0],road[6]);
 }
 function mirrors(p) {
-  const low=path(p,[[0,0,14],[23,0],[39,0,11],[61,-1],[80,0,11],[103,0],[126,2],[150,2]]);
+  const low=p.mainTrail([[0,0,14],[23,0],[39,0,11],[61,-1],[80,0,11],[103,0],[126,2],[150,2]], [-6, 0, 4, -4, 2, -5, 1, 7],[],sand);
   const west=cliff(p,low[2],45,11),east=cliff(p,low[4],86,14);
   lightBridge(p,'west',west,east,'让西镜照向东岩');
   lightBridge(p,'east',east,low[5],'对准谷底的蓄水池',{after:['west']});
@@ -80,7 +83,7 @@ function mirrors(p) {
   altar(p,low[6],['water'],'灌满小绿洲');p.prize(p.tile(104,12,8,sand));p.finish(low[0],low[7]);
 }
 function shaduf(p) {
-  const sandbank=path(p,[[0,1,13],[22,1],[44,-2],[63,-3],[86,-2],[111,0],[139,2],[160,2]]);
+  const sandbank=p.mainTrail([[0,1,13],[22,1],[44,-2],[63,-3],[86,-2],[111,0],[139,2],[160,2]], [7, 2, -3, -6, -2, 3, 6, 2],[],sand);
   const post=cliff(p,sandbank[2],50,10);
   p.station('weight',post,'platform-gear','在提水架挂上配重',{keep:true});
   jugAt(p,sandbank[3],['weight'],'pour','到河床把水罐装满');
@@ -90,7 +93,11 @@ function shaduf(p) {
   altar(p,banks[2],['rise'],'把水倒入高渠');p.prize(banks[1]);p.finish(sandbank[0],sandbank[7]);
 }
 function carved(p) {
-  const road=path(p,[[0,0,13],[23,1],[41,2],[65,1],[91,0],[115,0,11],[140,1],[163,2]]);
+  const road=p.mainTrail([[0,0,13],[23,1],[41,2],[65,1],[91,0],[115,0,11],[140,1],[163,2]], [-2, -6, 5, 14, 1, -3, 2, 4],[3, 4],sand);
+  if (p.stage.baseId) {
+    path(p,[[7,.6],[15,3.4],[24,6.2],[33,8],[41,5]]);
+    path(p,[[41,5],[49,11],[57,14],[65,14],[75,11],[83,8],[91,5],[99,2]]);
+  }
   const cave=springCave(p,road[2],road[4],'壁画暗河');
   p.station('star',cave.upper,'oasis-map','在洞顶拓下水纹',{carryUntil:'read'});
   p.station('read',cave.well,basin,'按水纹找到暗泉',{after:['star']});
@@ -99,7 +106,7 @@ function carved(p) {
   p.prize(road[3]);p.finish(road[0],road[7]);
 }
 function caravan(p) {
-  const road=path(p,[[0,0,14],[19,0],[37,0,11],[60,1],[85,1],[110,-1],[133,0,11],[155,0],[177,2]]);
+  const road=p.mainTrail([[0,0,14],[19,0],[37,0,11],[60,1],[85,1],[110,-1],[133,0,11],[155,0],[177,2]], [-6, 0, 4, 0, 6, -3, 2, -4, 2],[5],sand);
   const top=cliff(p,road[2],43,13),cave=springCave(p,road[3],road[5],'最后的泉室');
   lightBridge(p,'look',top,road[3],'用镜子找神灯',{hint:'爬到高台的镜子旁'});
   jugAt(p,cave.well,['look'],'pour');

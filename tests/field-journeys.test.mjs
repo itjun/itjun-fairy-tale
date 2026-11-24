@@ -149,10 +149,11 @@ test('列车在岔口锁定路线，红灯检修时等人回车再开',()=>{
   syncField(w,s,116);assert.ok(engine.x>child.x);
   syncField(w,s,127);assert.equal(engine.x,m.toX);
 });
-for(const theme of fieldThemes) test(theme.title+'：两组种子逐段走到每个机关，开门并读回存档',()=>{
+const journeyStages=fieldThemes.flatMap(theme=>[theme,PLAYABLE_WORLDS.find(s=>s.baseId===theme.id)]);
+for(const theme of journeyStages) test((theme.title || theme.chapterName+'分层版')+'：两组种子逐段走到每个机关，开门并读回存档',()=>{
   const store=openStore(':memory:');
   try {
-    assert.ok(PLAYABLE_WORLDS.some(s=>s.id===theme.id));
+    assert.ok(PLAYABLE_WORLDS.some(s=>s.baseId===(theme.baseId || theme.id)));
     for(const seed of [1,42]) {
       const w=createRoomWorld(seed,theme.id),s=newRoomState(w);
       assert.equal(w.rooms.length,8);assert.equal(w.rooms.at(-1).kind,'boss');

@@ -36,10 +36,29 @@ export function isCrowding(a, b) {
   return Math.abs(gap) > 0.05 || Math.abs(leftEnd - rightEnd) > 0.05;
 }
 
-export function createBuilder(world, theme, random) {
+// 分岔在同一小段交会时先收短台边；两路几乎叠在一起时，将后来的支路放在最近的空层。
+function fitLanding(p, others) {
+  if (p.isMoving || p.slope || p.snowDepth) return;
+  const near = others.filter(q => q.roomId === p.roomId && q.caveId === p.caveId && !q.isMoving && !q.slope && !q.snowDepth
+    && Math.abs(q.x - p.x) < (q.width + p.width) / 2 + MIN_GAP - 1e-6);
+  const overlaps = y => near.filter(q => Math.abs(q.y - y) < LAYER - 1e-6);
+  const touching = overlaps(p.y);
+  if (!touching.length) return;
+  const width = Math.min(...touching.map(q => 2 * (Math.abs(p.x-q.x)-MIN_GAP) - q.width));
+  if (width >= Math.max(2.5,p.width*.7)) {
+    p.width = width;
+    return;
+  }
+  const heights = near.flatMap(q => [q.y + LAYER,q.y - LAYER]);
+  heights.sort((a,b) => Math.abs(a-p.y)-Math.abs(b-p.y) || b-a);
+  p.y = heights.find(y => !overlaps(y).length);
+}
+
+export function createBuilder(world, theme, random, isLayered = false) {
   const state = { zoneId: 0, cursor: null, firstId: 0, lastShape: '', lastArena: '' };
   const add = (x, y, width = 6, extra = {}) => {
     const platform = { id: world.platforms.length, x, y, width, isOneWay: true, zone: state.zoneId, progress: state.zoneId, skin: SURFACES[theme.id], ...extra };
+    if (isLayered) fitLanding(platform, world.platforms);
     world.platforms.push(platform);
     return platform;
   };

@@ -14,7 +14,7 @@ import { readAdventure, writeAdventure } from '../src/game/save.js';
 import { openStore } from '../server/store.mjs';
 
 test('两个树心拓扑各有八段长路线，旧森林编号仍重建旧关', () => {
-  assert.equal(PLAYABLE_WORLDS[6], FOREST_RESCUE);
+  assert.equal(PLAYABLE_WORLDS[6].baseId, FOREST_RESCUE.id);
   assert.equal(createRoomWorld(42, 'forest-world').zones.length, 5);
   const variants = new Set();
   for (let seed = 1; seed <= 32; seed++) {

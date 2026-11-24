@@ -145,7 +145,7 @@ test('掉坑与扣命后在已长出的荷叶恢复，回到游戏仍能站稳',
 });
 
 test('新冒险入口与旧河谷续关、成绩使用各自的地图', () => {
-  assert.equal(PLAYABLE_WORLDS[0],WATERWAYS);
+  assert.equal(PLAYABLE_WORLDS[0].baseId,WATERWAYS.id);
   const store=openStore(':memory:');
   try {
     for (const id of ['rainbow-world',FLOWER_VALLEY.id]) {

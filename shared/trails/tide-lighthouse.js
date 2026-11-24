@@ -11,7 +11,8 @@ function light(p,key,tile,label,after) {
 }
 function inlet(p) {
   bay(p,4,104);
-  const shore=p.path([[0,3,14],[16,3],[29,0],[41,-2],[59,-2],[74,0],[91,3],[106,4]]);
+  const shore=p.mainTrail([[0,3,14],[16,3],[29,0],[41,-2],[59,-2],[74,0],[91,3],[106,4]], [8, 3, 0, -4, -6, -2, 3, 6]);
+  if (p.stage.baseId) p.path([[0,8],[10,10.6],[20,11],[29,8.5],[39,8]]);
   const bluff=p.path([[16,3],[26,6],[39,8],[55,8],[67,5]]);
   low(p,'shell',shore[3],shell,'退潮捡到潮纹贝',{carryUntil:'beacon'});
   light(p,'beacon',shore[7],'把贝壳挂到岸灯',['shell']);
@@ -20,7 +21,7 @@ function inlet(p) {
 }
 function wharf(p) {
   bay(p,17,96,-3,4);
-  const jetty=p.path([[0,2,14],[18,2],[36,1],[52,0]]);
+  const jetty=p.mainTrail([[0,2,14],[18,2],[36,1],[52,0]], [7, 2, -3, 0]);
   p.station('rope',jetty[2],'bridge-rope','解开系筏绳');
   const boat=p.move(59,0,8,78,8,{period:12,tide:true,after:'rope',icon:raft,width:8,height:1.5,below:.5});
   p.station('cross',boat,shell,'乘潮到高码头',{after:['rope'],atDock:1,wait:'站稳木筏，跟着水位上升',goal:true});
@@ -30,7 +31,7 @@ function wharf(p) {
 }
 function glassCove(p) {
   bay(p,7,115,-6,1);
-  const upper=p.path([[0,4,14],[24,4],[49,5],[72,4],[98,5],[122,4],[144,4]]);
+  const upper=p.mainTrail([[0,4,14],[24,4],[49,5],[72,4],[98,5],[122,4],[144,4]], [9, 4, 8, 10, 5, -1, 5],[3]);
   const pools=p.path([[24,4],[36,1],[49,-2],[62,-5],[75,-5],[88,-2],[98,5]]);
   low(p,'glass',pools[3],lens,'从潮池取蓝镜片',{carryUntil:'focus'});
   const arch=p.path([[98,5],[86,8],[74,11],[62,13]]);
@@ -39,8 +40,24 @@ function glassCove(p) {
   p.prize(arch[1]);p.prize(pools[4]);p.enemy(upper[4],'jelly');p.finish(upper[0],upper[6]);
 }
 function cave(p) {
+  if (p.stage.baseId) {
+    bay(p,13,120,-9,3);
+    const shore=p.path([[0,8,14],[16,5],[28,2],[40,-1],[52,-4],[64,-7],[80,-8]],{skin:'rock'});
+    const rim=p.path([[0,8],[9,10.6],[18,13.2],[28,12],[39,9],[47,6],[55,3],[61,0],[67,-3]],{skin:'rock'});
+    p.prize(rim[3]);
+    const climb=p.path([[80,-8],[91,-5],[102,-2],[113,1],[107,4],[97,7],[86,10]]);
+    p.room.tide.mouth={x:shore[3].x,y:shore[3].y};
+    p.prop('desert-cave-mouth',shore[3],6,5);
+    low(p,'wick',shore.at(-1),wick,'退潮取洞中灯芯',{carryUntil:'home'});
+    p.move(70,-7,8,76,9,{period:12,tide:true,after:'wick',icon:raft,height:1.6});
+    const tower=p.path([[86,10],[75,12],[63,14],[50,15]]);
+    light(p,'home',tower.at(-1),'带灯芯回到旧灯塔',['wick']);
+    const bridge=p.gate('home',[[60,18],[75,18],[92,16],[109,13],[126,11]],{skin:'plank'});
+    p.prize(climb[2]);p.prize(tower[2]);p.finish(shore[0],bridge.at(-1));
+    return;
+  }
   bay(p,17,124,-6,2.5);
-  const beach=p.path([[0,3,14],[21,3],[44,3],[65,4],[89,4],[111,4],[136,3]]);
+  const beach=p.mainTrail([[0,3,14],[21,3],[44,3],[65,4],[89,4],[111,4],[136,3]], [9, 3, 7, 4, 9, 4, 8],[2, 4]);
   const cave=p.path([[21,3],[33,0],[45,-3],[60,-5],[82,-5],[94,-3],[111,4]],{skin:'rock'});
   p.room.tide.mouth={x:cave[2].x,y:cave[2].y};
   p.prop('desert-cave-mouth',cave[2],6,5);
@@ -52,7 +69,7 @@ function cave(p) {
 }
 function buoys(p) {
   bay(p,2,139,-4,3);
-  const bottom=p.path([[0,1,14],[18,-1],[37,-2],[56,-2],[76,-1],[94,-2],[116,-1],[137,1],[151,3]]);
+  const bottom=p.mainTrail([[0,1,14],[18,-1],[37,-2],[56,-2],[76,-1],[94,-2],[116,-1],[137,1],[151,3]], [6, -1, -4, 1, -4, -2, 3, -1, 5]);
   const a=p.move(43,-1,7,43,6,{period:12,tide:true,icon:raft,height:1.6});
   const b=p.move(98,-1,7,98,7,{period:12,tide:true,icon:raft,height:1.6});
   p.station('west',a,'mini-gem-orange','举起西边浮标旗',{atDock:1,wait:'搭浮标升到水线顶'});
@@ -62,7 +79,7 @@ function buoys(p) {
 }
 function lantern(p) {
   bay(p,6,135,-5,4);
-  const sand=p.path([[0,2,14],[20,1],[38,-2],[56,-4],[73,-3],[90,-1],[110,1],[130,2]]);
+  const sand=p.mainTrail([[0,2,14],[20,1],[38,-2],[56,-4],[73,-3],[90,-1],[110,1],[130,2]], [7, 1, -3, -6, -2, -5, 1, 5],[5]);
   const ridge=p.path([[20,1],[32,4],[44,7],[57,9],[72,9],[87,6],[100,4]]);
   low(p,'oil',sand[3],'mini-cup','装一杯灯油',{carryUntil:'lit'});
   p.station('lens',ridge[4],lens,'取下灯塔透镜',{after:['oil'],carryUntil:'lit'});

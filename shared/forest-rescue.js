@@ -39,7 +39,7 @@ export function buildForestRescue(world, stage, builder, placeBoss) {
   const nest = add(0, 0, 32, 'crown', { isCheckpoint: true });
   world.start = nest;
   forest.nestId = nest.id;
-  const exit = add(20.4, 0, 6, 'crown', { isFinish: true, milestone: 1 });
+  const exit = add(20.4, stage.baseId ? 4.8 : 0, 6, 'crown', { isFinish: true, milestone: 1 });
   const rootEntry = add(0, -56, 14, 'roots');
   const art = (image, x, y, width, height, isCave = false) => route.art.push({ image, x, y, width, height, ...(isCave ? { caveId: cave.id } : {}) });
   const mouth = (from, to, offset, targetOffset, label, unlock) => {
@@ -75,9 +75,11 @@ export function buildForestRescue(world, stage, builder, placeBoss) {
       for (let n = index ? 0 : 1; n <= count; n++) {
         const x = startX + direction * spacing * n;
         const edge = n === 0 || n === count || n === count - 1;
-        const height = y + (edge ? 0 : design.heights[(n - 1) % design.heights.length] * 1.65);
+        const relief = design.heights[(n - 1) % design.heights.length] || 0;
+        const desiredHeight = y + (edge ? 0 : relief * (stage.baseId ? 2.65 : 1.65));
         const width = spacing - (edge ? 1.1 : 1.3 + random() * 1.1);
-        const platform = add(x, height, width, branch, { skin: design.skin });
+        const platform = add(x, desiredHeight, width, branch, { skin: design.skin });
+        const height = platform.y;
         path.push(platform.id);
         first ??= platform;
         if (n === count) {
@@ -112,7 +114,12 @@ export function buildForestRescue(world, stage, builder, placeBoss) {
           platform.isCrumbling = true;
           platform.skin = 'plank';
         }
-        if (!inside && index === 3 && n >= 4 && n <= 8) {
+        if (stage.baseId && n >= 5 && n <= 10) {
+          // 两端贴近原路，中间向上架枝桥或向下绕溪底；回到同一处机关。
+          const clearance = [2.7,5.3,7,7,5.3,2.7][n-5];
+          const side = inside ? -1 : 1;
+          add(x, height + side*clearance, width-1, branch, {skin:inside?'rock':'plank'});
+        } else if (!inside && index === 3 && n >= 4 && n <= 8) {
           add(x, y + (n === 4 || n === 8 ? 3.4 : 5.8), width - 1.2, branch, { skin: 'plank', isBridge: true });
         }
         // 洞口三只萤火虫分别停在石龛、低台与上层石架；带它们到洞底点灯。
@@ -156,7 +163,8 @@ export function buildForestRescue(world, stage, builder, placeBoss) {
   const boss = placeBoss(world, stage, room, nest);
   world.bossArenas = [{ id: 0, bossId: boss.id, floorId: nest.id, exitId: exit.id, left: -15, right: 15, y: 0, layout: 'platform', isLocked: true }];
   world.supplies.push({ id: 'medkit:0', kind: 'medkit', platformId: nest.id, x: -12, y: 1 });
-  Object.assign(room, { startId: nest.id, exitId: exit.id, exitPlatformIds: [exit.id], left: -16, right: 242, bottom: 0, top: crownTop.y + 5, fallY: -8 });
+  const canopyTop = stage.baseId ? Math.max(...world.platforms.filter(p=>!p.isCave).map(p=>p.y)) : crownTop.y;
+  Object.assign(room, { startId: nest.id, exitId: exit.id, exitPlatformIds: [exit.id], left: -16, right: 242, bottom: 0, top: canopyTop + 5, fallY: -8 });
   world.zones.push({ id: 0, kind: 'boss', name: '树冠救援', isBoss: true, roomIds: [0], platformIds: room.platformIds, startId: nest.id, exitId: exit.id, baseY: 0, minX: room.left, maxX: room.right });
   Object.assign(world, { finish: exit, mainPath: room.path, requiredFlowers: 0, minX: cave.left, minY: cave.floorY - 6, maxX: room.right, maxY: room.top + 8,
     signature: [forest.linked, ...room.path.map(id => world.platforms[id].x.toFixed(1))].join('|') });

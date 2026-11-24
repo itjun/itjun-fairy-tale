@@ -4,7 +4,8 @@ function wind(p,x,y,width,height,dx,dy,after) {
 }
 function kiteStand(p,t) {p.prop('windmill-tall',t,7.7,9,-3);}
 function school(p) {
-  const lawn=p.path([[0,0,14],[18,0],[34,0],[52,-1],[71,0],[91,1],[109,1]]);
+  const lawn=p.mainTrail([[0,0,14],[18,0],[34,0],[52,-1],[71,0],[91,1],[109,1]], [-5, 0, 0, -5, -6, -2, 4],[4]);
+  if (p.stage.baseId) p.path([[0,-5],[9,-7.6],[19,-8],[29,-5],[34,-2.5]]);
   const crest=p.path([[36,10.7,10],[54,10],[74,8],[90,6],[106,4]]);
   p.station('kite',lawn[1],kite,'取纸鸢迎风跳',{carryUntil:'perch'});
   wind(p,35,-.3,11,10,0,8,'kite');
@@ -13,7 +14,7 @@ function school(p) {
   kiteStand(p,lawn[1]);p.prize(crest[2]);p.prize(bridge[1]);p.finish(lawn[0],p.tile(163,2,12));
 }
 function mill(p) {
-  const floor=p.path([[0,0,14],[22,0],[46,-1],[66,-2],[88,0],[110,1],[133,1]]);
+  const floor=p.mainTrail([[0,0,14],[22,0],[46,-1],[66,-2],[88,0],[110,1],[133,1]], [5, 0, -5, -2, -4, 3, 6],[5]);
   const loft=p.path([[19,0],[31,3],[43,6],[56,8]]);
   p.station('turn',floor[2],spool,'接好风车齿轮',{keep:true});
   wind(p,72,-2,13,11,1.1,8,'turn');
@@ -22,7 +23,7 @@ function mill(p) {
   kiteStand(p,crown[2]);p.prize(loft[3]);p.prize(crown[1]);p.enemy(floor[4],'squirrel');p.finish(floor[0],floor[6]);
 }
 function span(p) {
-  const left=p.path([[0,2,13],[18,3],[36,4],[53,5]]);
+  const left=p.mainTrail([[0,2,13],[18,3],[36,4],[53,5]], [-3, 3, 7, 5]);
   const low=p.path([[16,1],[30,-2],[53,-5],[77,-5],[96,-2],[111,1]]);
   const right=p.path([[82,7,11],[102,7],[120,5],[137,3]]);
   p.station('tail',left[2],tail,'给纸鸢系长尾',{carryUntil:'land'});
@@ -31,7 +32,7 @@ function span(p) {
   p.prize(low[3]);p.prize(right[1]);p.finish(left[0],right[3]);
 }
 function relay(p) {
-  const road=p.path([[0,0,13],[20,0],[40,-1],[60,0],[83,0],[105,0],[129,0],[147,1]]);
+  const road=p.mainTrail([[0,0,13],[20,0],[40,-1],[60,0],[83,0],[105,0],[129,0],[147,1]], [5, 0, -2, -6, 2, -5, 4, 7],[4, 6]);
   const ridge=p.path([[31,9,10],[46,9],[63,7],[79,6]]);
   const high=p.path([[86,15.5,11],[103,15],[118,13],[132,10]]);
   p.station('spool',road[1],spool,'放开草坡风筒');wind(p,31,0,12,8.3,0,7.7,'spool');
@@ -41,7 +42,7 @@ function relay(p) {
   p.prize(ridge[1]);p.prize(high[2]);p.finish(road[0],road.at(-1));
 }
 function letters(p) {
-  const lower=p.path([[0,1,13],[18,1],[39,-2],[61,-3],[84,-2],[105,1],[125,2],[147,2]]);
+  const lower=p.mainTrail([[0,1,13],[18,1],[39,-2],[61,-3],[84,-2],[105,1],[125,2],[147,2]], [6, 1, -3, -4, -6, 1, 5, 2]);
   const branch=p.path([[19,2],[31,5],[44,8],[56,9]]);
   p.station('mail',lower[3],'meadow-letter','取草地邮袋',{carryUntil:'post'});
   wind(p,63,-3,14,11,-2,7.9,'mail');
@@ -51,7 +52,7 @@ function letters(p) {
   kiteStand(p,branch[3]);p.prize(lower[4]);p.prize(perch[0]);p.finish(lower[0],lower.at(-1));
 }
 function skyFair(p) {
-  const grass=p.path([[0,0,14],[22,0],[44,-1],[67,-2],[90,-2],[116,0],[143,1],[169,2]]);
+  const grass=p.mainTrail([[0,0,14],[22,0],[44,-1],[67,-2],[90,-2],[116,0],[143,1],[169,2]], [-5, 0, -3, -6, -1, -5, 4, 8],[3, 6]);
   const cliff=p.path([[31,10,11],[49,10],[64,8]]);
   const east=p.path([[88,9,11],[104,8],[121,8]]);
   const top=p.path([[139,17,11],[155,16],[171,15],[187,13]]);

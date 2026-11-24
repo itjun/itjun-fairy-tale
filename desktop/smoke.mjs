@@ -1,5 +1,6 @@
 import { roomFixture } from '../tests/helpers/adventure-fixtures.mjs';
 import { ADVENTURE_GENERATION_VERSION, TIMED_ITEMS } from '../shared/adventure-catalog.js';
+import { PLAYABLE_WORLDS } from '../shared/levels.js';
 import { app } from 'electron';
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -96,7 +97,7 @@ export async function runSmoke({ win, requestClose }) {
     await until('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"');
     const fresh = await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1"))');
     // 旧局重来时，从当前第一世界的河谷重新出发。
-    assert.equal(fresh.state.levelId,'rainbow-waterways');assert.equal(fresh.state.version,ADVENTURE_GENERATION_VERSION);assert.equal(fresh.state.rooms.roomId,0);assert.equal(fresh.state.survival.lives,3);assert.equal(fresh.state.survival.hp,100);assert.equal(fresh.state.survival.character,'mom');
+    assert.equal(fresh.state.levelId,PLAYABLE_WORLDS[0].id);assert.equal(fresh.state.version,ADVENTURE_GENERATION_VERSION);assert.equal(fresh.state.rooms.roomId,0);assert.equal(fresh.state.survival.lives,3);assert.equal(fresh.state.survival.hp,100);assert.equal(fresh.state.survival.character,'mom');
     await writeFile(join(profile,'zero-life-reopen.png'),(await capture()).toPNG());
     requestClose(); return;
   }
@@ -239,7 +240,7 @@ export async function runSmoke({ win, requestClose }) {
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"');
   const carried = await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state');
   // 下一关是第二个世界的开场房；角色、命数、血量、攻击累计和武器都带过去，不补满。
-  assert.equal(carried.levelId,'family-clock-tower');assert.equal(carried.version,ADVENTURE_GENERATION_VERSION);assert.equal(carried.rooms.roomId,0);
+  assert.equal(carried.levelId,PLAYABLE_WORLDS[1].id);assert.equal(carried.version,ADVENTURE_GENERATION_VERSION);assert.equal(carried.rooms.roomId,0);
   assert.equal(carried.survival.character,'mom');assert.equal(carried.survival.hp,afterReward.survival.hp);assert.equal(carried.survival.lives,afterReward.survival.lives);assert.equal(carried.survival.attacks,3);assert.ok(carried.adventure.loadouts[0].weapons.length>=3);
   for (const [id, remaining] of Object.entries(expectedEffects)) assert.ok(carried.adventure.effects[id] > remaining - 1 && carried.adventure.effects[id] <= remaining, `${id} 的领奖后时长应带入下一关`);
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');

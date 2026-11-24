@@ -17,10 +17,10 @@ function roomBuilder(world, builder, stage, name, kind, theme) {
   }
   const points = new Map();
   const fittedWidths = new Map();
-  function path(nodes, extra={}) {
+  function path(nodes, extra={}, breaks=[]) {
     const samples=[];
     for (const [i,[x,y,width=8]] of nodes.entries()) {
-      const split=!i;
+      const split=!i || breaks.includes(i);
       if (!split) {
         const [px,py]=nodes[i-1];
         const steps=Math.max(1,Math.ceil(Math.abs(x-px)/10),Math.ceil(Math.abs(y-py)/2.65));
@@ -40,19 +40,26 @@ function roomBuilder(world, builder, stage, name, kind, theme) {
     const anchors=[];
     for (const sample of samples) {
       const {x,y,width,fitted,isAnchor}=sample;
-      const key=x+','+y;
+      const key=stage.baseId ? [x,y,extra.fieldGate||'',extra.caveId||''].join(',') : x+','+y;
       // 旧局中只有地标共用台面，保留插入次序及原有房间边界供续关使用。
-      let platform=isAnchor && points.get(key);
+      const shared=isAnchor || stage.baseId;
+      let platform=shared && points.get(key);
       if (!platform) {
-        platform=tile(x,y,width,extra);
-        if (isAnchor) points.set(key,platform);
+        const landingWidth=stage.baseId ? Math.max(3.8,fitted??width) : width;
+        platform=tile(x,y,landingWidth,extra);
+        if (shared) points.set(key,platform);
       }
-      if (fitted!==undefined) {
+      if (!stage.baseId && fitted!==undefined) {
         fittedWidths.set(platform,Math.min(fittedWidths.get(platform)??platform.width,fitted));
       }
       if (isAnchor) anchors.push(platform);
     }
     return anchors;
+  }
+  // 断岸之间由本房间的高路、洞窟、风筒或载具接通。
+  function mainTrail(nodes, heights, breaks=[], extra={}) {
+    if (!stage.baseId) return path(nodes, extra);
+    return path(nodes.map(([x,,width], i) => [x, heights[i], width]), extra, breaks);
   }
   function station(key,p,icon,label,options={}) {
     const stop={key,platformId:p.id,icon,label,after:[],...options};
@@ -101,12 +108,21 @@ function roomBuilder(world, builder, stage, name, kind, theme) {
     world.zones.push({id,kind,name,isBoss:kind==='boss',roomIds:[id],startId:start.id,exitId:exit.id,
       platformIds:room.platformIds,minX:room.left,maxX:room.right,baseY:0});
   }
-  return {room,world,builder,stage,id,origin,random:builder.random,tile,path,station,gate,move,prop,prize,enemy,finish};
+  return {room,world,builder,stage,id,origin,random:builder.random,tile,path,mainTrail,station,gate,move,prop,prize,enemy,finish};
 }
 
 function guardRoom(p,theme) {
-  const ground=p.path([[0,0,13],[24,0,13],[45,-2,11],[68,0,13],[88,1,12],[112,0,13],[134,0,12]]);
+  const relief={
+    beach:[6,0,-6,-2,3,-2,5], meadow:[-4,1,-3,3,-2,4,8],
+    sweet:[5,0,-5,0,5,0,6], cartoon:[-5,0,-6,-2,3,-2,4],
+    desert:[-4,2,-4,-1,5,-2,4],
+  };
+  const ground=p.mainTrail([[0,0,13],[24,0,13],[45,-2,11],[68,0,13],[88,1,12],[112,0,13],[134,0,12]],relief[theme.theme]);
   const high=p.path([[28,2.7],[39,5.4],[57,5.4],[76,3.1]]);
+  if (p.stage.baseId) {
+    const crest=p.path([[88,ground[4].y],[97,ground[4].y+3],[106,ground[4].y+5.5],[115,ground[4].y+3]]);
+    p.prize(crest[2]);
+  }
   for(const [i,home] of [ground[1],high[1],ground[2],ground[4],ground[5],high[3]].entries()) {
     p.enemy(home,theme.monsters[i%theme.monsters.length],i<3?0:1);
   }
@@ -115,7 +131,7 @@ function guardRoom(p,theme) {
 }
 
 export function buildFieldWorld(world,stage,builder,placeBoss) {
-  const theme=fieldThemes.find(t=>t.id===stage.id);
+  const theme=fieldThemes.find(t=>t.id===(stage.baseId || stage.id));
   world.field=theme.theme;
   for(const chapter of theme.chapters(builder.random)) {
     const p=roomBuilder(world,builder,stage,chapter[0],chapter[1]?'mechanism':'battle',theme);
@@ -123,8 +139,12 @@ export function buildFieldWorld(world,stage,builder,placeBoss) {
   }
   const arena=roomBuilder(world,builder,stage,theme.arena,'boss',theme);
   const start=arena.tile(0,0,14,{isCheckpoint:true}),floor=arena.tile(27,0,34,{isOneWay:false,isBossFloor:true});
-  const flag=arena.tile(54,0,14,{isFinish:true});
+  const flag=arena.tile(54,stage.baseId?7.8:0,14,{isFinish:true});
   for(const [x,y] of [[16,2.7],[24,5.4],[36,2.7]]) arena.tile(x,y,6.5);
+  if (stage.baseId) {
+    arena.tile(44,5.3,7);
+    arena.tile(32,8,7);
+  }
   const boss=placeBoss(world,stage,arena.room,floor);
   world.bossArenas.push({id:0,bossId:boss.id,floorId:floor.id,exitId:flag.id,left:floor.x-16,right:floor.x+16,y:0,layout:'platform'});
   world.supplies.push({id:'medkit:0',kind:'medkit',platformId:start.id,x:start.x+1,y:1.2});
