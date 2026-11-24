@@ -97,10 +97,10 @@ function scroll(scope, delta) {
 
 export function startGamepad() {
   const gate = new GamepadGate(), abort = new AbortController();
-  let frame, identity = '', context = null, contextKey = '', lastTime = 0, isFocused = document.hasFocus(), stickUntil = 0, describedAt = 0;
+  let frame, identity = '', context = null, contextKey = '', lastTime = 0, isFocused = document.hasFocus(), describedAt = 0;
   function release() { gameplay?.release(); document.activeElement?.dispatchEvent(new CustomEvent('garden:practice-input', { detail: null })); gate.reset(); }
-  function keyboard() { if (performance.now() < stickUntil) return; publish({ mode: 'keyboard' }); }
-  window.addEventListener('keydown', keyboard, { signal: abort.signal });
+  function keyboard() { publish({ mode: 'keyboard' }); }
+  window.addEventListener('keydown', keyboard, { capture: true, signal: abort.signal });
   window.addEventListener('pointerdown', keyboard, { signal: abort.signal });
   window.addEventListener('blur', () => { isFocused = false; release(); gameplay?.pause(); activePad?.vibrationActuator?.reset?.()?.catch?.(() => {}); }, { signal: abort.signal });
   window.addEventListener('focus', () => { isFocused = true; release(); }, { signal: abort.signal });
@@ -118,7 +118,7 @@ export function startGamepad() {
     if (identity !== nextIdentity) {
       if (identity) { release(); gameplay?.pause(); }
       identity = nextIdentity; gate.reset();
-      publish({ connected: !!activePad, name: activePad?.id || '', notice: activePad ? '手柄已连接，松开按键后即可游玩。' : '手柄已断开，探险已暂停；连接后手动继续。' });
+      publish({ mode: activePad ? 'gamepad' : 'keyboard', connected: !!activePad, name: activePad?.id || '', notice: activePad ? '手柄已连接，松开按键后即可游玩。' : '手柄已断开，探险已暂停；连接后手动继续。' });
       previous?.vibrationActuator?.reset?.()?.catch?.(() => {});
     } else if (!activePad && pads.length) publish({ notice: '手柄尚未识别为 Xbox 标准布局，请切换到 XInput 模式或用 USB 重新连接。' });
     if (!isFocused || document.hidden || !activePad) return;
@@ -138,7 +138,7 @@ export function startGamepad() {
     if (isBindings && !input.faceX) input.actions.delete('attack');
     const step = gate.step(input, time);
     if (!step.isReady) return;
-    if (step.navigation || step.pressed.size || input.scroll || isBindings && Math.hypot(input.stick.x, input.stick.y) >= .52) { stickUntil = performance.now() + 500; publish({ mode: 'gamepad', notice: '' }); }
+    if (step.navigation || step.pressed.size || input.scroll || isBindings && Math.hypot(input.stick.x, input.stick.y) >= .52) publish({ mode: 'gamepad', notice: '' });
     if (isPlaying) {
       // 游玩中 B 不暂停，孩子乱按也不会被打断。
       if (step.pressed.has('pause')) { release(); gameplay.pause(); return; }
