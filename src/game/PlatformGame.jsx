@@ -157,7 +157,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
           else if (isAutoStart.current) { isAutoStart.current = false; if(restartBuild.current){game.configureStarter(restartBuild.current,restartDifficulty.current||getPlaySettings().difficulty,lockedItems(readAlbum()));restartBuild.current=null;} start(); }
           else if (enterCamp.current) changeStatus('camp');
           else changeStatus('ready');
-        }, onError: message => { enterCamp.current = false; setError(message); changeStatus('error'); }, onSound: playSound });
+        }, onError: message => { setError(message); changeStatus('error'); }, onSound: playSound });
       engine.current = game;
       if (import.meta.env.DEV) window.__gardenEngine = game;
     } catch (failure) {
@@ -255,14 +255,20 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     if (run.current?.id === origin.run.id) openPausePage('paused', 'worlds');
     else chooseWorld({ level: findStage(origin.run.levelId), saved: origin }, false);
   }
-  function restart(index = levelIndex, isImmediate = false) {
+  function retryLoad() {
+    if (statusRef.current !== 'error') return;
+    if (run.current) saved.current = { run: run.current, state: engine.current.exportState() };
+    changeStatus('loading');
+    setMap({ ...map });
+  }
+  function restart(index) {
     enterCamp.current = false;
     if (statusRef.current === 'loading') return;
-    const isContinuing = isImmediate && statusRef.current === 'completed';
+    const isContinuing = statusRef.current === 'completed';
     carriedAdventure.current = isContinuing ? carryToNextWorld(engine.current.exportAdventure(), levelIndex, WORLD_ACTS.length) : null;
     carriedSurvival.current = isContinuing ? structuredClone(engine.current.survival) : null;
     saved.current = null;
-    isAutoStart.current = isImmediate;
+    isAutoStart.current = true;
     changeStatus('loading');
     setMap({ levelId: WORLD_ACTS[index].id, seed: makeSeed(seed) });
   }
@@ -343,7 +349,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
       restartDifficulty.current=game.adventure?.difficulty || null;
       setCharacter(game.survival.character);
       if(run.current){const record=snapshotRun(game.snapshot(),'paused');if(record)queueRun({...record,status:'ended',revision:record.revision+1});}
-      restart(0,true);return true;
+      restart(0);return true;
     }}/>}
     {isPauseBook && <PauseBook game={engine.current} more={status === 'pause-more'} focusOnOpen={pauseFocus}
       hasAdventure={!!stats.adventure} error={pauseSaveError} onResume={start} onWorlds={openWorldPicker}
@@ -360,8 +366,8 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
       {isCycleComplete && <p>已获得的 {stats.adventure.weapons.length} 种武器和攻击键位都会带到下一轮。</p>}
       <div className="adventure-menu-actions">
         {status === 'fallen' && <button className="primary-button" onClick={() => { if (engine.current.revive()) start(); }}>从这里继续</button>}
-        {isResult && <button className="primary-button" onClick={() => restart((levelIndex + 1) % WORLD_ACTS.length, true)}>{isCycleComplete ? `进入第 ${stats.adventure.cycle + 1} 轮` : '去下一关'}<ArrowRight size={20}/></button>}
-        {status==='error'&&<button className="primary-button" onClick={()=>restart()}>重新打开</button>}
+        {isResult && <button className="primary-button" onClick={() => restart((levelIndex + 1) % WORLD_ACTS.length)}>{isCycleComplete ? `进入第 ${stats.adventure.cycle + 1} 轮` : '去下一关'}<ArrowRight size={20}/></button>}
+        {status === 'error' && <button className="primary-button" onClick={retryLoad}>重新打开</button>}
         <button className="text-button" data-gamepad-back onClick={exit}><House size={18}/>回到我的花园</button>
       </div>
     </section></div>}

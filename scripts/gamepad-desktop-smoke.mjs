@@ -8,6 +8,7 @@ import { completeMiniGame } from './helpers/gamepad-mini-games.mjs';
 import { createRoomWorld, spotPosition } from '../shared/room-world.js';
 import { resourcesFor } from '../src/game/expedition.js';
 import { WEAPONS } from '../shared/adventure-catalog.js';
+import { PLAYABLE_WORLDS } from '../shared/levels.js';
 if (!process.env.GARDEN_DESKTOP_PROFILE) throw new Error('手柄测试必须指定隔离目录');
 await import('../desktop/main.mjs');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -95,7 +96,13 @@ try {
   }
   await setupPad();
   if (process.env.GARDEN_GAMEPAD_CASE === 'worlds') { await checkWorldSwitch(); console.log('手柄换关及重开续玩通过'); app.exit(0); return; }
-  if (process.env.GARDEN_GAMEPAD_CASE === 'completion') { await checkCompletion(); console.log('手柄通关衔接通过'); app.exit(0); return; }
+  if (process.env.GARDEN_GAMEPAD_CASE === 'completion') {
+    await checkCompletion();
+    await checkCycleRecovery();
+    console.log('手柄通关衔接和跨轮加载重试通过');
+    app.exit(0);
+    return;
+  }
   if (process.env.GARDEN_GAMEPAD_CASE === 'bindings') { await checkWeaponBindings(); console.log('手柄圆环换装通过'); app.exit(0); return; }
   await evaluate('choose(".home-play")');
   await until(() => evaluate('!!document.querySelector(".atlas-sheet")'), '选地图');
@@ -466,6 +473,38 @@ try {
     await until(status('playing'), '结算已高亮的下一关按一次 A 直接出发');
     assert.equal(await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)})).state.survival.character`), finishedCharacter, '下一关保留角色');
   }
+  async function checkCycleRecovery() {
+    const fixture = roomFixture('finish', PLAYABLE_WORLDS.at(-1).id);
+    const { adventure } = fixture.state;
+    adventure.weapons.push('lightblade');
+    adventure.loadouts[0].weapons.push('lightblade');
+    adventure.weaponRanks.lightblade = 2;
+    fixture.run.status = 'completed';
+    fixture.state.isCompleted = true;
+    await loadFixture(fixture);
+    await until(status('completed'), '沙漠绿洲结算');
+    assert.match(await evaluate('document.activeElement.textContent'), /进入第 2 轮/);
+
+    await evaluate(`(() => {
+      const prototype = HTMLCanvasElement.prototype, getContext = prototype.getContext;
+      prototype.getContext = function (type, ...args) {
+        return type === 'webgl2' ? null : getContext.call(this, type, ...args);
+      };
+      window.restoreTestContext = () => { prototype.getContext = getContext; };
+    })()`);
+    await evaluate('tap(0)');
+    await until(status('error'), '下一轮首次加载失败');
+    await evaluate('restoreTestContext(); delete window.restoreTestContext');
+    await evaluate('choose(".adventure-menu-actions .primary-button")');
+    await until(status('playing'), '重试后进入第二轮');
+
+    const next = await evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(saveKey)}))`);
+    assert.equal(next.run.levelId, PLAYABLE_WORLDS[0].id);
+    assert.equal(next.state.adventure.cycle, 2);
+    assert.deepEqual(next.state.adventure.weapons, adventure.weapons);
+    assert.deepEqual(next.state.adventure.attackBindings, adventure.attackBindings);
+    assert.deepEqual(next.state.adventure.weaponRanks, adventure.weaponRanks);
+  }
   async function checkWeaponBindings() {
     win.setContentSize(1280, 720);
     const fixture = roomFixture('boss'), adventure = fixture.state.adventure;
@@ -514,7 +553,8 @@ try {
   }
   await checkCompletion();
   await checkWorldSwitch();
-  console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['方向键走遍菜单、选关、角色、装备和试用', '已高亮菜单一次 A 生效', '移动、跳跃、暂停、本领一览、选项', '断连、重连、防误触、失焦', '设置、全屏、成绩筛选、画展、成就、画册', '应用内备份和恢复', '三个小游戏全部题目、完成和重玩', '花园贴纸', '奖励、补给、死亡、零命重来', '进门、小店购买、通关领奖、结算、直接下一关'], before, after }));
+  await checkCycleRecovery();
+  console.log(JSON.stringify({ result: 'passed', actualPads, tests: ['方向键走遍菜单、选关、角色、装备和试用', '已高亮菜单一次 A 生效', '移动、跳跃、暂停、本领一览、选项', '断连、重连、防误触、失焦', '设置、全屏、成绩筛选、画展、成就、画册', '应用内备份和恢复', '三个小游戏全部题目、完成和重玩', '花园贴纸', '奖励、补给、死亡、零命重来', '进门、小店购买、通关领奖、结算、直接下一关', '跨轮加载重试保留武器、强化和键位'], before, after }));
   app.exit(0);
 } catch (error) {
   console.error(error);
