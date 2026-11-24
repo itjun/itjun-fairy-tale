@@ -337,6 +337,19 @@ export class GardenEngine {
     if (!this.world.forest && !this.world.expedition) this.sprite(this.newTowerMaterial, tower.x + 4, tower.y + 5, 4, 10, -1.5);
     for(const arena of this.world.bossArenas || []) { const exit=this.platforms[arena.exitId];this.sprite(this.bossGateMaterial,exit.x+1,exit.y+2,4,4,-.3);this.sprite(this.bossChestMaterial,exit.x-2,exit.y+.8,2.4,1.8,.6); }
   }
+  copyPauseFrame(canvas) {
+    const source = this.renderer.domElement;
+    const player = this.playerViews[0].position.clone().project(this.camera);
+    const width = Math.min(source.width, source.height * 4 / 3) * .86;
+    const height = width * 3 / 4;
+    const x = THREE.MathUtils.clamp((player.x + 1) * source.width / 2 - width * .45, 0, source.width - width);
+    const y = THREE.MathUtils.clamp((1 - player.y) * source.height / 2 - height * .68, 0, source.height - height);
+    canvas.width = Math.min(1400, Math.round(width));
+    canvas.height = Math.round(canvas.width * 3 / 4);
+    // WebGL 的默认帧缓冲在呈现后会清空，绘制与拷贝要在同一帧内完成。
+    this.renderer.render(this.scene, this.camera);
+    canvas.getContext('2d').drawImage(source, x, y, width, height, 0, 0, canvas.width, canvas.height);
+  }
   resize() {
     const width = this.host.clientWidth, height = this.host.clientHeight;
     if (!width || !height) return;

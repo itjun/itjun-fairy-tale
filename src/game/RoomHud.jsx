@@ -87,11 +87,11 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
 }
 
 // 暂停里的“本领一览”，游玩中按 View 也能打开。只看不改。
-export function RunOverview({ stats, onBack }) {
+export function RunOverview({ stats, onBack, backLabel }) {
   const adventure = stats.adventure, rooms = stats.rooms, magic = adventure.magic;
   const weapons = stats.activeWeapons?.length ? stats.activeWeapons : adventure.weapons;
   const quality = key => adventure.qualities?.[key] || 'common';
-  return <HomePage title="本领一览" onBack={onBack} backLabel="回到暂停" className="in-game-page run-overview">
+  return <HomePage title="本领一览" onBack={onBack} backLabel={backLabel} className="in-game-page run-overview">
     <section aria-label="武器和大招">
       <h2>武器和大招</h2>
       <ul className="overview-cards">

@@ -1,7 +1,7 @@
 html[data-input-mode="gamepad"] :focus { outline: 4px dashed #58753a !important; outline-offset: 5px; }
 html[data-input-mode="gamepad"] [tabindex="-1"]:focus { outline: none !important; }
 /* 手柄是主要操作。光标停住的选项整块填色，纸纹边框不再只剩一条虚线。已选传奇、史诗仍保持金、紫。 */
-html[data-input-mode="gamepad"] #root :is(button, a, select, input):focus:not(.atlas-mark, .family-portrait):not([data-gamepad-canvas]):not([aria-pressed="true"][data-rarity="legendary"]):not([aria-pressed="true"][data-rarity="epic"]) {
+html[data-input-mode="gamepad"] #root :is(button, a, select, input):focus:not(.atlas-mark, .family-portrait, .pause-book button):not([data-gamepad-canvas]):not([aria-pressed="true"][data-rarity="legendary"]):not([aria-pressed="true"][data-rarity="epic"]) {
   outline: none !important;
   border-image: none !important;
   background: #b6e84a !important;
@@ -10,7 +10,7 @@ html[data-input-mode="gamepad"] #root :is(button, a, select, input):focus:not(.a
   color: #1c340f !important;
   box-shadow: none !important;
 }
-html[data-input-mode="gamepad"] #root :is(button, a):focus:not(.atlas-mark, .family-portrait):not([aria-pressed="true"][data-rarity="legendary"]):not([aria-pressed="true"][data-rarity="epic"]) :is(span, strong, small, em) {
+html[data-input-mode="gamepad"] #root :is(button, a):focus:not(.atlas-mark, .family-portrait, .pause-book button):not([aria-pressed="true"][data-rarity="legendary"]):not([aria-pressed="true"][data-rarity="epic"]) :is(span, strong, small, em) {
   color: #1c340f;
 }
 html[data-input-mode="gamepad"] #root .reward-choice[aria-pressed="true"]:is([data-rarity="legendary"], [data-rarity="epic"]):focus {

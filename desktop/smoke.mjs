@@ -25,7 +25,7 @@ export async function runSmoke({ win, requestClose }) {
       if (!win.isFocused() && !win.isMinimized()) {
         app.focus({steal:true}); win.show(); win.focus(); wc.focus(); await wait(200);
         if (/gameStatus === "(playing|reward|completed)"/.test(code) && await evaluate('document.hasFocus() && document.querySelector(".platform-game")?.dataset.gameStatus === "paused"')) {
-          await evaluate('document.querySelector(".adventure-menu-actions .primary-button")?.click()');
+          await evaluate('document.querySelector("[data-gamepad-resume]")?.click()');
         }
       }
       await wait(100);
@@ -134,20 +134,37 @@ export async function runSmoke({ win, requestClose }) {
   await writeFile(join(profile, 'room.png'), (await capture()).toPNG());
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button"), button => button.textContent.trim())'), ['继续探险', '武器搭配', '本领一览', '选项', '切换关卡', '回到我的花园']);
-  await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button")).find(b=>b.textContent.trim()==="本领一览").click()');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".pause-book button"), button => button.textContent.trim())'), ['继续玩', '换世界', '回花园', '更多']);
+  // 模拟本机存档写满。离开关卡的两个入口都必须留在画册里，让孩子可以重试。
+  await evaluate(`(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'garden-active-adventure-v1') throw new DOMException('full', 'QuotaExceededError');
+      return setItem.call(this, key, value);
+    };
+    try {
+      document.querySelector('[data-pause-action=worlds]').click();
+      document.querySelector('[data-pause-action=garden]').click();
+    } finally { Storage.prototype.setItem = setItem; }
+  })()`);
+  await until('!!document.querySelector(".pause-book [role=alert]")');
+  await evaluate('document.querySelector("[data-pause-action=more]").click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "pause-more"');
+  await evaluate('document.querySelector("[data-pause-action=overview]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "overview"');
   assert.equal(await evaluate('document.querySelectorAll(".platform-game [role=dialog], .platform-game .adventure-overlay").length'),0,'本领一览是整页，不是弹窗');
   await writeFile(join(profile, 'overview.png'), (await capture()).toPNG());
   await evaluate('document.querySelector(".run-overview .home-back").click()');
-  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button")).find(b=>b.textContent.trim()==="选项").click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "pause-more"');
+  await evaluate('document.querySelector("[data-pause-action=options]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "options"');
   await writeFile(join(profile, 'game-options.png'), (await capture()).toPNG());
   await evaluate('document.querySelector(".home-options .home-back").click()');
+  await until('document.querySelector(".platform-game")?.dataset.gameStatus === "pause-more"');
+  await evaluate('document.querySelector("[data-pause-action=back]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
   // 稀疏宝物不保证出现在任意随机路线；用固定局的真实宝物验证键盘拾取。
-  await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
+  await evaluate('document.querySelector("[data-pause-action=garden]").click()');
   await until('!!document.querySelector(".home-play")');
   const scoring=roomFixture('score');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(scoring))})`);
@@ -155,14 +172,14 @@ export async function runSmoke({ win, requestClose }) {
   await until('!!document.querySelector(".home-play")');
   await evaluate('document.querySelector(".home-play").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  await evaluate('document.querySelector(".adventure-menu-actions .primary-button").click()');
+  await evaluate('document.querySelector("[data-gamepad-resume]").click()');
   win.focus(); await wait(800);
   if (await evaluate('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"')) {
-    await evaluate('document.querySelector(".adventure-menu-actions .primary-button").click()');
+    await evaluate('document.querySelector("[data-gamepad-resume]").click()');
   }
   // Real key events exercise physics and collectible scoring before closing mid-run.
   for (let attempt = 0; attempt < 20; attempt++) {
-    if (await evaluate('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"')) await evaluate('document.querySelector(".adventure-menu-actions .primary-button").click()');
+    if (await evaluate('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"')) await evaluate('document.querySelector("[data-gamepad-resume]").click()');
     app.focus({steal:true}); win.show(); win.focus(); wc.focus();
     await until('document.hasFocus()');
     wc.sendInputEvent({ type: 'keyDown', keyCode: 'Right' });
@@ -177,10 +194,12 @@ export async function runSmoke({ win, requestClose }) {
   win.restore(); win.focus(); await wait(500);
   await evaluate('window.gardenDesktop.setWindowMode("maximized")'); assert.equal(win.isMaximized(),true); assert.equal(win.isFullScreen(),false);
   await evaluate('window.gardenDesktop.setWindowMode("windowed")'); assert.equal(win.isMaximized(),false);
-  // 隔离配置中注入受伤/死亡边界，再通过真实按钮验证持久化与跨关。
-  await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
+  // 最小化会自动暂停，恢复窗口后也要由玩家主动继续。
+  if (await evaluate('document.querySelector(".platform-game").dataset.gameStatus === "playing"')) {
+    await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
+  }
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
+  await evaluate('document.querySelector("[data-pause-action=garden]").click()');
   await until('!!document.querySelector(".home-play")');
   const completed = roomFixture('finish');
   completed.state.adventure = roomFixture('stack').state.adventure;
@@ -189,7 +208,7 @@ export async function runSmoke({ win, requestClose }) {
   await new Promise(resolve => { wc.once('did-finish-load',resolve); wc.reload(); }); await until('!!document.querySelector(".home-play")');
   await evaluate('document.querySelector(".home-play").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  await evaluate('document.querySelector(".adventure-menu-actions .primary-button").click()');
+  await evaluate('document.querySelector("[data-gamepad-resume]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "reward"');
   assert.equal(await evaluate('document.activeElement.classList.contains("reward-panel")'), true);
   assert.equal(await evaluate('document.querySelector(".reward-confirm").disabled'), true);
@@ -224,7 +243,7 @@ export async function runSmoke({ win, requestClose }) {
   assert.equal(carried.survival.character,'mom');assert.equal(carried.survival.hp,afterReward.survival.hp);assert.equal(carried.survival.lives,afterReward.survival.lives);assert.equal(carried.survival.attacks,3);assert.ok(carried.adventure.loadouts[0].weapons.length>=3);
   for (const [id, remaining] of Object.entries(expectedEffects)) assert.ok(carried.adventure.effects[id] > remaining - 1 && carried.adventure.effects[id] <= remaining, `${id} 的领奖后时长应带入下一关`);
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
-  await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
+  await evaluate('document.querySelector("[data-pause-action=garden]").click()');
   await until('!!document.querySelector(".home-play")');
   const fallen=roomFixture('fallen');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(fallen))})`);
@@ -240,7 +259,7 @@ export async function runSmoke({ win, requestClose }) {
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.players[0].safeX'),fallen.state.players[0].safeX);
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.players[0].safeId'),fallen.state.players[0].safeId);
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
-  await evaluate('document.querySelector(".adventure-menu-actions .text-button").click()');
+  await evaluate('document.querySelector("[data-pause-action=garden]").click()');
   await until('!!document.querySelector(".home-play")');
   const over=roomFixture('over');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(over))})`);
