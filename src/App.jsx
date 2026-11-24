@@ -195,7 +195,7 @@ export function App() {
           <img className={`world-family ${total === 3 ? 'dancing' : ''}`} src={asset('assets/family.png')} alt="手牵手的爸爸、妈妈和两个小女孩" draggable="false" />
           {!isDecorating && <><button className="map-hotspot rainbow-hotspot" onClick={() => openQuest('rainbow')} aria-label="去找回彩虹"><Icon as={completed[0] ? Check : Sparkle} size={20} /><span>{completed[0] ? '彩虹回来啦' : '找找彩虹'}</span></button><button className="map-hotspot flower-hotspot" onClick={() => openQuest('garden')} aria-label="去照顾花朵"><Icon as={completed[1] ? Check : Drop} size={20} /><span>{completed[1] ? '小花开啦' : '小花口渴啦'}</span></button><button className="map-hotspot treat-hotspot" onClick={() => openQuest('treat')} aria-label="去甜蜜分享"><Icon as={completed[2] ? Check : IceCream} size={20} /><span>{completed[2] ? '甜甜的一家人' : '甜蜜小屋'}</span></button></>}
           {progress.stamps.map((item, i) => <div className={`placed-stamp stamp-${item.type}`} key={i} style={{ left: `${item.x}%`, top: `${item.y}%` }} data-stamp-type={item.type}><Stamp type={item.type} /></div>)}
-          {isDecorating && <div className="decorate-instruction">选一张贴纸，再点花园里的空地方</div>}
+          {isDecorating && <div className="decorate-instruction"><span className="stamp-pick-hint">选一张贴纸，放到喜欢的位置</span><span className="stamp-key-hint">方向键移动，回车或空格贴上</span></div>}
         </GamepadStampCanvas>
         <div className="world-bottom"><div className="guide"><Icon as={Heart} size={23} /><span aria-live="polite">{notice}</span></div><button className={`decorate-toggle ${isDecorating ? 'active' : ''}`} onClick={() => setIsDecorating(!isDecorating)}><Icon as={isDecorating ? Check : PaintBrush} size={22} />{isDecorating ? '装饰好啦' : '装饰花园'}</button></div>
       </section>
