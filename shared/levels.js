@@ -56,7 +56,8 @@ export const FLOWER_VALLEY = Object.freeze({
   subtitle: '让雨水浇出一条路', story: '河对岸就是城堡，水槽里的雨会流到哪里？',
 });
 export const WATERWAYS = Object.freeze({ ...FLOWER_VALLEY, id:'rainbow-waterways', chapterName:'花开成路 · 水乡长旅' });
-const NEW_WORLDS = [WATERWAYS, FOREST_RESCUE, ...fieldStages(WORLD_ACTS)];
+export const CLOCK_TOWER = Object.freeze({ ...WORLD_ACTS[1], id:'family-clock-tower', structure:'clock-tower', chapterName:'搭指针敲钟', subtitle:'沿屋脊登上大钟楼', story:'钟楼里的长针会把你送到哪一扇窗前？' });
+const NEW_WORLDS = [WATERWAYS, CLOCK_TOWER, FOREST_RESCUE, ...fieldStages(WORLD_ACTS)];
 export const WORLD_MAPS = Object.freeze([...WORLD_ACTS, FLOWER_VALLEY, ...NEW_WORLDS]);
 export const PLAYABLE_WORLDS = Object.freeze(WORLD_ACTS.map(stage => NEW_WORLDS.find(map => map.themeId === stage.themeId) || stage));
 export function findStage(id) { return WORLD_MAPS.find(stage => stage.id === id) || STAGES.find(stage => stage.id === id); }

@@ -47,6 +47,13 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
     world.lifts.push(p);
     return p;
   }
+  function hand(x, y, length, period = 7, phase = 0) {
+    const p = tile(x+length/2,y,length,'clock-hand',{ isMoving:true, pivotX:origin+x, pivotY:y,
+      handLength:length, period, phase, slope:0, deltaX:0, deltaY:0 });
+    room.hands.push(p.id);
+    room.frames.push({ x:origin+x+length*.52, y:y+1.4, width:length*2.8 });
+    return p;
+  }
   function finish(start, exit) {
     const ps = room.platformIds.map(i => world.platforms[i]);
     if (room.id && room.kind==='mechanism') {
@@ -57,6 +64,11 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
       for(const fraction of [.27,.73]) {
         const home=homes[Math.floor(homes.length*fraction)];
         if(home) enemy(home,pool[Math.floor(builder.random()*pool.length)]);
+      }
+      if(stage.themeId!=='rainbow' && homes.length>4) {
+        const home=homes[Math.floor(homes.length*.52)];
+        world.hazards.push({id:world.hazards.length,kind:stage.themeId==='snow'?'icicle':'pendulum',platformId:home.id,
+          x:home.x,y:home.y,period:7,phase:builder.random()*2,length:3.9,warning:1.5,active:1.2});
       }
     }
     Object.assign(room,{ startId:start.id, exitId:exit.id, exitPlatformIds:[exit.id],
@@ -69,11 +81,11 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
     world.zones.push({id,kind,name,isBoss:kind==='boss',roomIds:[id],startId:start.id,exitId:exit.id,
       platformIds:room.platformIds,minX:room.left,maxX:room.right,baseY:0});
   }
-  return {room,origin,tile,trail,treasure,station,gated,enemy,spring,ferry,finish,random:builder.random};
+  return {room,origin,tile,trail,treasure,station,gated,enemy,hand,spring,ferry,finish,random:builder.random};
 }
 
-const leaves = 'water-leaf', lilies = 'water-lily';
-const water = 'water-gutter';
+const leaves = 'water-leaf', lilies = 'water-lily', roof = 'roof', plank = 'plank';
+const water = 'water-gutter', bell = 'clock-golden-bell', gear = 'platform-gear';
 
 function nursery(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
@@ -137,4 +149,120 @@ export function addGardenChapters(world,stage,builder,secondHalf) {
     : [['沉睡的苗圃',nursery],['双渠水磨',watermill]];
   if (secondHalf && world.valley.layout==='aqueduct') [chapters[0],chapters[1]]=[chapters[1],chapters[0]];
   for (const [name,build] of chapters) build(storyRoom(world,stage,builder,name));
+}
+
+
+function towerSchool(p) {
+  const {tile,trail,station,hand,treasure,finish}=p;
+  const street=trail([[0,0,14],[13,0,9],[24,0,9],[35,0,9]],plank);
+  const stairs=trail([[12,2.6],[20,5.2],[28,7.8]],roof);
+  const arm=hand(34,7.7,13);
+  station('ride',arm,gear,'搭上了时针',{kind:'ride'});
+  tile(42,1.1,17,'safety-net');
+  const window=tile(54,12.2,11,plank);
+  station('chime',window,bell,'敲响街口的晨钟',{after:['ride']});
+  const roofs=trail([[65,11,9],[76,9,9],[87,7,9],[98,5,9],[109,3,9]],roof);
+  treasure(stairs[2]);treasure(roofs[2]);finish(street[0],tile(121,2,12));
+}
+function rooftops(p) {
+  const {tile,trail,station,gated,treasure,finish}=p;
+  const alley=trail([[0,0,14],[14,0,10],[26,0,10],[38,-1,10],[50,-2,10],[62,-2,10],[74,-1,10],[86,0,10],[98,0,10],[110,0,10]],plank);
+  const roofline=trail([[16,2.6],[24,5.2],[32,7.8],[41,9],[50,8.2],[59,7],[68,6.2],[77,6],[86,7.6],[95,9]],roof);
+  station('weight',alley[5],gear,'放下钟楼的配重');
+  station('latch',roofline[8],bell,'屋顶的窗锁松开了');
+  const landing=gated([[111,2.6],[119,5.2],[127,7.8]],'weight',plank);
+  treasure(roofline[3]);treasure(alley[7]);treasure(landing[0]);finish(alley[0],tile(137,8,13,roof));
+}
+function twinHands(p) {
+  const {tile,trail,station,hand,treasure,finish}=p;
+  const base=tile(0,0,13,plank);
+  trail([[11,2.5],[19,5],[27,7.5]],roof);
+  const first=hand(32,7.5,14,7);
+  station('brass',first,gear,'短针齿轮咬合',{kind:'ride'});
+  const ledge=tile(54,11.6,12,plank);
+  const step=tile(66,13.9,9,roof);
+  const second=hand(72,13.9,15,8,2.7);
+  station('copper',second,gear,'长针开始带动钟面',{kind:'ride',after:['brass']});
+  tile(43,2,22,'safety-net');tile(81,8.1,19,'safety-net');
+  trail([[93,18,9],[104,19,9],[115,17,9],[126,16,9]],roof);
+  treasure(ledge);treasure(step);finish(base,tile(139,15,13,plank));
+}
+function echoGallery(p) {
+  const {tile,trail,station,gated,treasure,finish}=p;
+  const floor=trail([[0,0,13],[13,0,10],[25,0,10],[37,0,10],[49,0,10],[61,0,10],[73,0,10],[85,0,10],[97,0,10]],plank);
+  const west=trail([[14,2.6],[22,5.2],[30,7.8],[38,8.6]],roof);
+  const east=trail([[58,2.6],[66,5.2],[74,7.8],[82,8.6]],roof);
+  // Each seed determines which of the two balconies sends the first echo.
+  const [first,reply]=p.random()<.5?[west,east]:[east,west];
+  station('call',first.at(-1),bell,'第一声钟响了');
+  station('answer',reply.at(-1),bell,'对面传来回应',{after:['call']});
+  gated([[106,2.6],[114,5.2],[122,7.8]],'answer',plank);
+  treasure(west[2]);treasure(east[2]);treasure(floor[5]);finish(floor[0],tile(132,8,12,roof));
+}
+function belfry(p) {
+  const {tile,trail,station,hand,gated,treasure,finish}=p;
+  const lower=trail([[0,0,13],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9]],plank);
+  const steps=trail([[78,2.6],[70,5.2],[62,7.8],[54,10.4],[46,13]],roof);
+  const arm=hand(24,13.2,14,7,2);
+  station('ride',arm,gear,'转轴接上了钟绳',{kind:'ride'});
+  // Return left along the high gallery, then walk across the unlocked bridge.
+  tile(32,5.2,18,'safety-net');tile(22,13.2,6,plank);
+  const top=tile(13,15.5,9,roof);
+  station('bell',top,bell,'大钟放下了广场吊桥',{after:['ride']});
+  const bridge=gated([[23,18],[32,18],[41,18],[50,18],[59,18],[68,18],[77,18],[86,17],[95,15.5]],'bell',plank);
+  treasure(steps[2]);treasure(bridge[4]);finish(lower[0],tile(106,14,12,roof));
+}
+function clockParade(p) {
+  const {tile,trail,station,hand,treasure,finish}=p;
+  const roads=trail([[0,0,14],[13,0,9],[24,0,9],[35,0,9],[46,0,9],[57,0,9],[68,0,9],[79,0,9],[90,0,9],[101,0,9]],plank);
+  const steps=trail([[13,2.5],[21,5],[29,7.5]],roof);
+  const arm=hand(35,7.6,14,8);
+  station('pass',arm,gear,'搭针越过街巷',{kind:'ride'});
+  tile(44,2.7,17,'safety-net');
+  const balcony=trail([[56,11.9,10],[67,10,9],[77,8.5,8],[87,7,9],[97,6,8]],roof);
+  station('flag',balcony[3],bell,'广场游行开始了',{after:['pass']});
+  const shortcut=trail([[107,4.2],[116,3]],plank);
+  treasure(steps[1]);treasure(roads[6]);treasure(shortcut[0]);finish(roads[0],tile(127,2,12));
+}
+
+// The ball and the child travel on independent routes. The valley follows the
+// ball, the upper ridge reaches the switch before it passes the junction.
+function sentries(p,theme) {
+  const {tile,trail,enemy,treasure,finish,room}=p;
+  const path=trail([[0,0,14],[15,0,12],[29,1.2,12],[43,0,12],[57,0,12],[71,1.6,12],[85,0,12],[99,0,12],[113,0,12]],theme==='snow'?'ice':plank);
+  const high=trail([[30,3.8],[38,6.2],[47,5],[68,4.2],[77,6.6],[86,5.2]],theme==='snow'?'rock':roof);
+  for (const [i,home] of [path[1],high[0],path[3],path[5],high[4],path[7]].entries()) {
+    const guard = enemy(home,theme==='snow'?['puff','snowball','jelly'][i%3]:['puff','flowerpot','jelly'][i%3]);
+    if (i>=3) Object.assign(guard,{wave:1,isDormant:true});
+  }
+  room.waves=2;room.encounters=[{endId:path[3].id,lastWave:0},{endId:path[8].id,lastWave:1}];
+  treasure(high[2]);treasure(high[4]);finish(path[0],tile(127,0,12));
+}
+function arena(world,stage,builder,placeBoss) {
+  const p=storyRoom(world,stage,builder,stage.themeId==='snow'?'雪山守望台':'广场钟庭','boss');
+  const start=p.tile(0,0,12), floor=p.tile(24,0,32,undefined,{isBossFloor:true,isOneWay:false}), exit=p.tile(49,0,13,undefined,{isFinish:true});
+  for (const [x,y] of [[14,2.6],[22,5.2],[33,2.6]]) p.tile(x,y,6,stage.themeId==='snow'?'ice':roof);
+  const boss=placeBoss(world,stage,p.room,floor);
+  world.bossArenas.push({id:0,bossId:boss.id,floorId:floor.id,exitId:exit.id,left:floor.x-15,right:floor.x+15,y:0,layout:'platform'});
+  world.supplies.push({id:'medkit:0',kind:'medkit',platformId:start.id,x:start.x+1,y:1.1});
+  p.finish(start,exit);world.finish=exit;
+}
+export function buildStoryWorld(world,stage,builder,placeBoss) {
+  world.expedition=true;
+  const chapters = [
+    ['街口学搭针',towerSchool],['屋顶与暗巷',rooftops],['双针齿轮房',twinHands],['报时街守卫',null],
+    ['回声钟廊',echoGallery],['登楼放吊桥',belfry],['屋脊大巡游',clockParade]
+  ];
+  if (builder.random()<.5) [chapters[1],chapters[2]]=[chapters[2],chapters[1]];
+  for (const [name,build] of chapters) {
+    const p=storyRoom(world,stage,builder,name,build?'mechanism':'battle',build?null:'upgrade');
+    if(build) build(p); else sentries(p,stage.themeId);
+  }
+  arena(world,stage,builder,placeBoss);
+  for(const room of world.rooms.slice(0,-1)) {
+    const next=world.rooms[room.id+1];
+    world.doors.push({id:room.id,roomId:room.id,targetRoomId:next.id,platformId:room.exitId,offsetX:2.5,kind:next.kind,reward:next.reward});
+  }
+  Object.assign(world,{minX:world.rooms[0].left,maxX:world.rooms.at(-1).right,minY:Math.min(...world.rooms.map(r=>r.fallY))-3,
+    maxY:Math.max(...world.rooms.map(r=>r.top))+6,requiredFlowers:0,signature:world.rooms.map(r=>r.name).join('|')+'|'+world.treasures.map(t=>t.kind).join(',')});
 }

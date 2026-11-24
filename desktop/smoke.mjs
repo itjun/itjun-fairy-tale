@@ -212,7 +212,7 @@ export async function runSmoke({ win, requestClose }) {
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"');
   const carried = await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state');
   // 下一关是第二个世界的开场房；角色、命数、血量、攻击累计和武器都带过去，不补满。
-  assert.equal(carried.levelId,'family-world');assert.equal(carried.version,ADVENTURE_GENERATION_VERSION);assert.equal(carried.rooms.roomId,0);
+  assert.equal(carried.levelId,'family-clock-tower');assert.equal(carried.version,ADVENTURE_GENERATION_VERSION);assert.equal(carried.rooms.roomId,0);
   assert.equal(carried.survival.character,'mom');assert.equal(carried.survival.hp,afterReward.survival.hp);assert.equal(carried.survival.lives,afterReward.survival.lives);assert.equal(carried.survival.attacks,3);assert.ok(carried.adventure.loadouts[0].weapons.length>=3);
   for (const [id, remaining] of Object.entries(expectedEffects)) assert.ok(carried.adventure.effects[id] > remaining - 1 && carried.adventure.effects[id] <= remaining, `${id} 的领奖后时长应带入下一关`);
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');

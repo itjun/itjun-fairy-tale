@@ -11,14 +11,32 @@ export function storyHint(room,state) {
   const count = room.goals.filter(key=>reached(room,state,key)).length;
   if (count===room.goals.length) return '路通了，去发光的门';
   const active = room.stations.find(s=>s.goal && !done(state,s.key) && s.requires.every(k=>done(state,k)));
-  const clue = active?.icon === 'water-gutter' ? '哪条水渠还没通水？'
+  const clue = active?.icon === 'clock-golden-bell' ? '找一找还在晃的金钟'
+    : active?.kind === 'ride' ? '站上橙色指针，等它靠窗'
+    : active?.icon === 'water-gutter' ? '哪条水渠还没通水？'
     : active?.icon === 'flower' ? '高处的花粉熟了'
     : active?.icon === 'water-sunflower' ? '找找还没开花的地方' : '看看附近会动的机关';
   return clue+'　'+count+' / '+room.goals.length;
 }
 
+export function movingHand(p,elapsed,rider) {
+  const previousX=p.x,previousY=p.y,previousSlope=p.slope;
+  const u=rider?.isGrounded && rider.ground===p ? (rider.x-p.x)/p.width : null;
+  // Short pauses at the ends let a child board or step onto a balcony.
+  const angle=.38*Math.max(-1,Math.min(1,1.4*Math.sin(elapsed*Math.PI*2/p.period+p.phase)));
+  const width=p.handLength*Math.cos(angle);
+  p.x=p.pivotX+width/2;p.y=p.pivotY+p.handLength*Math.sin(angle)/2;
+  p.width=width;p.slope=Math.tan(angle);
+  if (u!==null) {
+    const previousHeight=previousY+(rider.x-previousX)*previousSlope;
+    rider.x=p.x+u*width;
+    rider.y+=p.y+u*width*p.slope-previousHeight;
+  }
+}
+
 export function syncStory(world,rooms,elapsed,player) {
   const room=world.rooms[rooms.roomId],state=rooms.story;
+  for (const id of room.hands || []) movingHand(world.platforms[id],elapsed,player);
   for (const id of room.platformIds) {
     const tile=world.platforms[id];
     if (tile.needsMark) tile.isEnabled=done(state,tile.needsMark);

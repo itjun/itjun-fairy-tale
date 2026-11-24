@@ -2,7 +2,14 @@ export { randomGenerator } from '../../shared/random.js';
 export const RULES = Object.freeze({ speed: 6, gravity: 23, jump: 12.6, radius: 0.28, coyote: 0.14, buffer: 0.16 });
 // 给四位角色的平地二段跳留足安全高度。
 export function landingDamage(height) { return Math.min(100, Math.ceil(Math.max(0, height - 8.5) * 4)); }
-export function platformY(platform, x) { return platform.y + (platform.slope || 0) * Math.max(-platform.width / 2, Math.min(platform.width / 2, x - platform.x)); }
+export function platformY(platform, x) {
+  const offset = Math.max(-platform.width / 2, Math.min(platform.width / 2, x - platform.x));
+  if (platform.skin === 'safety-net') {
+    const distance = offset / (platform.width / 2);
+    return platform.y + platform.width * .12 * distance ** 2;
+  }
+  return platform.y + (platform.slope || 0) * offset;
+}
 export function createPlayer(platform, offset = 0) {
   return { x: platform.x + offset, y: platformY(platform,platform.x+offset), vx: 0, vy: 0, isGrounded: true, ground: platform, coyote: RULES.coyote, buffer: 0, safe: platform, safeX: platform.x + offset, facing: 1, recoveries: 0, protection: 0, knockTime: 0, dropTime: 0, springTime: 0 };
 }
@@ -46,7 +53,7 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
     player.vy = player.character === 'little' ? RULES.jump * 1.16 : RULES.jump;
     player.buffer = 0; player.coyote = 0; player.isAirJumpUsed = true; isJumped = true;
   }
-  const support = player.isGrounded && player.ground && (player.ground.slope || player.ground.isSeesaw) && Math.abs(player.y-platformY(player.ground,player.x))<.05 ? player.ground : null;
+  const support = player.isGrounded && player.ground && (player.ground.slope || player.ground.isSeesaw || player.ground.skin === 'safety-net') && Math.abs(player.y-platformY(player.ground,player.x))<.05 ? player.ground : null;
   const previousY = player.y, previousX = player.x;
   player.x += player.vx * dt;
   player.x = Math.max(bounds.minX ?? platforms[0].x - platforms[0].width / 2 + RULES.radius, Math.min(bounds.maxX ?? Infinity, player.x));

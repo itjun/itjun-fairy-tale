@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAYABLE_WORLDS, WATERWAYS } from '../shared/levels.js';
+import { PLAYABLE_WORLDS, WATERWAYS, CLOCK_TOWER } from '../shared/levels.js';
 import { createRoomWorld } from '../shared/room-world.js';
-import { advanceStory, metGoals, syncStory } from '../shared/story-mechanisms.js';
+import { advanceStory, metGoals, movingHand, syncStory } from '../shared/story-mechanisms.js';
 import { newRoomState, stepRoom, isValidRoomState } from '../src/game/rooms.js';
 import { createPlayer, platformY, stepPlayer } from '../src/game/physics.js';
 import { roomFixture } from './helpers/adventure-fixtures.mjs';
 import { readAdventure } from '../src/game/save.js';
 import { openStore } from '../server/store.mjs';
 
-const stages=[WATERWAYS], dt=1/120;
+const stages=[WATERWAYS,CLOCK_TOWER], dt=1/120;
 const roomTiles=(world,room)=>room.platformIds.map(id=>world.platforms[id]);
 test('探险世界八个区段分别进入选关、成绩与续关，旧地图继续可读',()=>{
   const store=openStore(':memory:');
@@ -73,7 +73,11 @@ function pathExists(w,room,start,destination) {
     if(from===destination)return true;
     for (const to of tiles) {
       if(seen.has(to))continue;
-      if(!canHop(from,to,tiles,room))continue;
+      const phases=(room.hands||[]).some(id=>id===from.id||id===to.id)?[0,1.8,4.9,6.2]:[0];
+      if(!phases.some(t=>{
+        for(const id of room.hands||[])movingHand(w.platforms[id],t);
+        return canHop(from,to,tiles,room);
+      }))continue;
       queue.push(to);seen.add(to);
     }
   }
@@ -101,4 +105,30 @@ test('按机关的实际顺序，从上一个落点走到下一个机关和出�
       assert.ok(stepRoom(w,s,createPlayer(w.platforms[room.exitId]),dt).some(e=>e.type==='clear'));
     }
   }
+});
+
+test('指针载人随转轴升降，松开方向不会滑下，错过窗台还会回来',()=>{
+  const w=createRoomWorld(3,CLOCK_TOWER),s=newRoomState(w),r=w.rooms[0];
+  const p=w.platforms[r.hands[0]],tiles=roomTiles(w,r);
+  movingHand(p,0);
+  const rider=createPlayer(p,p.width*.38);rider.y=platformY(p,rider.x);
+  let low=rider.y,high=rider.y;
+  for (let i=1;i<=840;i++) {
+    movingHand(p,i*dt,rider);
+    stepPlayer(rider,{direction:0},tiles,dt,{minX:r.left,maxX:r.right,minY:r.fallY,isFiniteLife:true});
+    assert.equal(rider.ground,p);
+    low=Math.min(low,rider.y);high=Math.max(high,rider.y);
+    advanceStory(w,s,rider,i*dt);
+  }
+  assert.ok(high-low>7);assert.ok(Object.hasOwn(s.story.marks,'0/ride'));
+  assert.ok(!metGoals(r,s.story));
+  const net=tiles.find(t=>t.skin==='safety-net');
+  const fallen=createPlayer(net,net.width*.25);
+  fallen.y+=12;fallen.ground=null;fallen.isGrounded=false;
+  for(let i=0;i<240 && !fallen.isGrounded;i++) {
+    stepPlayer(fallen,{direction:0},[net],dt,{minX:r.left,maxX:r.right,minY:r.fallY,isFiniteLife:true});
+  }
+  assert.equal(fallen.ground,net);
+  assert.equal(fallen.y,platformY(net,fallen.x));
+  assert.ok(pathExists(w,r,net,p),'从网面还能再次搭针');
 });

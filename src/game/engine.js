@@ -130,10 +130,11 @@ export class GardenEngine {
     try {
       const loader = new THREE.TextureLoader();
       const surfaceImage = this.level.surface || 'grass-texture';
-      const landscape = this.world.field === 'beach' ? 'paper-texture' : (this.world.valley ? 'water-valley' : ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image);
+      const storyBackdrop = this.world.expedition && {family:'clock-town-sky'}[this.level.id];
+      const landscape = this.world.field === 'beach' ? 'paper-texture' : storyBackdrop || (this.world.valley ? 'water-valley' : ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image);
       const isDesert = this.level.id === 'desert';
       const poseNames = Object.keys(CHARACTERS).flatMap(character => ['climb', 'crawl'].map(pose => `${character}-${pose}`));
-      this.isNewLandscape = landscape === 'landscape-new-drawing' || !!this.world.valley;
+      this.isNewLandscape = landscape === 'landscape-new-drawing' || !!this.world.valley || !!storyBackdrop;
       const names = [...new Set([landscape, ...fieldImages(this.world), ...storyImages(this.world), ...(this.world.valley ? VALLEY_IMAGES : []), ...Object.values(CHARACTERS).flatMap(c => [c.image, c.attack]), ...poseNames, ...TRAVERSAL_IMAGES, ...(isDesert ? DESERT_IMAGES : []), 'flower', 'collectible-rainbow', 'light-wave', 'enemy-burst', 'treehouse-tall', ...(this.world.forest ? ['forest-hollow', 'forest-root-hall', 'forest-nest', 'forest-owlet', 'forest-vine'] : []), 'platform-raft', 'platform-ice', 'platform-gear', 'platform-conveyor', 'island-lighthouse', 'castle-cutaway', 'street-house', 'windmill-tall', 'platform-awning', surfaceImage,
         'lift-leaf', 'spring-flower', 'bridge-rope', 'checkpoint-flag', 'collectible-star', 'magic-bubble',
         ...LEVEL_COLLECTIBLES[this.level.id].map(id => COLLECTIBLES[id].image), 'new-drawing-tower', 'new-drawing-flowers', 'trap-pendulum', 'trap-thorns', 'trap-steam', 'terrain-blocks', 'platform-cloud', 'life-potion', 'supply-medkit', 'flame-stream', 'collectible-snowflake', 'upgrade-frost', 'upgrade-chain', 'boss-gate', 'boss-chest', 'terrain-bank', 'terrain-cookie', 'terrain-rock', ...ROOM_IMAGES, ...Object.values(MONSTERS).map(m => m.image), ...Object.values(WEAPONS).map(w => w.image), ...this.world.enemies.filter(e=>e.isBoss && e.image).map(e=>e.image), ...this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image))])];
@@ -231,7 +232,18 @@ export class GardenEngine {
     const hasFloorBelow=platform=>this.platforms.some(other=>other.id!==platform.id&&!other.isMoving&&other.y<platform.y-.01&&platform.y-other.y<LAYER*2-.2&&Math.min(platform.x+platform.width/2,other.x+other.width/2)-Math.max(platform.x-platform.width/2,other.x-other.width/2)>0);
     for (const platform of this.platforms) {
       const group = new THREE.Group(); group.position.set(platform.x, platform.y, 0);
-      if (this.waterMaterials?.[platform.skin]) {
+      if (platform.handLength || platform.skin==='safety-net') {
+        const hand=!!platform.handLength, net=platform.skin==='safety-net';
+        const art=hand?'clock-orange-hand':'clock-safety-net';
+        this.storyDecks ||= {};
+        const mat=this.storyDecks[art] ||= this.spriteMaterial(art);
+        const mesh=new THREE.Mesh(this.planeGeometry,mat);
+        const width=hand?platform.handLength*1.11:platform.width;
+        const height=hand?width*.15:width*.25;
+        mesh.scale.set(width,height,1);
+        mesh.position.set(hand?-platform.handLength*.045:0,net?height*.03:hand?-height*.26:-height*.44,.3);
+        group.add(mesh);
+      } else if (this.waterMaterials?.[platform.skin]) {
         const deck = new THREE.Mesh(this.planeGeometry, this.waterMaterials[platform.skin]);
         const height = platform.skin === 'bank' ? Math.min(7, platform.width * .42) : platform.skin === 'water-treadle' ? .36 : platform.skin === 'water-lily' ? 1.15 : 1.35;
         deck.scale.set(platform.width, height, 1);
@@ -330,7 +342,7 @@ export class GardenEngine {
     if (!width || !height) return;
     this.renderer.setSize(width, height);
     const aspect = width / height;
-    const halfHeight = 9;
+    const halfHeight = this.world.expedition ? ({family:14.8}[this.level.id] || 9) : 9;
     const halfWidth = Math.max(12,halfHeight * aspect);
     if (!this.isReady) this.cameraX = Math.min(16, halfWidth - 4);
     this.camera.left = -halfWidth; this.camera.right = halfWidth;
@@ -470,6 +482,8 @@ export class GardenEngine {
       const facing = this.world.valley.layout === 'aqueduct' && averageY > 10 ? -1 : 1;
       return { x: Math.max(min, Math.min(max, averageX + facing * lookAhead)), y: averageY + 1 };
     }
+    const frame = room.frames?.find(f => Math.abs(f.x-averageX)<f.width*.48 && Math.abs(f.y-averageY)<12);
+    if (frame) return {x:frame.x+(averageX-frame.x)*.25,y:frame.y+.35+(averageY-frame.y)*.15};
     const x = min > max ? (room.left + room.right) / 2 : Math.max(min, Math.min(max, averageX + Math.min(5, this.camera.right * 0.25)));
     // 往上爬的房间多看一点头顶，往下跳的房间多看一点脚下。
     const isAscending = room.traversal?.ridges && averageX < room.traversal.practiceUntilX;
@@ -492,7 +506,9 @@ export class GardenEngine {
       const message=advanceStory(world,state,player,this.elapsed);
       if (message) {
         syncStory(world,state,this.elapsed);
-        this.callbacks.onSound('checkpoint');
+        const marked = state.story.marks;
+        const rang = room.stations?.some(s => s.icon === 'clock-golden-bell' && marked[s.key] === this.elapsed);
+        this.callbacks.onSound(rang ? 'tower-chime' : 'checkpoint');
         this.skillEffects.burst(player.x,player.y+1.2,this.elapsed,true);
         this.publish(message);
         this.callbacks.onLifeChange?.(this.snapshot());
@@ -771,7 +787,7 @@ export class GardenEngine {
         player.fallPeak = player.y;
         if (!wasGrounded && !wasClimbing && !result.isTraversed) {
           if (powers.safeLanding && dropHeight > 4.2) player.protection = Math.max(player.protection, 1.2);
-          const damage = landingDamage(dropHeight);
+          const damage = player.ground?.skin === 'safety-net' ? 0 : landingDamage(dropHeight);
           if (damage) {
             player.protection = Math.max(player.protection, 1);
             this.hurt(false, powers.safeLanding ? damage / 2 : damage, 'landing');
