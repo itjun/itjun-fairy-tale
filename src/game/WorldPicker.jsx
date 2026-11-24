@@ -1,70 +1,90 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, House, Play } from '@phosphor-icons/react';
+import { MapPin } from '@phosphor-icons/react';
 import { PLAYABLE_WORLDS, findStage } from '../../shared/levels.js';
-import { COLLECTIBLES, LEVEL_COLLECTIBLES } from './collectibles.js';
-import { CHARACTERS, INITIAL_LIVES } from './characters.js';
-import { DIFFICULTIES, difficultyOf, setPlaySettings, usePlaySettings } from './difficulty.js';
+import { CHARACTERS } from './characters.js';
+import { difficultyOf } from './difficulty.js';
 import { readWorldAdventures } from './save.js';
-import { trapFocus } from './AdventurePanels.jsx';
+import { ConfirmAction, DeparturePage } from './DeparturePage.jsx';
 
-function worldChoices(saves) {
-  return PLAYABLE_WORLDS.flatMap(level => {
-    const entries = saves.filter(({ run }) => findStage(run.levelId)?.themeId === level.themeId);
-    if (!entries.length) return [{ key: level.id, level }];
-    return entries.map(saved => ({ key: saved.run.id, level: findStage(saved.run.levelId), saved }));
-  });
-}
-
-const routeHints = {
-  'flower-valley': '河对岸就是城堡。站上水槽，看一看花园里有什么变化。',
-  'clock-tower': '搭上会摆动的指针，到窗台敲钟，再去镇广场。',
-  'snow-chutes': '雪球能撞开冰墙。沿山脊追过去，看看岔路藏着什么。',
-  'forest-rescue': '沿枝头找树冠幼鸟，钻进树洞找树根幼鸟。带它们回巢后，守住大树。',
+// Coordinates are percentages of the painted atlas, independent of viewport size.
+const LANDMARKS = {
+  rainbow: { x: 46.8, y: 48, portraitX: 49.5, portraitY: 41.8, region: '四川盆地', description: '群山环抱花田，江水向东流。' },
+  family: { x: 74.7, y: 25.6, portraitX: 74.5, portraitY: 22.4, region: '东部平原', description: '穿过河畔的小镇，找找钟楼。' },
+  sweet: { x: 67.8, y: 54.4, portraitX: 68.1, portraitY: 66.7, region: '江南丘陵', description: '顺着起伏的山丘，去城堡做甜点。' },
+  beach: { x: 85.5, y: 60.4, portraitX: 82.5, portraitY: 51.4, region: '东海与海岛', description: '沿海岸找贝壳，隔海望见小岛。' },
+  meadow: { x: 31.6, y: 24, portraitX: 25.1, portraitY: 22.7, region: '北方草原', description: '翻过草坡，风把风车吹转了。' },
+  snow: { x: 54.4, y: 19.6, portraitX: 50, portraitY: 13.1, region: '北方雪山', description: '白雪盖住山脊，山下站着雪人。' },
+  forest: { x: 32.5, y: 80.5, portraitX: 27, portraitY: 83.8, region: '南方雨林', description: '循着鸟鸣，走进藤蔓缠绕的雨林。' },
+  cartoon: { x: 65, y: 84, portraitX: 74.5, portraitY: 89.1, region: '东南河谷', description: '小火车沿着河谷，开往积木镇。' },
+  desert: { x: 16.2, y: 46.8, portraitX: 20.5, portraitY: 49.4, region: '西部沙漠', description: '从敦煌石窟到绿洲，一排排小树挡住风沙。' },
 };
-function progressLabel(saved) {
-  if (saved.state.survival.phase === 'over' || saved.state.isCompleted && !saved.state.journey.pending) return '查看结算';
-  return '继续这一关';
+
+function resumeLabel(saved) {
+  if (saved.state.survival.phase === 'over' || (saved.state.isCompleted && !saved.state.journey.pending)) return '查看结算';
+  return '接着玩';
 }
 
-export function WorldPicker({ levelIndex, isSwitching, freshOnly, isGamepad, onChoose, onBack }) {
-  const [choices] = useState(() => worldChoices(freshOnly ? [] : readWorldAdventures()));
-  const [marked, setMarked] = useState(() => choices.findIndex(choice => choice.level.worldIndex === levelIndex));
+export function WorldPicker({ levelIndex, isSwitching, freshOnly, onChoose, onBack }) {
+  const [saves] = useState(() => freshOnly ? [] : readWorldAdventures());
+  const [marked, setMarked] = useState(PLAYABLE_WORLDS[levelIndex].themeId);
+  const [listing, setListing] = useState(false);
   const [error, setError] = useState('');
-  const menu = useRef(null);
-  const settings = usePlaySettings();
-  const { level, saved } = choices[marked];
+  const page = useRef(null);
+  const level = PLAYABLE_WORLDS.find(item => item.themeId === marked);
+  const entriesFor = theme => saves.filter(item => findStage(item.run.levelId)?.themeId === theme);
+  const entries = entriesFor(marked);
+  const { region, description } = LANDMARKS[marked];
+
   useEffect(() => {
-    const button = menu.current.querySelector('.level-choices [aria-pressed=true]');
-    button.focus({ preventScroll: true });
-    button.scrollIntoView({ block: 'nearest' });
-  }, []);
-  function choose(choice) {
-    if (!onChoose(choice)) setError('本机空间不足，进度暂时存不下。请腾出空间后再试一次。');
+    const selector = listing ? '.world-saves button' : '.atlas-mark[aria-pressed=true]';
+    page.current?.querySelector(selector)?.focus({ preventScroll: true });
+  }, [listing]);
+
+  function enter(target, saved) {
+    if (!onChoose({ level: saved ? findStage(saved.run.levelId) : target, saved })) {
+      setError('进度暂时存不下，请腾出空间后重试。');
+    }
   }
-  return <div className="adventure-overlay"><section className="adventure-menu level-menu" ref={menu} role="dialog" aria-modal="true" aria-labelledby="world-heading" onKeyDown={event => {
-    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!event.repeat) onBack(); }
-    else trapFocus(event);
-  }}>
-    <span className="adventure-kicker">带着画里的自己，去看更大的世界</span>
-    <h2 id="world-heading">{isSwitching ? '想去哪个世界？' : '选一个小世界，出发吧'}</h2>
-    <div className="level-choices" aria-label="选择挑战关卡">{choices.map((choice, index) =>
-      <button key={choice.key} data-world={choice.level.themeId} aria-pressed={index === marked} onFocus={() => setMarked(index)} onClick={() => choose(choice)}>
-        <img src={`./assets/${choice.level.image}.png`} alt={choice.level.subtitle}/>
-        <span>第 {choice.level.worldIndex + 1} 个世界</span><strong>{choice.level.chapterName}</strong><small>{choice.level.name}</small>
-        <small>{choice.saved ? `${progressLabel(choice.saved)} · ${CHARACTERS[choice.saved.state.survival.character].name} · 第 ${choice.saved.state.rooms.path.length} 段` : `通关加 ${choice.level.bonus} 分`}</small>
-      </button>)}</div>
-    <p className="level-source">{level.sources.length ? `这一关组合了原画 ${level.sources.join('、')} 的元素。` : level.story}</p>
-    <div className="collectible-preview" aria-label="这一关的宝物">{LEVEL_COLLECTIBLES[level.themeId].map(id =>
-      <span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt=""/>{COLLECTIBLES[id].name} <b>{COLLECTIBLES[id].points} 分</b></span>)}</div>
-    {saved ? <p>{progressLabel(saved)} · 第 {saved.state.adventure.cycle || 1} 轮 · {difficultyOf(saved.state.adventure.difficulty).name} · 剩 {saved.state.survival.lives} 条命</p>
-      : <div className="difficulty-row"><span>难度</span><div className="option-chips" aria-label="难度" data-gamepad-tabs="换难度">{Object.entries(DIFFICULTIES).map(([id, item]) =>
-        <button key={id} aria-pressed={settings.difficulty === id} onClick={() => setPlaySettings({ difficulty: id })}>{item.name}</button>)}</div><small>{DIFFICULTIES[settings.difficulty].hint}。出发后这次冒险不能换。</small></div>}
-    {!isGamepad && <div className="key-guide"><span><kbd>A</kbd><kbd>D</kbd> 走一走</span><span><kbd>空格</kbd> 跳起来</span><span><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> 武器和大招</span><span><kbd>W</kbd> 在小店买</span></div>}
-    <small className="game-reassurance">{saved ? '地图和宝物都记着，回来可以接着玩。' : <>{level.structure === 'field-journey' ? level.story : routeHints[level.structure] || '一章是四间房加一场首领。清完一间，跳到发光的门上。'}初始 {INITIAL_LIVES} 条命，血条用完后选继续或重来。</>}</small>
-    {error && <p role="alert">{error}</p>}
-    <div className="adventure-menu-actions">
-      <button className="primary-button" onClick={() => choose(choices[marked])}><Play size={21} weight="fill"/>{saved ? progressLabel(saved) : '选择角色'}<ArrowRight size={21}/></button>
-      <button className="text-button" data-gamepad-back onClick={onBack}>{isSwitching ? <><ArrowLeft size={18}/>回到暂停</> : <><House size={18}/>回到我的花园</>}</button>
-    </div>
-  </section></div>;
+  function choose(target) {
+    const matches = entriesFor(target.themeId);
+    setMarked(target.themeId);
+    if (matches.length > 1) setListing(true);
+    else enter(target, matches[0]);
+  }
+  if (listing) return <DeparturePage pageRef={page} className="saves-page" title={level.name}
+    backLabel="回地图" onBack={() => { setError(''); setListing(false); }}>
+    <div className="world-saves" aria-label="选择要继续的冒险">{entries.map(saved =>
+      <button key={saved.run.id} data-run={saved.run.id} onClick={() => enter(level, saved)}>
+        <img src={`./assets/${CHARACTERS[saved.state.survival.character].image}.png`} alt="" />
+        <span><strong>{CHARACTERS[saved.state.survival.character].name}</strong>
+          <small>第 {saved.state.adventure.cycle || 1} 轮 · 第 {saved.state.rooms.path.length} 段 · {difficultyOf(saved.state.adventure.difficulty).name}</small>
+          <small>{new Date(saved.run.startedAt).toLocaleString('zh-CN')}</small></span>
+        <b>{resumeLabel(saved)}</b>
+      </button>)}</div>{error && <p role="alert">{error}</p>}
+  </DeparturePage>;
+
+  return <DeparturePage pageRef={page} className="atlas-page" title="选地图"
+    backLabel={isSwitching ? '回到暂停' : '返回'} onBack={onBack}>
+    <div className="atlas-viewport"><div className="atlas-sheet" aria-label="九个世界">
+      <picture>
+        <source media="(max-aspect-ratio: 1/1)" srcSet="./assets/adventure-china-atlas-portrait.webp" />
+        <img className="atlas-art" src="./assets/adventure-china-atlas.webp" alt="彩笔山河，北方是雪山，南方是雨林，西边是敦煌沙漠，四川盆地的河流向东汇入大海。" />
+      </picture>
+      {PLAYABLE_WORLDS.map(world => {
+        const { x, y, portraitX, portraitY } = LANDMARKS[world.themeId];
+        const selected = marked === world.themeId;
+        return <button key={world.themeId} className="atlas-mark" data-world={world.themeId}
+          style={{ '--x': `${x}%`, '--y': `${y}%`, '--portrait-x': `${portraitX}%`, '--portrait-y': `${portraitY}%` }} aria-label={world.name} aria-pressed={selected}
+          onFocus={() => setMarked(world.themeId)}
+          onPointerEnter={event => { if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true }); }}
+          onClick={() => choose(world)}>
+          <span className="atlas-marker" aria-hidden="true">{selected ? world.name : <MapPin weight="fill" />}</span>
+        </button>;
+      })}
+    </div></div>
+    <footer className="departure-footer"><div className="atlas-location" aria-live="polite">
+      <strong>{region}</strong><span>{description}</span>
+    </div><ConfirmAction onClick={() => choose(level)}>{entries.length > 1 ? '选进度' : entries.length ? resumeLabel(entries[0]) : '选这关'}</ConfirmAction></footer>
+    {error && <p className="departure-error" role="alert">{error}</p>}
+  </DeparturePage>;
 }

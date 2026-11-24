@@ -18,7 +18,7 @@ export function StarterPicker({ build, locked = [], onConfirm, onClose }) {
       return next;
     });
   }
-  return <div className="starter-picker-overlay"><section ref={root} tabIndex={-1} className="starter-picker" role="dialog" aria-modal="true" aria-labelledby="starter-title" onKeyDown={event=>{event.stopPropagation();if(event.repeat&&[' ','Enter'].includes(event.key))event.preventDefault();trapFocus(event);}}>
+  return <div className="starter-picker-overlay"><section ref={root} tabIndex={-1} className="starter-picker" role="dialog" aria-modal="true" aria-labelledby="starter-title" onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();if(!event.repeat)onClose();return;}if(event.repeat&&[' ','Enter'].includes(event.key))event.preventDefault();trapFocus(event);}}>
     <header><h2 id="starter-title">自己搭配初始本领</h2><p>选 1 种武器，最多 2 项本领。探索奖励可叠加武器和发射数量。</p></header>
     <div className="starter-selection" aria-live="polite"><span>武器 {draft.weapons.length}/1：{draft.weapons.map(id=>WEAPONS[id].shortName).join('、')||'还没选'}</span><span>本领 {draft.upgrades.length}/2：{draft.upgrades.map(id=>UPGRADES[id].name).join('、')||'还没选'}</span></div>
     <nav aria-label="初始搭配分类">{Object.entries({weapons:'武器',...CATEGORY_LABELS}).map(([id,label])=><button key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}>{label}</button>)}</nav>

@@ -98,19 +98,28 @@ try {
   if (process.env.GARDEN_GAMEPAD_CASE === 'completion') { await checkCompletion(); console.log('手柄通关衔接通过'); app.exit(0); return; }
   if (process.env.GARDEN_GAMEPAD_CASE === 'bindings') { await checkWeaponBindings(); console.log('手柄圆环换装通过'); app.exit(0); return; }
   await evaluate('choose(".home-play")');
-  await until(() => evaluate('!!document.querySelector(".level-choices")'), '选关');
-  const difficulty = 'document.querySelector(".difficulty-row [aria-pressed=true]").textContent';
+  await until(() => evaluate('!!document.querySelector(".atlas-sheet")'), '选地图');
+  const themes = await evaluate('Array.from(document.querySelectorAll("[data-world]"), button => button.dataset.world)');
+  assert.equal(themes.length, 9);
+  for (const theme of themes) {
+    await evaluate(`reach("[data-world=${theme}]")`);
+    assert.equal(await evaluate('document.activeElement.getAttribute("aria-pressed")'), 'true', theme);
+  }
+  await evaluate('choose("[data-world=rainbow]")');
+  await until(() => evaluate('!!document.querySelector(".family-grid")'), '选角');
+  for (const id of ['dad', 'mom', 'sister', 'little']) {
+    await evaluate(`reach("[data-character=${id}]")`);
+    assert.equal(await evaluate('document.querySelector(".family-grid [aria-pressed=true]").dataset.character'), id);
+  }
+  await evaluate('tap(3)');
+  await until(() => evaluate('document.querySelector(".loadout-options h3")?.textContent.includes("妹妹")'), 'Y 为高亮的妹妹打开设置');
+  const difficulty = 'document.querySelector(".departure-difficulty [aria-pressed=true]").textContent';
   assert.equal(await evaluate(difficulty), '轻松', '默认是轻松档');
   await evaluate('tap(5)');
   assert.equal(await evaluate(difficulty), '标准', 'RB 换难度');
   await evaluate('tap(4)');
   assert.equal(await evaluate(difficulty), '轻松', 'LB 换回来');
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-play-settings-v1")).difficulty'), 'easy');
-  await evaluate('reach(".level-choices button:last-child")');
-  assert.equal(await evaluate('document.activeElement === document.querySelector(".level-choices button:last-child")'), true, '方向键能滚到最后一个世界');
-  await evaluate('reach(".level-choices button:first-child")');
-  await evaluate('choose(".adventure-menu-actions .primary-button")');
-  await until(() => evaluate('!!document.querySelector(".character-depart")'), '角色营地');
   await evaluate('choose(".starter-actions button:last-child")');
   await until(() => evaluate('!!document.querySelector(".starter-picker")'), '装备选择');
   await evaluate('tap(1)');
@@ -123,8 +132,16 @@ try {
   await evaluate('choose("[data-gamepad-practice]")');
   await evaluate('tap(2)'); await evaluate('tap(0)'); await evaluate('tap(1)');
   assert.equal(await evaluate('document.activeElement.matches(".character-try-row button")'), true, 'B 退出角色试用');
-  await evaluate('choose(".character-depart")');
+  await evaluate('tap(1)');
+  await until(() => evaluate('!!document.querySelector(".family-grid")'), '设置返回选角');
+  assert.equal(await evaluate('document.activeElement.dataset.character'), 'little');
+  await evaluate('choose("[data-character=sister]")');
   await until(() => evaluate('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"'), '开始探险');
+  assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.survival.character'), 'sister');
+  if (process.env.GARDEN_GAMEPAD_CASE === 'navigation') {
+    console.log('九地标、四格选角、角色设置、试用及直接出发通过');
+    app.exit(0); return;
+  }
   const before = await evaluate('JSON.parse(document.querySelector(".platform-game").dataset.playerPositions)[0]');
   await evaluate('testPad.axes[0]=0.6;testPad.buttons[0]={pressed:true,value:1};testPad.buttons[7]={pressed:true,value:1}');
   await wait(400);
@@ -380,13 +397,14 @@ try {
     await until(status('camp'), '新世界选角色');
     await evaluate('tap(1)');
     await until(status('worlds'), '营地返回换关页');
+    assert.equal(await evaluate('document.activeElement.dataset.world'), 'family');
     await evaluate('tap(1)');
     await until(status('paused'), '取消出发回到原来的第一关');
     assert.equal((await current()).run.id, first.run.id);
     await evaluate('choose("[data-switch-world]")');
     await evaluate('choose("[data-world=family]")');
     await until(status('camp'), '再次进入新世界营地');
-    await evaluate('choose(".character-depart")');
+    await evaluate('choose(".character-depart-action")');
     await until(status('playing'), '第二关出发');
     await evaluate('tap(9)');
     await until(status('paused'), '保存第二关');
@@ -412,6 +430,23 @@ try {
     await evaluate('choose("[data-world=family]")');
     await until(status('playing'), '恢复第二关');
     assert.equal((await current()).run.id, second.run.id);
+
+    // 同一地标可有两份独立进度。先取消，再从列表恢复指定的一局。
+    const alternate = structuredClone(first);
+    alternate.run.id = crypto.randomUUID();
+    alternate.state.survival.character = 'mom';
+    await evaluate(`localStorage.setItem(${JSON.stringify('garden-parked-adventure-v1:' + alternate.run.id)}, ${JSON.stringify(JSON.stringify(alternate))})`);
+    await evaluate('tap(9)'); await until(status('paused'), '暂停第二关');
+    await evaluate('choose("[data-switch-world]")');
+    await evaluate('choose("[data-world=rainbow]")');
+    assert.equal(await evaluate('document.querySelectorAll(".world-saves button").length'), 2);
+    await evaluate('tap(1)');
+    assert.equal(await evaluate('document.activeElement.dataset.world'), 'rainbow');
+    await evaluate('tap(0)');
+    await evaluate(`choose(".world-saves [data-run='${alternate.run.id}']")`);
+    await until(status('playing'), '恢复所选的同关进度');
+    assert.equal((await current()).run.id, alternate.run.id);
+    assert.equal((await current()).state.survival.character, 'mom');
   }
   async function checkCompletion() {
     await loadFixture(roomFixture('finish'));

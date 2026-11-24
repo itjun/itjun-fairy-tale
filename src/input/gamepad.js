@@ -55,7 +55,7 @@ function editControl(node, direction) {
   }
   return false;
 }
-function navigate(scope, direction) {
+export function navigate(scope, direction) {
   const items = controls(scope), current = document.activeElement, index = items.indexOf(current);
   if (!items.length) return;
   if (editControl(current, direction)) return;
@@ -172,6 +172,10 @@ export function startGamepad() {
     if (step.navigation) navigate(scope, step.navigation);
     if (input.scroll) scroll(scope, input.scroll * dt * 0.65);
     if (step.pressed.has('back')) { back(scope); return; }
+    if (step.pressed.has('spell')) {
+      const settings = scope.querySelector('[data-gamepad-settings]');
+      if (settings) { settings.click(); return; }
+    }
     if (step.pressed.has('pause')) { controls(scope).find(node => node.hasAttribute('data-gamepad-resume'))?.click(); return; }
     if (step.pressed.has('confirm')) {
       // 高亮项就是当前选项，一次 A 即可确认。跨页先松键由 gate 负责；

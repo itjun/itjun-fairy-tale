@@ -1,17 +1,18 @@
 import { useGamepad } from '../input/GamepadSupport.jsx';
 import { CombatAudio } from './combat-audio.js';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Heart, Star } from '@phosphor-icons/react';
-import { INITIAL_LIVES, CHARACTERS, newSurvival, takeDamage, applyWeaponTalent, bloomAtHit } from './characters.js';
+import { Check, GearSix } from '@phosphor-icons/react';
+import { CHARACTERS, newSurvival, takeDamage, applyWeaponTalent, bloomAtHit } from './characters.js';
 import { createPlayer, stepPlayer } from './physics.js';
 import { fireLoadout, stepAdventureWave, attackSource } from './adventure-combat.js';
 import { WEAPONS, UPGRADES } from './adventure.js';
 import { starterAdventure, recommendedStarter } from './starter-build.js';
 import { StarterPicker } from './StarterPicker.jsx';
-import { trapFocus } from './AdventurePanels.jsx';
+import { DIFFICULTIES, setPlaySettings, usePlaySettings } from './difficulty.js';
+import { ConfirmAction, DeparturePage } from './DeparturePage.jsx';
 import './characters.css';
 
-function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
+function CharacterPractice({ character, build, isTrying, onError, mixer }) {
   const canvas = useRef(null);
   useEffect(() => {
     const pad = { actions: new Set(), direction: 0 };
@@ -21,9 +22,9 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
     player.x = build.weapons.includes('lightblade') ? 11.5 : 8.5;
     let isDisposed = false, frame, previous = 0, elapsed = 0, waves = [], jump = false, effect, nextDemoJump = 0, nextContact = 2;
     const names = [...new Set([person.image, person.attack, 'enemy-leaf', 'flame-stream', ...Object.values(WEAPONS).map(w=>w.image), 'flower', 'collectible-rainbow', 'enemy-burst'])];
-    onProgress({ attacks:0, shieldRemaining:0 });
+    onError('');
     function keydown(event) {
-      if (!['ArrowLeft','ArrowRight','KeyA','KeyD','KeyJ','Space','ArrowUp','KeyW'].includes(event.code) || event.code === 'Space' && event.target.closest('button')) return;
+      if (document.activeElement !== node || !['ArrowLeft','ArrowRight','KeyA','KeyD','KeyJ','Space','ArrowUp','KeyW'].includes(event.code) || event.code === 'Space' && event.target.closest('button')) return;
       event.preventDefault(); if (['Space','ArrowUp','KeyW'].includes(event.code) && !keys.has(event.code)) jump = true; keys.add(event.code);
     }
     const keyup = event => keys.delete(event.code), clear = () => { keys.clear(); pad.actions = new Set(); pad.direction = 0; jump = false; };
@@ -35,7 +36,7 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
     };
     node.addEventListener('garden:practice-input', gamepadInput); node.addEventListener('blur', clear);
     window.addEventListener('keydown',keydown); window.addEventListener('keyup',keyup); window.addEventListener('blur',clear);
-    Promise.all(names.map(name => new Promise((resolve,reject) => { const image = new Image(); image.onload = () => { images[name] = image; resolve(); }; image.onerror = reject; image.src = `./assets/${name}.png`; }))).then(() => { if (!isDisposed) frame = requestAnimationFrame(draw); }).catch(() => { if (!isDisposed) onProgress({ error:'素材还没准备好，请返回后重试。' }); });
+    Promise.all(names.map(name => new Promise((resolve,reject) => { const image = new Image(); image.onload = () => { images[name] = image; resolve(); }; image.onerror = reject; image.src = `./assets/${name}.png`; }))).then(() => { if (!isDisposed) frame = requestAnimationFrame(draw); }).catch(() => { if (!isDisposed) onError('素材还没准备好，请返回后重试。'); });
     function draw(time) {
       const dt = previous ? Math.min((time-previous)/1000,0.035) : 0; previous = time; elapsed += dt;
       survival.shieldRemaining = Math.max(0,survival.shieldRemaining-dt);
@@ -46,11 +47,11 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
         if (shots.length) {
           applyWeaponTalent(survival, shots);
           for(const kind of new Set(shots.map(attackSource)))mixer.play(`${kind}:fire`);
-          waves.push(...shots); onProgress({...survival});
+          waves.push(...shots);
         }
       }
       if (character === 'dad' && isTrying && elapsed >= nextContact && survival.shieldRemaining === 0) {
-        takeDamage(survival); effect={x:player.x,y:player.y+1,at:elapsed,isShield:true}; nextContact=elapsed+20; onProgress({...survival});
+        takeDamage(survival); effect={x:player.x,y:player.y+1,at:elapsed,isShield:true}; nextContact=elapsed+20;
       }
       const spawned=[];
       for (const wave of waves) {
@@ -87,34 +88,92 @@ function CharacterPractice({ character, build, isTrying, onProgress, mixer }) {
       frame=requestAnimationFrame(draw);
     }
     return () => { node.removeEventListener('garden:practice-input', gamepadInput); node.removeEventListener('blur', clear); isDisposed=true; cancelAnimationFrame(frame); window.removeEventListener('keydown',keydown); window.removeEventListener('keyup',keyup); window.removeEventListener('blur',clear); };
-  },[character,build,isTrying,onProgress,mixer]);
+  },[character,build,isTrying,onError,mixer]);
   return <canvas ref={canvas} data-gamepad-canvas data-gamepad-practice tabIndex={0} onPointerDown={event => event.currentTarget.focus()} width="1060" height="530" aria-label={`${CHARACTERS[character].name}技能试用场景`}/>;
 }
-export function CharacterCamp({ character, build, locked = [], isSound, onBuild, onSelect, onBack, onStart }) {
-  const gamepadState = useGamepad();
-  const root=useRef(null), [isTrying,setIsTrying]=useState(false), [progress,setProgress]=useState({attacks:0}),[isPicking,setIsPicking]=useState(false);
-  const isPickerPreviouslyOpen=useRef(false),audio=useRef(null);audio.current ||= new CombatAudio();
-  useEffect(()=>{audio.current.setMuted(!isSound);return()=>audio.current.pause();},[isSound]);
-  useEffect(()=>()=>{audio.current.close();},[]);
-  const person=CHARACTERS[character];
-  useEffect(()=>{root.current?.querySelector('[aria-pressed=true]')?.focus();},[]);
-  useEffect(()=>{if(isPickerPreviouslyOpen.current&&!isPicking)root.current?.querySelector('.starter-actions button:last-child')?.focus();isPickerPreviouslyOpen.current=isPicking;},[isPicking]);
-  return <section ref={root} className="character-camp" role="dialog" aria-modal="true" aria-labelledby="character-heading" onKeyDown={trapFocus}>
-    <header inert={isPicking}><button className="paper-action" data-gamepad-back onClick={onBack}><ArrowLeft/>返回</button><h2 id="character-heading">选好角色，试试本领</h2></header>
-    <div className="character-camp-layout" inert={isPicking}>
-      <div className="character-camp-left">
-        <div className="character-choices" aria-label="选择角色">{Object.entries(CHARACTERS).map(([id,item])=><button key={id} aria-pressed={character===id} onClick={()=>{setIsTrying(false);onSelect(id);}}><img src={`./assets/${item.image}.png`} alt=""/><strong>{item.name}</strong>{character===id&&<Check className="character-check" weight="bold"/>}</button>)}</div>
-        <div className="character-practice"><img className="character-camp-background" src="./assets/character-camp.png" alt="彩笔森林里的出发营地"/><CharacterPractice character={character} build={build} isTrying={isTrying} onProgress={setProgress} mixer={audio.current}/></div>
-        <div className="character-try-row"><button className="paper-action" onClick={()=>{audio.current.unlock();setIsTrying(!isTrying);}}><img src="./assets/collectible-star.png" alt=""/>{isTrying?'停一下':'试一试'}</button><small>{gamepadState.mode === 'gamepad' ? '选中场景，左摇杆移动、A 跳跃、X 攻击、B 返回' : '点场景后，用方向键、空格和 J'}<br/>营地练习不扣命、不计分</small></div>
-      </div>
-      <div className="character-info"><h3>{person.name}</h3><h4><img src={`./assets/${person.icon}.png`} alt=""/>{person.talent}</h4><p>{person.hint}</p>
-        <div className="character-talent-demo" aria-live="polite">{['mom','sister'].includes(character) ? <div className="talent-pips" aria-label={`已累计 ${progress.attacks||0} 次攻击`}>{[0,1,2,3].map(i=><Star key={i} size={48} weight={i<(progress.attacks||0)?'fill':'regular'}/>)}</div> : <span>{person.detail}</span>}</div>
-        {progress.error&&<p role="alert">{progress.error}</p>}
-        <div className="starter-build"><h4>初始搭配</h4><div className="starter-actions"><button className="paper-action" onClick={()=>{setIsTrying(false);onBuild(recommendedStarter(character));}}>自动搭配</button><button className="paper-action" onClick={()=>{setIsTrying(false);setIsPicking(true);}}>自己选择</button></div><div className="starter-summary" aria-label="当前初始搭配">{build.weapons.map(id=><span key={id}><img src={`./assets/${WEAPONS[id].image}.png`} alt=""/>{WEAPONS[id].name}</span>)}{build.upgrades.map(id=><span key={id}><img src={`./assets/${UPGRADES[id].image}.png`} alt=""/>{UPGRADES[id].name}</span>)}</div><small>初始 1 种武器、最多 2 项本领，探索中继续叠加</small></div>
-        <div className="character-rules"><p><Heart weight="duotone"/>血瓶 ×{INITIAL_LIVES}　血量 100 / 100</p><progress aria-label="初始血量" value={INITIAL_LIVES} max={INITIAL_LIVES}/><p>受伤先扣血，血条耗尽才扣一条命。</p></div>
-        <button className="paper-action character-depart" onClick={onStart}><img src="./assets/checkpoint-flag.png" alt=""/>用{person.name}出发<ArrowRight/></button>
-      </div>
+function DepartureSettings({ character, build, locked, isSound, onBuild, onBack }) {
+  const buildButton = useRef(null);
+  const [isTrying, setTrying] = useState(false);
+  const [error, setError] = useState('');
+  const [picking, setPicking] = useState(false);
+  const mixer = useRef(null);
+  mixer.current ||= new CombatAudio();
+  const { mode } = useGamepad();
+  const { difficulty } = usePlaySettings();
+  const person = CHARACTERS[character];
+  useEffect(() => { mixer.current.setMuted(!isSound); }, [isSound]);
+  useEffect(() => () => mixer.current.close(), []);
+  useEffect(() => { if (!picking) buildButton.current?.focus({ preventScroll: true }); }, [picking]);
+
+  if (picking) return <StarterPicker build={build} locked={locked} onClose={() => setPicking(false)}
+    onConfirm={next => { onBuild(next); setPicking(false); }} />;
+
+  return <DeparturePage title="出发设置" backLabel="回选角" onBack={onBack} className="loadout-page">
+    <div className="loadout-content">
+      <section className="practice-column">
+        <div className="character-practice"><img className="character-camp-background" alt="" src="./assets/character-camp.png" />
+          <CharacterPractice character={character} build={build} isTrying={isTrying} onError={setError} mixer={mixer.current} />
+        </div>
+        <div className="character-try-row">
+          <button className="departure-secondary" onClick={() => { mixer.current.unlock(); setTrying(!isTrying); }}>{isTrying ? '停一下' : '试一试'}</button>
+          <span>{mode === 'gamepad' ? '选中场景，A 跳跃，X 攻击' : '点场景，空格跳跃，J 攻击'}</span>
+        </div>
+        {error && <p role="alert">{error}</p>}
+      </section>
+      <section className="loadout-options">
+        <h3>{person.name} · {person.talent}</h3><p>{person.hint}</p>
+        <h3>初始搭配</h3>
+        <div className="loadout-items">
+          {[...build.weapons.map(id => WEAPONS[id]), ...build.upgrades.map(id => UPGRADES[id])].map(item =>
+            <span key={item.name}><img src={`./assets/${item.image}.png`} alt="" />{item.name}</span>)}
+        </div>
+        <div className="starter-actions">
+          <button className="departure-secondary" onClick={() => onBuild(recommendedStarter(character))}>自动搭配</button>
+          <button ref={buildButton} className="departure-secondary" onClick={() => { setTrying(false); setPicking(true); }}>自己选择</button>
+        </div>
+        <h3>难度</h3><div className="departure-difficulty" data-gamepad-tabs="换难度">
+          {Object.entries(DIFFICULTIES).map(([id, item]) => <button key={id} className="departure-secondary"
+            aria-pressed={id === difficulty} onClick={() => setPlaySettings({ difficulty: id })}>{item.name}</button>)}
+        </div><p>{DIFFICULTIES[difficulty].hint}。</p>
+      </section>
     </div>
-    {isPicking&&<StarterPicker build={build} locked={locked} onClose={()=>setIsPicking(false)} onConfirm={next=>{onBuild(next);setIsPicking(false);}}/>}
-  </section>;
+  </DeparturePage>;
+}
+
+export function CharacterCamp({ character, build, locked = [], isSound, onBuild, onSelect, onBack, onStart }) {
+  const page = useRef(null);
+  const [settings, setSettings] = useState(false);
+  const { mode } = useGamepad();
+  useEffect(() => {
+    if (settings) return;
+    page.current?.querySelector('[aria-pressed=true]')?.focus({ preventScroll: true });
+  }, [settings]);
+
+  if (settings) return <DepartureSettings character={character} build={build} locked={locked} isSound={isSound}
+    onBuild={onBuild} onBack={() => setSettings(false)} />;
+
+  return <DeparturePage pageRef={page} title="选角色" backLabel="回地图" onBack={onBack} className="family-page">
+    <div className="family-grid" aria-label="选择角色">
+      {Object.entries(CHARACTERS).map(([id, person]) => {
+        const selected = id === character;
+        return <button key={id} className="family-portrait" data-character={id} aria-pressed={selected} tabIndex={selected ? 0 : -1}
+          onFocus={() => { if (!selected) onSelect(id); }}
+          onClick={event => {
+            if (!selected) onSelect(id);
+            else if (event.detail === 0) onStart();
+          }}>
+          <span className="portrait-crop"><img src={`./assets/${person.image}.png`} alt="" /></span>
+          <span className="portrait-name"><strong>{person.name}</strong>
+            {selected && <small><Check weight="bold" />{id === 'little' ? '跳得更高' : person.talent}</small>}
+          </span>
+        </button>;
+      })}
+    </div>
+    <footer className="departure-footer">
+      <button data-gamepad-settings className="departure-secondary" onClick={() => setSettings(true)}>
+        {mode === 'gamepad' ? <kbd aria-hidden="true">Y</kbd> : <GearSix />}出发设置
+      </button>
+      <ConfirmAction className="character-depart-action" onClick={onStart}>出发</ConfirmAction>
+    </footer>
+  </DeparturePage>;
 }
