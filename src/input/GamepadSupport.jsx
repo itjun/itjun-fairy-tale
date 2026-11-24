@@ -19,14 +19,14 @@ export function GamepadSettings() {
     <h2>Xbox 手柄</h2>
     <p role="status">{state.connected ? `已连接：${state.name}` : '连接 USB 或蓝牙手柄后，按一下 A 唤醒。'}</p>
     <dl className="pad-map">
-      <dt><PadKey name="stick" /></dt><dd>左摇杆或方向键：移动。跳到发光的门上就进去。小店里站到摊位前按上买东西。按下再按 A 往下跳</dd>
-      <dt><PadKey name="A" /></dt><dd>跳，空中再按一次。页面上是确定</dd>
-      <dt><PadKey name="X" /><PadKey name="RT" /></dt><dd>攻击，按住连发</dd>
-      <dt><PadKey name="Y" /></dt><dd>大招攒满后放出去</dd>
-      <dt><PadKey name="B" /></dt><dd>页面上返回上一层。游玩中不起作用</dd>
+      <dt><PadKey name="stick" /></dt><dd>移动；键盘用方向键。向上买东西，向下加跳跃穿过跳台</dd>
+      <dt><PadKey name="A" /></dt><dd>跳跃（空格），空中可再跳一次。页面上按 A 或 Enter 确定</dd>
+      <dt><PadKey name="X" /><PadKey name="RT" /></dt><dd>使用 X 格的攻法（J）</dd>
+      <dt><PadKey name="Y" /></dt><dd>使用 Y 格的攻法（K）</dd>
+      <dt><PadKey name="B" /></dt><dd>使用 B 格的攻法（L）。普通菜单中返回上一层</dd>
       <dt><PadKey name="LB" /><PadKey name="RB" /></dt><dd>翻页、换分类、换难度</dd>
-      <dt><PadKey name="View" /></dt><dd>看这一局的本领。老地图里是休息点</dd>
-      <dt><PadKey name="Menu" /></dt><dd>暂停，再按一次继续</dd>
+      <dt><PadKey name="View" /></dt><dd>看这一局的本领</dd>
+      <dt><PadKey name="Menu" /></dt><dd>暂停或继续（Esc）</dd>
     </dl>
     <label>摇杆死区 <input aria-label="摇杆死区" type="range" min="0.1" max="0.4" step="0.02" value={state.deadzone} onChange={event => setGamepadSettings({ deadzone: Number(event.target.value) })}/><span>{Math.round(state.deadzone * 100)}%</span></label>
     <button aria-pressed={state.vibration} onClick={() => setGamepadSettings({ vibration: !state.vibration })}>震动反馈：{state.vibration ? '开' : '关'}</button>
