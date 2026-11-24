@@ -89,8 +89,8 @@ export function addValleyViews(views) {
   const first = valley.controls[0];
   const cloud = sprite('platform-cloud',first.x-1,first.y+6.7,4.3,1.6,-.3);
   watch(0, (_,current) => { cloud.visible = current; });
-  stream([[first.x-.5,6.25],[first.x-.3,4.5],[first.x,1.35]],0,() => 0,.065);
-  stream([[first.x+1.15,1.15],[4.1,1.1],[4.9,.65],[5.45,.08]],0,water => water.demo,.14);
+  stream([[first.x-.5,first.y+6.25],[first.x-.3,first.y+4.5],[first.x,first.y+1.1]],0,() => 0,.13);
+  stream([[first.x+1.15,first.y+1.05],[4.1,first.y+.85],[4.9,first.y*.5+.45],[5.45,.08]],0,water => water.demo,.23);
   const forkX = valley.forkX;
   const forkCloud = sprite('platform-cloud',forkX-1,6.1,4.3,1.6,-.3);
   watch(0, (_,current) => { forkCloud.visible = current; });
@@ -103,7 +103,7 @@ export function addValleyViews(views) {
     stream([[22.2,15.35],[20.1,14.6],[16.8,13.9],[12.3,13.5]],0,water => water.bridge,.14);
   }
 
-  const gutters = [{x:first.x,y:0,key:'demo'}, {x:forkX,y:0,key:'fork'}];
+  const gutters = [{x:first.x,y:first.y,key:'demo'}, {x:forkX,y:0,key:'fork'}];
   const upper = valley.controls.find(item => item.channel === 'bridge');
   if (upper) gutters.push({x:upper.x,y:upper.y,key:'bridge'});
   for (const item of gutters) {

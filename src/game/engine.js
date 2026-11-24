@@ -529,7 +529,6 @@ export class GardenEngine {
         const rang = room.stations?.some(s => s.icon === 'clock-golden-bell' && marked[s.key] === this.elapsed);
         const broke = room.runs?.some(b => marked[b.wall] === this.elapsed || b.secret && marked[b.secret] === this.elapsed);
         this.callbacks.onSound(rang ? 'tower-chime' : broke ? 'snow-crack' : 'checkpoint');
-        this.skillEffects.burst(player.x,player.y+1.2,this.elapsed,true);
         this.publish(message);
         this.callbacks.onLifeChange?.(this.snapshot());
       }

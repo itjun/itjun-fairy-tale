@@ -4,6 +4,15 @@ const ink='#554232';
 // Draw interactive equipment on transparent paper in the same heavy outline as
 // the original drawings. Coordinates are shared by foreground and moving pieces.
 const drawings={
+  'mill-wheel'(a) {
+    a.circle(100,70,59,'#a86637');a.circle(100,70,46,'#f7d39b');
+    for(let i=0;i<8;i++) {
+      const angle=i*Math.PI/4, dx=Math.cos(angle), dy=Math.sin(angle);
+      a.line([[100+dx*12,70+dy*12],[100+dx*55,70+dy*55]],'#a66b3b',8);
+      a.line([[100+dx*52-dy*8,70+dy*52+dx*8],[100+dx*60+dy*8,70+dy*60-dx*8]],'#704932',7);
+    }
+    a.circle(100,70,11,'#efae4e');
+  },
   'oasis-jug'(a) {
     a.poly([[73,23],[108,23],[104,45],[118,61],[131,83],[126,104],[111,119],[73,121],[52,105],[52,81],[63,60],[77,45]],'#75bebe');
     a.line([[114,56],[136,54],[143,65],[141,80],[128,87]],'#866e4e',6);
