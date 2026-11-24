@@ -8,7 +8,13 @@ contextBridge.exposeInMainWorld('gardenDesktop', {
     ipcRenderer.on('garden:update-state', listener);
     return () => ipcRenderer.removeListener('garden:update-state', listener);
   },
-  toggleMaximize: () => ipcRenderer.invoke('garden:maximize'),
+  windowMode: () => ipcRenderer.invoke('garden:window-mode'),
+  setWindowMode: mode => ipcRenderer.invoke('garden:set-window-mode', mode),
+  onWindowMode: callback => {
+    const listener = (_event, mode) => callback(mode);
+    ipcRenderer.on('garden:window-mode', listener);
+    return () => ipcRenderer.removeListener('garden:window-mode', listener);
+  },
   quit: () => ipcRenderer.invoke('garden:quit'),
   onPrepareClose: callback => {
     const listener = (_event, token) => callback(token);
@@ -16,7 +22,6 @@ contextBridge.exposeInMainWorld('gardenDesktop', {
     return () => ipcRenderer.removeListener('garden:prepare-close', listener);
   },
   finishClose: (token, isSaved) => ipcRenderer.send('garden:close-ready', { token, isSaved: isSaved === true }),
-  toggleFullscreen: () => ipcRenderer.invoke('garden:fullscreen'),
   restart: () => ipcRenderer.invoke('garden:restart'),
   listBackups: () => ipcRenderer.invoke('garden:backup-list'),
   createBackup: garden => ipcRenderer.invoke('garden:backup-create', garden),

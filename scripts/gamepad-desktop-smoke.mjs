@@ -224,12 +224,20 @@ try {
   await until(() => evaluate('!!document.querySelector(".home-collection")'), '小成就');
   await evaluate('tap(1)');
   await evaluate('choose(".home-options-categories button:nth-child(3)")');
-  await evaluate('choose(".desktop-actions button:first-child")');
-  await until(() => win.isFullScreen(), '手柄进入全屏');
-  await wait(700);
-  await evaluate('choose(".desktop-actions button:first-child")');
-  await until(() => !win.isFullScreen(), '手柄退出全屏');
-  await wait(700);
+  for (const [mode, check] of [
+    ['windowed', () => !win.isFullScreen() && !win.isMaximized()],
+    ['maximized', () => !win.isFullScreen() && win.isMaximized()],
+    ['fullscreen', () => win.isFullScreen()],
+    ['windowed', () => !win.isFullScreen() && !win.isMaximized()],
+  ]) {
+    const changesFullscreen = win.isFullScreen() !== (mode === 'fullscreen');
+    const button = `.window-mode-row button[value=${mode}]`;
+    await evaluate(`choose(${JSON.stringify(button)})`);
+    await until(() => check() && evaluate(`document.querySelector(${JSON.stringify(button)})?.getAttribute("aria-pressed") === "true"`), `手柄选择显示模式 ${mode}`);
+    // macOS 切换桌面空间时，窗口模式会先于焦点稳定下来。
+    if (changesFullscreen && process.platform === 'darwin') await wait(700);
+    await focusWindow();
+  }
   await evaluate('tap(1)');
   await until(() => evaluate('!!document.querySelector(".home-play")'), '窗口设置返回首页');
   await evaluate('choose(".home-navigation button:nth-last-child(3)")');

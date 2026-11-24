@@ -48,7 +48,10 @@
 .option-row svg { flex-shrink:0; }
 .option-row b { font-weight:400; color:#a83e66; }
 .option-chips { display:flex; gap:12px; margin-left:auto; }
+.window-mode-row,.window-mode-row .option-chips { flex-wrap:wrap; }
+.window-mode-row > span { white-space:nowrap; }
 #root .option-chips button { min-width:96px; min-height:52px; padding:6px 18px; font-size:22px; border:2px solid #9d9b71; border-radius:12px 14px 11px 13px; background:#fffdf6; }
+#root .window-mode-row .option-chips button { min-width:88px; padding-inline:12px; }
 #root .option-chips button[aria-pressed="true"] { background:#f6b6cb; border-color:#a83e66; color:#5c1f38; }
 .option-note { margin:24px 12px 0; font-size:16px; line-height:1.7; color:#777761; text-align:left; }
 #root .home-options .home-options-grid .quiet-button[aria-pressed="true"] { color:#304a2b; }

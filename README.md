@@ -6,9 +6,9 @@
 
 ## macOS / Windows 桌面版
 
-Electron 桌面版启动即全屏，安装后无需 Node 或浏览器，游戏可离线运行；联网时可检查更新。macOS 提供 Apple Silicon / Intel 的 DMG 和 ZIP；Windows 提供 x64 / ARM64 的安装程序。打包产物在 `release/`，不包含家庭 SQLite 数据和测试存档。
+Electron 桌面版默认全屏启动，安装后无需 Node 或浏览器，游戏可离线运行；联网时可检查更新。macOS 提供 Apple Silicon / Intel 的 DMG 和 ZIP；Windows 提供 x64 / ARM64 的安装程序。打包产物在 `release/`，不包含家庭 SQLite 数据和测试存档。
 
-- 首页与应用菜单有“全屏 / 窗口”“保存并退出”。F11 切换全屏，macOS 也支持 Control + Command + F；Esc 暂停游戏。
+- 在「选项 → 窗口」选择窗口、最大化或全屏，游戏会记住显示模式。Windows 用 F11 切换全屏，macOS 用 Control + Command + F。Esc 暂停游戏。
 - 关闭窗口、Command + Q 或 Alt + F4 都先保存本局再退出；保存失败会提示留在游戏重试。重复打开只唤起原窗口。
 - 成绩存在系统用户数据目录下的 `花园王国/saves/garden.sqlite`：macOS 通常位于 `~/Library/Application Support/`，Windows 通常位于 `%APPDATA%/`。更新应用不覆盖成绩。
 - 原生菜单“成绩本”提供备份、导入旧版 SQLite 和打开存档目录。Windows 全屏时按 Alt 可显示菜单，也可先切换窗口。
@@ -21,7 +21,7 @@ Electron 桌面版启动即全屏，安装后无需 Node 或浏览器，游戏�
 
 ```sh
 npm ci
-npm start              # 构建并打开全屏 Electron
+npm start              # 构建并打开 Electron 桌面版
 npm run build
 npm test               # 并行跑功能检查，再单独跑性能检查，避免计时受其他测试抢占 CPU 影响
 npm run test:performance # 满配战斗性能检查，保留单步 P95 < 4ms 的门槛
@@ -135,7 +135,7 @@ python3 build.py
 python3 build.py --no-launch
 ```
 
-脚本先让本游戏旧进程保存退出，等待 15 秒后仅强制结束仍存活的项目进程，再执行 `npm ci`、构建、测试、按本机架构打包并安装。macOS 安装到可写的 `/Applications`，否则使用 `~/Applications`；Windows 使用当前用户的 `%LOCALAPPDATA%/Programs/GardenKingdom`。成功后启动全屏游戏。macOS 成功安装后同时生成 ZIP，将旧程序和构建副本移到废纸篓并取消其应用登记，只保留正式安装入口。用户数据目录不会被覆盖。Node 版本不匹配时会提前停止，不修改全局 Node。
+脚本先让本游戏旧进程保存退出，等待 15 秒后仅强制结束仍存活的项目进程，再执行 `npm ci`、构建、测试、按本机架构打包并安装。macOS 安装到可写的 `/Applications`，否则使用 `~/Applications`；Windows 使用当前用户的 `%LOCALAPPDATA%/Programs/GardenKingdom`。成功后按当前显示模式启动游戏。macOS 成功安装后同时生成 ZIP，将旧程序和构建副本移到废纸篓并取消其应用登记，只保留正式安装入口。用户数据目录不会被覆盖。Node 版本不匹配时会提前停止，不修改全局 Node。
 
 ## 发布新版与自动更新
 
@@ -148,7 +148,7 @@ git push origin main --follow-tags
 
 `.github/workflows/desktop.yml` 为 macOS / Windows 的 ARM64、x64 分别构建。全部成功后生成 `garden-update.json`（架构、文件大小、SHA-512）和 `SHA256SUMS.txt`，先上传到草稿 Release，资产齐全后公开为最新版。普通分支 push 不发布；手动运行只上传构建产物。版本标签必须与 package 版本一致，失败的任务不会发布不完整的新版。
 
-应用启动 12 秒后及每 4 小时检查 GitHub 最新正式版本，也可以点“检查更新”。新版自动下载；进入首页或暂停/结算界面后等待 5 秒，自动保存当前成绩、安装、重启全屏。正在跳跃时不会自动重启；暂停局会结束并保存，更新后重新选关。断网、校验失败或保存失败均保留现有应用和存档，可以稍后重试。
+应用启动 12 秒后及每 4 小时检查 GitHub 最新正式版本，也可以点“检查更新”。新版自动下载；进入首页或暂停/结算界面后等待 5 秒，自动保存当前成绩、安装并按当前显示模式重启。正在跳跃时不会自动重启；暂停局会结束并保存，更新后重新选关。断网、校验失败或保存失败均保留现有应用和存档，可以稍后重试。
 
 如果使用过 0.1.0 / 0.1.1 早期预览包，请手动安装 0.1.2 或更新版本一次，修复 macOS 中文 ZIP 校验问题；个人存档保留。后续正式版本使用上述自动更新流程。
 

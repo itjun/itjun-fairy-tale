@@ -28,4 +28,4 @@ for (let i = 0; i < 100; i++) {
   await new Promise(resolve => setTimeout(resolve, 100));
 }
 assert.equal(isExited, true, '退出游戏应正常结束重启后的进程');
-console.log('全屏切换、保存失败重试、防重复重启、新进程存档恢复和退出均通过。');
+console.log('默认全屏、三种显示模式、托盘切换、保存重试及重启恢复均通过。');

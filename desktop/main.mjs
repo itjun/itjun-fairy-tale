@@ -2,7 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, protocol,
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { mkdir, access, readdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { once } from 'node:events';
+import { mkdir, access, readdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { openStore, validateRun } from '../server/store.mjs';
 import { UpdateManager } from './updates.mjs';
@@ -15,6 +16,9 @@ if (process.env.GARDEN_DESKTOP_PROFILE) app.setPath('userData', resolve(process.
 protocol.registerSchemesAsPrivileged([{ scheme: 'garden', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 let win, store, databasePath, backupDir, closeRequest, updater, installing = false, mayExit = false;
 let tray, trayMenu, isRestarting = false;
+const windowModes = ['windowed', 'maximized', 'fullscreen'];
+const windowModePath = join(app.getPath('userData'), 'window-mode');
+let windowedMode = 'windowed', windowModeChange = Promise.resolve();
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
 
@@ -23,6 +27,7 @@ async function finishExit() {
   if (mayExit || closeRequest?.phase === 'finishing') return;
   if (closeRequest) closeRequest.phase = 'finishing';
   clearTimeout(closeRequest?.timer);
+  await windowModeChange;
   if (installing) {
     try { await updater.apply(); }
     catch (error) { installing = false; closeRequest = null; updater.cancelInstall(); dialog.showErrorBox('更新未完成，游戏已保留', error.message); return; }
@@ -62,11 +67,55 @@ function requestRestart() {
   isRestarting = true;
   requestClose();
 }
+async function readWindowMode() {
+  try {
+    const mode = await readFile(windowModePath, 'utf8');
+    if (windowModes.includes(mode)) return mode;
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.error('无法读取窗口模式', error);
+  }
+  return 'fullscreen';
+}
+function getWindowMode() {
+  if (win.isFullScreen()) return 'fullscreen';
+  return win.isMaximized() ? 'maximized' : 'windowed';
+}
+async function applyWindowMode(mode) {
+  const fullscreen = mode === 'fullscreen';
+  if (win.isFullScreen() !== fullscreen) {
+    // macOS 离开全屏动画结束后，才能调整窗口大小。
+    const transition = process.platform === 'darwin'
+      ? once(win, fullscreen ? 'enter-full-screen' : 'leave-full-screen', { signal: AbortSignal.timeout(5000) })
+      : null;
+    win.setFullScreen(fullscreen);
+    await transition;
+  }
+  if (mode === 'maximized' && !win.isMaximized()) win.maximize();
+  if (mode === 'windowed' && win.isMaximized()) win.unmaximize();
+}
+function changeWindowMode(chooseMode) {
+  if (!win || win.isDestroyed() || mayExit || closeRequest?.phase === 'finishing') return;
+  const change = windowModeChange.then(async () => {
+    const current = getWindowMode();
+    const mode = chooseMode(current);
+    if (mode === 'fullscreen' && current !== 'fullscreen') windowedMode = current;
+    await applyWindowMode(mode);
+    if (getWindowMode() !== mode) throw new Error('无法切换窗口模式');
+    const pending = windowModePath + '.tmp';
+    await writeFile(pending, mode);
+    await rename(pending, windowModePath);
+  });
+  windowModeChange = change.catch(error => console.error('窗口模式设置未完成', error));
+  return change;
+}
 function toggleFullscreen() {
   if (!win || win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
   win.show(); win.focus();
-  win.setFullScreen(!win.isFullScreen());
+  void changeWindowMode(mode => mode === 'fullscreen' ? windowedMode : 'fullscreen');
+}
+function toggleMaximize() {
+  void changeWindowMode(mode => mode === 'maximized' ? 'windowed' : 'maximized');
 }
 function createTray() {
   const image = nativeImage.createFromPath(join(root, 'build/icon.png')).resize({ width: 18, height: 18 });
@@ -148,13 +197,20 @@ async function backupTask(task) {
 function menuTask(task) { return () => { task().catch(error => dialog.showErrorBox('成绩本操作未完成', error.message)); }; }
 async function createWindow() {
   const area = screen.getPrimaryDisplay().workAreaSize;
-  win = new BrowserWindow({ width: Math.min(1280,area.width-48), height: Math.min(800,area.height-48), minWidth: Math.min(720,area.width-48), minHeight: Math.min(540,area.height-48), show: false, frame: false, fullscreen: false, fullscreenable: true, backgroundColor: '#faf8f1', title: '花园王国', icon: join(root, 'build/icon.png'), autoHideMenuBar: true,
+  const mode = await readWindowMode();
+  win = new BrowserWindow({ width: Math.min(1280,area.width-48), height: Math.min(800,area.height-48), minWidth: Math.min(720,area.width-48), minHeight: Math.min(540,area.height-48), show: false, frame: false, fullscreen: mode === 'fullscreen', fullscreenable: true, backgroundColor: '#faf8f1', title: '花园王国', icon: join(root, 'build/icon.png'), autoHideMenuBar: true,
     webPreferences: { preload: join(root, 'desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, autoplayPolicy: 'no-user-gesture-required', spellcheck: false, backgroundThrottling: process.env.GARDEN_DESKTOP_SMOKE !== '1' } });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
   win.webContents.on('will-attach-webview', event => event.preventDefault());
   win.on('close', event => { if (!mayExit) { event.preventDefault(); requestClose(); } });
-  win.once('ready-to-show', () => { win.show(); });
+  win.once('ready-to-show', () => {
+    if (mode === 'maximized') win.maximize();
+    win.show();
+  });
+  for (const event of ['enter-full-screen', 'leave-full-screen', 'maximize', 'unmaximize']) {
+    win.on(event, () => win.webContents.send('garden:window-mode', getWindowMode()));
+  }
   createTray();
   await win.loadURL(APP_ORIGIN + '/');
   if (!app.isPackaged && process.env.GARDEN_DESKTOP_MENU_SMOKE === '1') {
@@ -194,12 +250,14 @@ if (hasLock) {
     session.defaultSession.setPermissionCheckHandler(() => false);
     // All game resources are local. External navigation and network access are unnecessary.
     session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (_details, callback) => callback({ cancel: true }));
-    ipcMain.handle('garden:maximize', event => { if (trusted(event)) { if(win.isMaximized())win.unmaximize();else win.maximize(); } });
+    ipcMain.handle('garden:window-mode', event => trusted(event) ? getWindowMode() : null);
+    ipcMain.handle('garden:set-window-mode', (event, mode) => {
+      if (trusted(event) && windowModes.includes(mode)) return changeWindowMode(() => mode);
+    });
     ipcMain.handle('garden:update-state', event => trusted(event) ? updater.state : null);
     ipcMain.handle('garden:check-update', event => trusted(event) ? updater.check() : null);
     ipcMain.on('garden:update-safe', (event, safe) => { if (trusted(event)) updater.setSafe(safe === true); });
     ipcMain.handle('garden:quit', event => { if (trusted(event)) requestClose(); });
-    ipcMain.handle('garden:fullscreen', event => { if (trusted(event)) toggleFullscreen(); });
     ipcMain.handle('garden:restart', event => { if (trusted(event)) requestRestart(); });
     ipcMain.handle('garden:backup-list', event => trusted(event) ? backupTask(listBackups) : null);
     ipcMain.handle('garden:backup-create', (event, garden) => trusted(event) ? backupTask(() => createBackup(garden)) : null);
@@ -218,7 +276,7 @@ if (hasLock) {
     updater = new UpdateManager({ app, notify: state => { if (win && !win.isDestroyed()) win.webContents.send('garden:update-state', state); }, requestInstall: () => { if (closeRequest || mayExit) { updater.cancelInstall(); return; } installing = true; requestClose(); } });
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ label: '花园王国', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { label: '保存并退出', accelerator: 'Cmd+Q', click: requestClose }] }] : []),
-      { label: '游戏', submenu: [{ label: '全屏游玩', accelerator: process.platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11', click: toggleFullscreen }, { label: '放大 / 还原窗口', click: () => { if(win.isMaximized())win.unmaximize();else win.maximize(); } }, { label: '重新启动', click: requestRestart }, { label: '退出游戏', accelerator: process.platform === 'darwin' ? undefined : 'Alt+F4', click: requestClose }] },
+      { label: '游戏', submenu: [{ label: '全屏游玩', accelerator: process.platform === 'darwin' ? 'Ctrl+Cmd+F' : 'F11', click: toggleFullscreen }, { label: '放大 / 还原窗口', click: toggleMaximize }, { label: '重新启动', click: requestRestart }, { label: '退出游戏', accelerator: process.platform === 'darwin' ? undefined : 'Alt+F4', click: requestClose }] },
       { label: '成绩本', submenu: [{ label: '备份成绩本…', click: menuTask(backupScores) }, { label: '导入成绩本…', click: menuTask(importScores) }, { label: '打开存档文件夹', click: () => shell.openPath(dataDir) }] },
       { role: 'editMenu', label: '编辑' },
       { label: '更新', submenu: [{ label: '检查新版本', click: () => void updater.check() }] },

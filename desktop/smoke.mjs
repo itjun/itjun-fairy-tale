@@ -33,19 +33,20 @@ export async function runSmoke({ win, requestClose }) {
     throw new Error(`Not ready: ${code}; window=${JSON.stringify({focused:win.isFocused(),visible:win.isVisible(),minimized:win.isMinimized()})}; UI=${await evaluate('JSON.stringify({status:document.querySelector(".platform-game")?.dataset.gameStatus,text:document.body.innerText.slice(-1200)})')}`);
   }
 
+  const isReopen = process.env.GARDEN_DESKTOP_PHASE === 'reopen';
   await until('!!document.querySelector(".home-play")');
   await until('document.fonts.check("18px GardenHand")');
   await until('Array.from(document.images).every(image => image.complete && image.naturalWidth > 0)');
   await wait(1000);
-  assert.equal(win.isFullScreen(), false);
+  assert.equal(win.isFullScreen(), !isReopen, '初次全屏，重启恢复窗口模式');
   assert.deepEqual(win.getBounds(),win.getContentBounds(),'无边框窗口内容应铺满客户区');
   assert.equal(await evaluate('document.querySelector(".desktop-window-bar")'),null);
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".home-title")).getPropertyValue("-webkit-app-region")'),'drag');
   assert.equal(await evaluate('typeof window.require'), 'undefined');
   assert.equal(await evaluate('typeof window.gardenDesktop.quit'), 'function');
+  if (!isReopen) await evaluate('window.gardenDesktop.setWindowMode("windowed")');
   // 通过实际界面记录三个独立盘面，退出桌面再打开后仍恢复同一局。
   const miniProofPath = join(profile, 'mini-games.json');
-  const isReopen = process.env.GARDEN_DESKTOP_PHASE === 'reopen';
   const miniProof = isReopen ? JSON.parse(await readFile(miniProofPath, 'utf8')) : {};
   await evaluate(`Array.from(document.querySelectorAll('.home-navigation button')).find(button => button.textContent === '小游戏').click()`);
   await until('!!document.querySelector(".home-games .quest-card")');
@@ -167,8 +168,8 @@ export async function runSmoke({ win, requestClose }) {
   await writeFile(join(profile, 'playing.png'), (await capture()).toPNG());
   win.minimize(); await wait(500); assert.equal(win.isMinimized(),true);
   win.restore(); win.focus(); await wait(500);
-  await evaluate('window.gardenDesktop.toggleMaximize()'); await wait(800); assert.equal(win.isMaximized(),true); assert.equal(win.isFullScreen(),false);
-  await evaluate('window.gardenDesktop.toggleMaximize()'); await wait(800); assert.equal(win.isMaximized(),false);
+  await evaluate('window.gardenDesktop.setWindowMode("maximized")'); assert.equal(win.isMaximized(),true); assert.equal(win.isFullScreen(),false);
+  await evaluate('window.gardenDesktop.setWindowMode("windowed")'); assert.equal(win.isMaximized(),false);
   // 隔离配置中注入受伤/死亡边界，再通过真实按钮验证持久化与跨关。
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');

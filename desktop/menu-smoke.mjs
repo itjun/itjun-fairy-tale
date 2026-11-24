@@ -8,20 +8,21 @@ export async function runMenuSmoke({ win, tray, trayMenu, requestClose }) {
   const profile = app.getPath('userData');
   const evaluate = code => win.webContents.executeJavaScript(code);
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-  async function until(check) {
+  async function until(check, label = '页面') {
     for (let i = 0; i < 150; i++) { if (await check()) return; await wait(100); }
-    throw new Error('桌面菜单验收等待超时');
+    throw new Error(`桌面菜单验收等待超时：${label}`);
   }
-  await until(() => evaluate('!!document.querySelector(".home-play")'));
+  await until(() => win.isVisible() && evaluate('!!document.querySelector(".home-play")'));
   assert.equal(tray.isDestroyed(), false);
   assert.deepEqual(trayMenu.items.filter(item => item.type !== 'separator').map(item => item.label), ['全屏游玩', '重新启动', '退出游戏']);
-  assert.equal(win.isFullScreen(), false, '启动仍为普通窗口');
   const restartMarker = join(profile, 'menu-restart-requested.json');
   let previous;
   try { previous = JSON.parse(await readFile(restartMarker, 'utf8')); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (previous) {
     assert.notEqual(process.pid, previous.pid, '必须启动新进程，而非刷新页面');
+    assert.equal(win.isFullScreen(), false);
+    assert.equal(win.isMaximized(), true, '重启恢复最大化');
     assert.equal(await evaluate('localStorage.getItem("menu-close-count")'), '2', '重复入口只能保存一次；失败后允许重试');
     const saved = await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1"))');
     assert.equal(saved.state.seed, previous.seed);
@@ -31,10 +32,27 @@ export async function runMenuSmoke({ win, tray, trayMenu, requestClose }) {
     trayMenu.getMenuItemById('garden-quit').click();
     return;
   }
+  assert.equal(win.isFullScreen(), true, '新配置默认全屏启动');
+  await evaluate('Array.from(document.querySelectorAll(".home-navigation button")).find(button => button.textContent === "选项").click()');
+  await until(() => evaluate('!!document.querySelector(".home-options-categories")'));
+  await evaluate('Array.from(document.querySelectorAll(".home-options-categories button")).find(button => button.textContent === "窗口").click()');
+  const selected = mode => evaluate(`document.querySelector(".window-mode-row button[aria-pressed=true]")?.value === "${mode}"`);
+  await until(() => selected('fullscreen'), '初始选中全屏');
+  const normalBounds = win.getNormalBounds();
+  async function chooseMode(mode, nativeState) {
+    await evaluate(`document.querySelector(".window-mode-row button[value=${mode}]").click()`);
+    await until(() => nativeState() && selected(mode), mode);
+  }
+  const isMaximized = () => !win.isFullScreen() && win.isMaximized();
+  await chooseMode('maximized', isMaximized);
+  await chooseMode('fullscreen', () => win.isFullScreen());
+  await chooseMode('windowed', () => !win.isFullScreen() && !win.isMaximized());
+  assert.deepEqual(win.getBounds(), normalBounds, '恢复原窗口尺寸');
+  await chooseMode('maximized', isMaximized);
   trayMenu.getMenuItemById('garden-fullscreen').click();
-  await until(() => win.isFullScreen() && trayMenu.getMenuItemById('garden-fullscreen').checked);
+  await until(() => win.isFullScreen() && trayMenu.getMenuItemById('garden-fullscreen').checked && selected('fullscreen'), '托盘进入全屏');
   trayMenu.getMenuItemById('garden-fullscreen').click();
-  await until(() => !win.isFullScreen() && !trayMenu.getMenuItemById('garden-fullscreen').checked);
+  await until(() => isMaximized() && !trayMenu.getMenuItemById('garden-fullscreen').checked && selected('maximized'), '托盘退出全屏后还原最大化');
 
   const fixture = roomFixture('score');
   await evaluate(`localStorage.setItem('garden-active-adventure-v1',${JSON.stringify(JSON.stringify(fixture))})`);
