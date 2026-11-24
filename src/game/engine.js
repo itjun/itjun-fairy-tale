@@ -130,7 +130,7 @@ export class GardenEngine {
     try {
       const loader = new THREE.TextureLoader();
       const surfaceImage = this.level.surface || 'grass-texture';
-      const storyBackdrop = this.world.expedition && {family:'clock-town-sky'}[this.level.id];
+      const storyBackdrop = this.world.expedition && {family:'clock-town-sky',snow:'snow-expedition-ridge'}[this.level.id];
       const landscape = this.world.field === 'beach' ? 'paper-texture' : storyBackdrop || (this.world.valley ? 'water-valley' : ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image);
       const isDesert = this.level.id === 'desert';
       const poseNames = Object.keys(CHARACTERS).flatMap(character => ['climb', 'crawl'].map(pose => `${character}-${pose}`));
@@ -232,14 +232,14 @@ export class GardenEngine {
     const hasFloorBelow=platform=>this.platforms.some(other=>other.id!==platform.id&&!other.isMoving&&other.y<platform.y-.01&&platform.y-other.y<LAYER*2-.2&&Math.min(platform.x+platform.width/2,other.x+other.width/2)-Math.max(platform.x-platform.width/2,other.x-other.width/2)>0);
     for (const platform of this.platforms) {
       const group = new THREE.Group(); group.position.set(platform.x, platform.y, 0);
-      if (platform.handLength || platform.skin==='safety-net') {
+      if (platform.handLength || platform.skin==='safety-net' || (this.world.expedition && this.level.id==='snow' && platform.isIce)) {
         const hand=!!platform.handLength, net=platform.skin==='safety-net';
-        const art=hand?'clock-orange-hand':'clock-safety-net';
+        const art=hand?'clock-orange-hand':net?'clock-safety-net':'snow-crayon-bank';
         this.storyDecks ||= {};
         const mat=this.storyDecks[art] ||= this.spriteMaterial(art);
         const mesh=new THREE.Mesh(this.planeGeometry,mat);
-        const width=hand?platform.handLength*1.11:platform.width;
-        const height=hand?width*.15:width*.25;
+        const width=hand?platform.handLength*1.11:platform.snowDepth?Math.hypot(platform.width,platform.width*platform.slope)+.32:platform.width;
+        const height=hand?width*.15:net?width*.25:platform.snowDepth || Math.min(2.2,width*.23);
         mesh.scale.set(width,height,1);
         mesh.position.set(hand?-platform.handLength*.045:0,net?height*.03:hand?-height*.26:-height*.44,.3);
         group.add(mesh);
@@ -342,7 +342,7 @@ export class GardenEngine {
     if (!width || !height) return;
     this.renderer.setSize(width, height);
     const aspect = width / height;
-    const halfHeight = this.world.expedition ? ({family:14.8}[this.level.id] || 9) : 9;
+    const halfHeight = this.world.expedition ? ({family:14.8,snow:12.5}[this.level.id] || 9) : 9;
     const halfWidth = Math.max(12,halfHeight * aspect);
     if (!this.isReady) this.cameraX = Math.min(16, halfWidth - 4);
     this.camera.left = -halfWidth; this.camera.right = halfWidth;
@@ -484,6 +484,9 @@ export class GardenEngine {
     }
     const frame = room.frames?.find(f => Math.abs(f.x-averageX)<f.width*.48 && Math.abs(f.y-averageY)<12);
     if (frame) return {x:frame.x+(averageX-frame.x)*.25,y:frame.y+.35+(averageY-frame.y)*.15};
+    if (this.world.expedition && this.level.id==='snow' && room.runs?.length) {
+      return {x:Math.max(min,Math.min(max,averageX + Math.min(10,this.camera.right*.43))),y:averageY+2.4};
+    }
     const x = min > max ? (room.left + room.right) / 2 : Math.max(min, Math.min(max, averageX + Math.min(5, this.camera.right * 0.25)));
     // 往上爬的房间多看一点头顶，往下跳的房间多看一点脚下。
     const isAscending = room.traversal?.ridges && averageX < room.traversal.practiceUntilX;
@@ -508,7 +511,8 @@ export class GardenEngine {
         syncStory(world,state,this.elapsed);
         const marked = state.story.marks;
         const rang = room.stations?.some(s => s.icon === 'clock-golden-bell' && marked[s.key] === this.elapsed);
-        this.callbacks.onSound(rang ? 'tower-chime' : 'checkpoint');
+        const broke = room.runs?.some(b => marked[b.wall] === this.elapsed || b.secret && marked[b.secret] === this.elapsed);
+        this.callbacks.onSound(rang ? 'tower-chime' : broke ? 'snow-crack' : 'checkpoint');
         this.skillEffects.burst(player.x,player.y+1.2,this.elapsed,true);
         this.publish(message);
         this.callbacks.onLifeChange?.(this.snapshot());

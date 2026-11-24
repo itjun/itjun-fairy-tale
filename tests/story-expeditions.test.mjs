@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAYABLE_WORLDS, WATERWAYS, CLOCK_TOWER } from '../shared/levels.js';
+import { PLAYABLE_WORLDS, WATERWAYS, CLOCK_TOWER, SNOW_EXPEDITION } from '../shared/levels.js';
 import { createRoomWorld } from '../shared/room-world.js';
-import { advanceStory, metGoals, movingHand, syncStory } from '../shared/story-mechanisms.js';
+import { advanceStory, ballPosition, metGoals, movingHand, syncStory } from '../shared/story-mechanisms.js';
 import { newRoomState, stepRoom, isValidRoomState } from '../src/game/rooms.js';
 import { createPlayer, platformY, stepPlayer } from '../src/game/physics.js';
 import { roomFixture } from './helpers/adventure-fixtures.mjs';
 import { readAdventure } from '../src/game/save.js';
 import { openStore } from '../server/store.mjs';
 
-const stages=[WATERWAYS,CLOCK_TOWER], dt=1/120;
+const stages=[WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION], dt=1/120;
 const roomTiles=(world,room)=>room.platformIds.map(id=>world.platforms[id]);
-test('探险世界八个区段分别进入选关、成绩与续关，旧地图继续可读',()=>{
+test('三个世界八个区段分别进入选关、成绩与续关，旧地图继续可读',()=>{
   const store=openStore(':memory:');
   try {
     for(const stage of stages) {
@@ -32,7 +32,7 @@ test('探险世界八个区段分别进入选关、成绩与续关，旧地图�
   } finally {store.close();}
 });
 
-test('写入及重读探险世界的首领房和终点', () => {
+test('写入及重读三个世界的首领房和终点，保存滚动中的雪球', () => {
   const restore = ({ run, state }) => readAdventure({ getItem: () => JSON.stringify({ run, state }), removeItem() {} });
   for (const stage of stages) {
     for (const mode of ['boss', 'finish']) {
@@ -43,6 +43,16 @@ test('写入及重读探险世界的首领房和终点', () => {
       assert.deepEqual(saved.state.rooms.story, fixture.state.rooms.story);
     }
   }
+  const fixture = roomFixture('room', SNOW_EXPEDITION.id);
+  const world = createRoomWorld(fixture.state.seed, SNOW_EXPEDITION);
+  const room = world.rooms[0], ball = room.runs[0];
+  const release = room.stations.find(s => s.key === ball.release);
+  advanceStory(world, fixture.state.rooms, createPlayer(world.platforms[release.platformId]), 17);
+  const saved = restore(fixture);
+  assert.ok(saved);
+  const before = ballPosition(ball, fixture.state.rooms.story, fixture.state.elapsed);
+  assert.ok(before.progress > 0 && before.progress < 1);
+  assert.deepEqual(ballPosition(ball, saved.state.rooms.story, saved.state.elapsed), before);
 });
 
 // Try a real single or double jump from the near edge. Platforms between the
@@ -131,4 +141,22 @@ test('指针载人随转轴升降，松开方向不会滑下，错过窗台还�
   assert.equal(fallen.ground,net);
   assert.equal(fallen.y,platformY(net,fallen.x));
   assert.ok(pathExists(w,r,net,p),'从网面还能再次搭针');
+});
+
+test('雪球途中保存后位置一致；错过岔轨可再发一次，破冰与宝物支路各只开启一次',()=>{
+  const w=createRoomWorld(1,SNOW_EXPEDITION),r=w.rooms.find(r=>r.name==='岔轨雪沟'),s=newRoomState(w);
+  s.roomId=r.id;
+  const b=r.runs[0], station=k=>r.stations.find(x=>x.key===k), stand=k=>createPlayer(w.platforms[station(k).platformId]);
+  advanceStory(w,s,stand(b.release),2);
+  const saved=structuredClone(s);
+  assert.deepEqual(ballPosition(b,s.story,4),ballPosition(b,saved.story,4));
+  assert.ok(ballPosition(b,s.story,4).progress>0 && ballPosition(b,s.story,4).progress<1);
+  advanceStory(w,s,stand(b.lever),20);
+  assert.ok(Object.hasOwn(s.story.marks,b.wall));assert.ok(!(b.secret in s.story.marks));
+  advanceStory(w,s,stand(b.release),21);advanceStory(w,s,stand(b.lever),42);
+  assert.ok(b.secret in s.story.marks);
+  const marks=structuredClone(s.story.marks);
+  advanceStory(w,s,stand(b.release),49);assert.deepEqual(s.story.marks,marks);
+  s.path=[0,r.id];s.cleared=[0];s.stars={0:3};
+  assert.equal(isValidRoomState(s,w),false);
 });

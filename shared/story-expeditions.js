@@ -18,6 +18,12 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
     return p;
   }
   function trail(points, skin) { return points.map(([x,y,w=7]) => tile(x,y,w,skin)); }
+  function snowbank(points,depth) {
+    return points.slice(1).map(([x2,y2],i)=>{
+      const [x1,y1]=points[i];
+      return tile((x1+x2)/2,(y1+y2)/2,x2-x1,'ice',{slope:(y2-y1)/(x2-x1),snowDepth:depth});
+    });
+  }
   function treasure(p) {
     const kinds = LEVEL_COLLECTIBLES[stage.themeId];
     world.treasures.push({ id: world.treasures.length + 1, roomId: id, platformId: p.id,
@@ -54,6 +60,15 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
     room.frames.push({ x:origin+x+length*.52, y:y+1.4, width:length*2.8 });
     return p;
   }
+  function run(key, source, points, label, {fork, spur, switchKey} = {}) {
+    const absolute = path => path.map(([x,y]) => [origin+x,y]);
+    const release = station(key+'-release',source,'snow-expedition-ball','放出雪球',{kind:'release',goal:false});
+    const ball = { release, wall:tag(key), points:absolute(points),
+      label, ...(spur ? { fork, spur:absolute(spur), lever:tag(switchKey), secret:tag(key+'-spur') } : {}) };
+    room.runs.push(ball);
+    room.goals.push(ball.wall);
+    return ball;
+  }
   function finish(start, exit) {
     const ps = room.platformIds.map(i => world.platforms[i]);
     if (room.id && room.kind==='mechanism') {
@@ -71,6 +86,11 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
           x:home.x,y:home.y,period:7,phase:builder.random()*2,length:3.9,warning:1.5,active:1.2});
       }
     }
+    // Match the local slope of the snow channel under the rolling ball.
+    for (const ball of room.runs) for (let i=1;i<ball.points.length;i++) {
+      const [x0,y0]=ball.points[i-1],[x1,y1]=ball.points[i];
+      for (const p of ps) if(p.isIce && !p.snowDepth && p.x>x0 && p.x<=x1 && Math.abs(p.y-(y1-1))<1.25) p.slope=(y1-y0)/(x1-x0);
+    }
     Object.assign(room,{ startId:start.id, exitId:exit.id, exitPlatformIds:[exit.id],
       left:Math.min(...ps.map(p=>p.x-p.width/2)),right:Math.max(...ps.map(p=>p.x+p.width/2)),
       bottom:Math.min(...ps.map(p=>p.y)),top:Math.max(...ps.map(p=>p.y))+2 });
@@ -81,11 +101,11 @@ export function storyRoom(world, stage, builder, name, kind = 'mechanism', rewar
     world.zones.push({id,kind,name,isBoss:kind==='boss',roomIds:[id],startId:start.id,exitId:exit.id,
       platformIds:room.platformIds,minX:room.left,maxX:room.right,baseY:0});
   }
-  return {room,origin,tile,trail,treasure,station,gated,enemy,hand,spring,ferry,finish,random:builder.random};
+  return {room,origin,tile,trail,snowbank,treasure,station,gated,enemy,hand,run,spring,ferry,finish,random:builder.random};
 }
 
 const leaves = 'water-leaf', lilies = 'water-lily', roof = 'roof', plank = 'plank';
-const water = 'water-gutter', bell = 'clock-golden-bell', gear = 'platform-gear';
+const water = 'water-gutter', bell = 'clock-golden-bell', gear = 'platform-gear', crystal = 'collectible-snowflake';
 
 function nursery(p) {
   const {tile,trail,station,gated,treasure,finish}=p;
@@ -227,6 +247,71 @@ function clockParade(p) {
 
 // The ball and the child travel on independent routes. The valley follows the
 // ball, the upper ridge reaches the switch before it passes the junction.
+function snowChute(p, {key='ice',label,spur=false}) {
+  const {tile,trail,station,run,treasure,gated,finish}=p;
+  const start=tile(0,4,14,'ice');
+  const launch=tile(13,4,10,'ice');
+  const low=p.snowbank([[18,4],[24,2],[35,0],[46,-2],[57,-3],[72,-3],[89,-3],[101,-2],[113,0],[118,1]],4.3);
+  const high=[
+    ...p.snowbank([[20,6.4],[28,8.3],[37,9.5],[45,10],[52,9.2]],1.6),
+    ...p.snowbank([[54,9],[66,7.5],[77,6.4],[88,5],[97,4]],2)
+  ];
+  if (spur) station('rail',high[2],gear,'岔轨转向蓝冰窟',{goal:false});
+  const points=[[13,5],[24,3],[35,1],[46,-1],[57,-2],[72,-2],[89,-2]];
+  run(key,launch,points,label,spur ? {fork:4,spur:[[57,-2],[65,0],[73,2],[81,2]],switchKey:'rail'} : {});
+  if (spur) {
+    const secret=gated([[82,1.4,7],[91,1.8,7]],key+'-spur','ice');
+    treasure(secret[0]);treasure(secret[1]);
+  }
+  treasure(high[4]);treasure(low[3]);
+  finish(start,tile(125,1,13,'ice'));
+}
+function starPass(p) {
+  const {tile,trail,station,run,gated,treasure,finish}=p;
+  const base=trail([[0,0,13],[13,0,10],[25,0,10],[37,0,10],[49,0,10]],'rock');
+  const climb=trail([[11,2.6],[19,5.2],[27,7.8],[35,10.4],[43,13],[52,14,9]],'ice');
+  run('arch',climb.at(-1),[[52,15],[64,12],[76,9],[88,6],[100,3],[110,2]],'山脚的星灯洞打开了');
+  const descent=trail([[64,11,10],[76,8,10],[88,5,10],[100,2,10],[112,1,10],[124,1,10]],'ice');
+  station('star',descent.at(-1),'collectible-star','带回了雪洞里的星光',{after:['arch']});
+  const rise=gated([[119,3.6],[111,6.2],[103,8.8],[95,11.4],[87,14],[79,16.6]],'star','ice');
+  station('beacon',rise.at(-1),'collectible-star','点亮山口的星灯',{after:['star']});
+  gated([[88,19],[97,19],[106,18],[115,17],[124,16]],'beacon','ice');
+  treasure(base[3]);treasure(climb[3]);treasure(rise[3]);finish(base[0],tile(135,15,12,'ice'));
+}
+function relay(p) {
+  const {tile,trail,run,station,gated,treasure,finish}=p;
+  const top=trail([[0,4,13],[13,4,10],[25,2,10],[37,0,10],[49,-2,10],[61,-4,10],[73,-4,10]],'ice');
+  run('rose',top[1],[[13,5],[25,3],[37,1],[49,-1],[61,-3],[70,-3]],'冰门打开，通往第二个雪球台');
+  const shaft=gated([[76,-1.4],[68,1.2],[76,3.8],[84,6.4],[92,9],[100,11.6]],'rose','ice');
+  const shelf=tile(111,12,12,'ice');
+  const lower=trail([[124,10,10],[136,8,10],[148,6,10],[160,4,10],[172,2,10],[184,1,10]],'ice');
+  const high=trail([[121,14.6],[129,17.2],[137,19.8],[146,20],[155,18.5],[164,17]],'rock');
+  station('rail',high[1],gear,'切换了最后一道岔轨',{goal:false});
+  run('blue',shelf,[[111,13],[124,11],[136,9],[148,7],[160,5],[172,3],[184,2]],'山顶哨站的通路打开了',
+    {fork:3,spur:[[148,7],[159,9],[173,8]],switchKey:'rail'});
+  const secret=gated([[169,6.2],[178,5.6]],'blue-spur','ice');
+  treasure(shaft[3]);treasure(lower[2]);treasure(secret[0]);finish(top[0],tile(197,1,13,'ice'));
+}
+function glacierLake(p) {
+  const {tile,trail,station,gated,treasure,finish}=p;
+  const lake=trail([[0,2,14],[13,0,9],[24,-2,9],[35,-4,9],[46,-5,9],[57,-5,9],[68,-4,9],[79,-3,9],[90,-2,9],[101,0,9]],'ice');
+  const ridge=trail([[14,4.5],[22,7],[30,9.5],[39,10],[48,9.3],[57,8],[66,7],[75,6],[84,5.4]],'rock');
+  station('blue',lake[5],crystal,'找到湖底蓝晶');
+  station('white',ridge[5],crystal,'找到山脊白晶');
+  gated([[110,2.4],[118,4.8],[126,7.2]],'blue','ice');
+  treasure(lake[3]);treasure(ridge[3]);finish(lake[0],tile(137,7.2,12,'ice'));
+}
+function penguin(p) {
+  const {tile,trail,station,gated,run,treasure,finish}=p;
+  const shelf=trail([[0,3,14],[13,3,10],[25,2,10],[37,0,10],[49,-2,10],[61,-3,10],[73,-3,10],[85,-3,10],[97,-2,10],[109,0,10]],'ice');
+  run('den',shelf[1],[[13,4],[25,3],[37,1],[49,-1],[61,-2],[73,-2],[86,-2]],'冰封的企鹅洞打开了');
+  station('chick',shelf[8],'snow-lost-penguin','小企鹅跟上你了',{after:['den']});
+  const ledges=trail([[108,2.6],[100,5.2],[92,7.8],[84,9.6],[75,9.6],[66,9.6],[57,9.6],[48,9.6],[39,9.6]],'rock');
+  station('nest',ledges.at(-1),'snow-lost-penguin','小企鹅回到了巢里',{after:['chick']});
+  const bridge=gated([[49,12.2],[58,12.4],[67,13],[76,13],[85,13.1],[94,13],[103,12.6],[112,12.2]],'nest','ice');
+  treasure(bridge[4]);treasure(shelf[5]);finish(shelf[0],tile(123,12,12,'ice'));
+}
+
 function sentries(p,theme) {
   const {tile,trail,enemy,treasure,finish,room}=p;
   const path=trail([[0,0,14],[15,0,12],[29,1.2,12],[43,0,12],[57,0,12],[71,1.6,12],[85,0,12],[99,0,12],[113,0,12]],theme==='snow'?'ice':plank);
@@ -249,7 +334,13 @@ function arena(world,stage,builder,placeBoss) {
 }
 export function buildStoryWorld(world,stage,builder,placeBoss) {
   world.expedition=true;
-  const chapters = [
+  const snow=stage.themeId==='snow';
+  const chapters=snow ? [
+    ['松林放雪球',p=>snowChute(p,{label:'山脚的薄冰碎开了'})],['双晶冰湖',glacierLake],
+    ['岔轨雪沟',p=>snowChute(p,{spur:true,label:'雪沟出口通了'})],['冰川哨站',null],
+    ['寻找小企鹅',penguin],['回望星灯岭',starPass],
+    ['双崖接力',relay]
+  ] : [
     ['街口学搭针',towerSchool],['屋顶与暗巷',rooftops],['双针齿轮房',twinHands],['报时街守卫',null],
     ['回声钟廊',echoGallery],['登楼放吊桥',belfry],['屋脊大巡游',clockParade]
   ];

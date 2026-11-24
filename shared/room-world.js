@@ -4,7 +4,7 @@ import { applyCycleHealth } from './adventure-cycle.js';
 import { buildForestRescue } from './forest-rescue.js';
 import { buildStoryWorld } from './story-expeditions.js';
 import { buildFlowerValley } from './flower-valley.js';
-import { WORLD_MAPS, FLOWER_VALLEY, WATERWAYS, CLOCK_TOWER, FOREST_RESCUE, themeFor } from './levels.js';
+import { WORLD_MAPS, FLOWER_VALLEY, WATERWAYS, CLOCK_TOWER, SNOW_EXPEDITION, FOREST_RESCUE, themeFor } from './levels.js';
 import { LEVEL_COLLECTIBLES } from './collectibles.js';
 import { ADVENTURE_GENERATION_VERSION, EXPANDED_THEME_MONSTERS, MONSTERS } from './adventure-catalog.js';
 import { bossBaseline } from './boss-health.js';
@@ -353,7 +353,7 @@ export function createRoomWorld(seed, selected, cycle = 1) {
     applyCycleHealth(world, cycle);
     return world;
   }
-  if ([FOREST_RESCUE,FLOWER_VALLEY,WATERWAYS,CLOCK_TOWER].includes(stage)) {
+  if ([FOREST_RESCUE,FLOWER_VALLEY,WATERWAYS,CLOCK_TOWER,SNOW_EXPEDITION].includes(stage)) {
     if (stage === FOREST_RESCUE) buildForestRescue(world, stage, builder, placeBoss);
     else if (stage === FLOWER_VALLEY || stage === WATERWAYS) buildFlowerValley(world, stage, builder, placeBoss, stage === WATERWAYS);
     else buildStoryWorld(world, stage, builder, placeBoss);
