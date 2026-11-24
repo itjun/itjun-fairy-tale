@@ -13,22 +13,56 @@ import { WATER_CHANNELS, growthFraction } from '../../shared/flower-valley.js';
 import { isValidRoomState } from './rooms.js';
 import { saveEnemy } from './enemies.js';
 const KEY = ['garden','active','adventure','v1'].join('-');
+const PARKED_PREFIX = 'garden-parked-adventure-v1:';
 // 以前换规则时留下的旧存档备份，现在跟旧地图一起清掉。
 const OLD_BACKUPS = ['single-player', 'life-only', 'boss-growth', 'easier-combat', 'hp-lives'];
-export function writeAdventure(run,state,storage=localStorage) { storage.setItem(KEY,JSON.stringify({run,state})); }
-export function clearAdventure(storage=localStorage) { storage.removeItem(KEY); }
-// 只认当前这一版地图。别的版本的续关存档和旧备份直接删掉，成绩本里的历史不受影响。
-function removeOldSaves(storage) {
-  for (const name of OLD_BACKUPS) storage.removeItem(`${KEY}-before-${name}`);
-  let saved;
-  try { saved = JSON.parse(storage.getItem(KEY)); } catch { saved = undefined; }
-  if (saved !== null && (saved?.run?.generationVersion !== ADVENTURE_GENERATION_VERSION || saved.state?.version !== ADVENTURE_GENERATION_VERSION)) storage.removeItem(KEY);
+export function writeAdventure(run, state, storage = localStorage) {
+  storage.setItem(KEY, JSON.stringify({ run, state }));
+  storage.removeItem(PARKED_PREFIX + run.id);
 }
-export function readAdventure(storage=localStorage) {
+
+export function clearAdventure(storage = localStorage) {
+  const saved = readAdventure(storage);
+  if (saved) storage.removeItem(PARKED_PREFIX + saved.run.id);
+  storage.removeItem(KEY);
+}
+
+// 进入另一局前留一份完整存档。原活动档一直保留到目标关卡首次保存成功。
+export function parkActiveAdventure(nextRunId, storage = localStorage) {
+  const raw = storage.getItem(KEY);
+  if (!raw) return;
+  const { run } = JSON.parse(raw);
+  if (run.id !== nextRunId) storage.setItem(PARKED_PREFIX + run.id, raw);
+}
+
+export function readWorldAdventures(storage = localStorage) {
+  const active = readAdventure(storage);
+  const saves = active ? [active] : [];
+  const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index));
+  for (const key of keys) {
+    if (!key?.startsWith(PARKED_PREFIX) || key === PARKED_PREFIX + active?.run.id) continue;
+    const saved = readSave(key, storage);
+    if (saved && key === PARKED_PREFIX + saved.run.id) saves.push(saved);
+  }
+  return saves;
+}
+
+export function readAdventure(storage = localStorage) {
   try {
-    removeOldSaves(storage);
-    const saved=JSON.parse(storage.getItem(KEY));
-    if(!saved) return null;
+    for (const name of OLD_BACKUPS) storage.removeItem(`${KEY}-before-${name}`);
+    return readSave(KEY, storage);
+  } catch { return null; }
+}
+
+function readSave(key, storage) {
+  try {
+    let saved;
+    try { saved = JSON.parse(storage.getItem(key)); } catch { saved = undefined; }
+    if (saved === null) return null;
+    if (saved?.run?.generationVersion !== ADVENTURE_GENERATION_VERSION || saved.state?.version !== ADVENTURE_GENERATION_VERSION) {
+      storage.removeItem(key);
+      return null;
+    }
     const {run,state}=saved;
     if(run.scoringVersion!==3 || !['playing','paused','completed','ended'].includes(run.status) || run.players!==1 || !Number.isInteger(run.seed) || !Number.isFinite(state.elapsed) || state.elapsed<0 || state.seed!==run.seed || state.levelId!==run.levelId) return null;
     const stage=findStage(run.levelId);

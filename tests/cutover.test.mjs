@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { roomFixture } from './helpers/adventure-fixtures.mjs';
-import { readAdventure, writeAdventure } from '../src/game/save.js';
+import { clearAdventure, parkActiveAdventure, readAdventure, readWorldAdventures, writeAdventure } from '../src/game/save.js';
 import { openStore } from '../server/store.mjs';
 import { ADVENTURE_GENERATION_VERSION } from '../shared/adventure-catalog.js';
 
@@ -9,7 +9,7 @@ const KEY = 'garden-active-adventure-v1';
 const BACKUPS = ['single-player', 'life-only', 'boss-growth', 'easier-combat', 'hp-lives'].map(name => `${KEY}-before-${name}`);
 function storage(entries = {}) {
   const values = new Map(Object.entries(entries));
-  return { values, getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+  return { values, get length() { return values.size; }, key: i => [...values.keys()][i], getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
 }
 const range = { from: '2026-01-01', until: '2027-01-01' };
 // 第 9 版留下来的一条成绩：小关编号、地图版本都是旧的，分数没法再算。
@@ -35,6 +35,46 @@ test('续关只认第 11 版：别的版本的存档和旧备份都删掉，第 
   assert.equal(saved.state.version, 11); assert.equal(saved.run.id, run.id);
   assert.deepEqual([...current.values.keys()], [KEY], '第 11 版的存档留着，旧备份清掉');
   assert.equal(readAdventure(storage()), null);
+});
+
+test('旧的单局存档可以换关，往返与同世界重来各自保留地图和成长', () => {
+  const first = roomFixture('stack', 'rainbow-world');
+  const second = roomFixture('reward', 'family-clock-tower');
+  const local = storage({ [KEY]: JSON.stringify(first) });
+  const original = readAdventure(local);
+  parkActiveAdventure(undefined, local);
+  assert.equal(readWorldAdventures(local).length, 1, '在新关出发前退出仍然只有一个第一关');
+  writeAdventure(second.run, second.state, local);
+  const [recent, parked] = readWorldAdventures(local);
+  assert.equal(recent.run.id, second.run.id);
+  assert.deepEqual(parked, original);
+  parkActiveAdventure(parked.run.id, local);
+  writeAdventure(parked.run, parked.state, local);
+  assert.deepEqual(readAdventure(local).state, original.state);
+  assert.deepEqual(readWorldAdventures(local)[1].state.journey.pending, recent.state.journey.pending);
+
+  parkActiveAdventure(recent.run.id, local);
+  writeAdventure(recent.run, recent.state, local);
+  const freshFirst = roomFixture('room', 'rainbow-waterways', { seed: 157 });
+  writeAdventure(freshFirst.run, freshFirst.state, local);
+  assert.deepEqual(readWorldAdventures(local).map(item => item.run.id), [freshFirst.run.id, first.run.id]);
+  clearAdventure(local);
+  assert.deepEqual(readWorldAdventures(local).map(item => item.run.id), [first.run.id]);
+});
+
+test('换关写入失败时两局都可恢复', () => {
+  const first = roomFixture('door');
+  const second = roomFixture('fallen', 'family-world');
+  const local = storage();
+  writeAdventure(first.run, first.state, local);
+  const fail = { ...local, setItem() { throw new Error('空间不足'); } };
+  assert.throws(() => parkActiveAdventure(second.run.id, fail), /空间不足/);
+  assert.equal(readAdventure(local).run.id, first.run.id);
+  parkActiveAdventure(second.run.id, local);
+  writeAdventure(second.run, second.state, local);
+  parkActiveAdventure(first.run.id, local);
+  assert.throws(() => writeAdventure(first.run, first.state, fail), /空间不足/);
+  assert.deepEqual(readWorldAdventures(local).map(item => item.run.id), [second.run.id, first.run.id]);
 });
 
 test('成绩服务不再收旧版地图的新成绩，也不收旧的小关编号', () => {
