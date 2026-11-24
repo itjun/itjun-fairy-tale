@@ -7,6 +7,7 @@ import { advanceStory } from '../shared/story-mechanisms.js';
 import { newRoomState } from '../src/game/rooms.js';
 import { createPlayer } from '../src/game/physics.js';
 import { addStoryViews } from '../src/game/story-views.js';
+import { fieldReaction } from '../src/game/field-reactions.js';
 import { GardenEngine } from '../src/game/engine.js';
 
 test('新旧双渠都能看见水面，踩哪一渠哪一渠出水，续关时仍通水', t => {
@@ -50,5 +51,56 @@ test('新旧双渠都能看见水面，踩哪一渠哪一渠出水，续关时�
     }
     draw({...state,roomId:3});
     assert.equal(visibleWater().length,0,'离开水磨时水面和出水口一起隐藏');
+  }
+});
+
+test('各探索地图每个触点都有相应的器材、搬运、交付或载具反应', () => {
+  const reactions=new Set();
+  for(const stage of PLAYABLE_WORLDS) {
+    const world=createRoomWorld(42,stage);
+    for(const room of world.rooms) for(const stop of room.stops||[]) {
+      const kind=fieldReaction(stop);
+      assert.ok(kind,room.name+' '+stop.label);
+      reactions.add(kind);
+    }
+  }
+  for(const kind of ['heat','beam','flag','lever','pour','mirror','fill','carry','serve','ride','turn','signal'])
+    assert.ok(reactions.has(kind),kind);
+});
+
+test('点炉、点灯、扳道岔的反馈在各自的触点出现，换房后收起', async () => {
+  const { addFieldReaction }=await import('../src/game/field-reactions.js');
+  const { stepField }=await import('../shared/trails/field-progress.js');
+  for(const [index,key,art] of [[2,'heat','oven-flame'],[3,'beacon','lantern-beam'],[7,'spur',null]]) {
+    const world=createRoomWorld(612,PLAYABLE_WORLDS[index]);
+    const room=world.rooms.find(r=>r.stops.some(s=>s.key===key));
+    const stop=room.stops.find(s=>s.key===key), platform=world.platforms[stop.platformId];
+    const state=newRoomState(world);
+    state.roomId=room.id;
+    for(const dep of stop.after) state.field[room.id+'/'+dep]=1;
+    const player=createPlayer(platform), engine={world,players:[player],elapsed:5};
+    const views={engine,items:[]}, scene=new THREE.Scene();
+    const sprite=(name,x,y,width,height,z)=>{
+      const mesh=new THREE.Object3D();mesh.name=name;mesh.scale.set(width,height,1);mesh.position.set(x,y,z);
+      scene.add(mesh);return mesh;
+    };
+    const item=sprite(stop.icon,platform.x,platform.y,2.25,2.25,.54);
+    const update=addFieldReaction(views,room,stop,item,sprite);
+    update(state,true,false);
+    const effect=art?scene.getObjectByName(art):item;
+    if(art) assert.equal(effect.visible,false);
+    else assert.ok(item.scale.x>0);
+    assert.equal(stepField(world,state,player,5),stop);
+    engine.elapsed=6;
+    update(state,true,false);
+    assert.equal(effect.visible,true);
+    assert.ok(Math.abs(effect.position.x-platform.x)<10,'反馈应出现在触点旁');
+    if(!art) assert.ok(item.scale.x<0,'扳柄拨向另一边');
+    if(art) {
+      update(state,false,false);
+      assert.equal(effect.visible,false);
+      update(structuredClone(state),true,false);
+      assert.equal(effect.visible,true,'再进房间时保持点亮');
+    }
   }
 });

@@ -85,7 +85,7 @@ function mirrors(p) {
 function shaduf(p) {
   const sandbank=p.mainTrail([[0,1,13],[22,1],[44,-2],[63,-3],[86,-2],[111,0],[139,2],[160,2]], [7, 2, -3, -6, -2, 3, 6, 2],[],sand);
   const post=cliff(p,sandbank[2],50,10);
-  p.station('weight',post,'platform-gear','在提水架挂上配重',{keep:true});
+  p.station('weight',post,'platform-gear','在提水架挂上配重',{reaction:'weight',keep:true});
   jugAt(p,sandbank[3],['weight'],'pour','到河床把水罐装满');
   const lift=p.move(79,-2,8,88,11,{period:10,after:'water',icon:'oasis-bucket',width:8,height:3.6});
   p.station('rise',lift,'oasis-bucket','乘提水斗上高渠',{after:['water'],atDock:1,wait:'站在水斗上等它升高'});

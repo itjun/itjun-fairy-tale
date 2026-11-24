@@ -42,7 +42,7 @@ function wafers(p) {
   const floor=p.mainTrail([[0,1,13],[24,0],[45,-2],[69,-1],[91,1]], [6, 0, -6, -3, 1],[3]);
   const oven=p.path([[23,0],[35,3],[47,6],[59,8],[74,7]]);
   p.prop('kitchen-oven',floor[2],7,4.8,1);
-  p.station('heat',floor[2],'mini-sun','点亮烤炉',{received:'饼干出炉，传送带转了'});
+  p.station('heat',floor[2],'mini-sun','点亮烤炉',{reaction:'heat',received:'饼干出炉，传送带转了'});
   const belt=p.gate('heat',[[78,7],[98,7],[118,7]],{conveyor:2.3,skin:'conveyor'});
   order(p,[cone,berry],[oven[3],belt.at(-1)],floor.at(-1));
   p.gate('serve',[[106,2],[125,4],[141,3]]);

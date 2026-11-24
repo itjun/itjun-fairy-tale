@@ -516,7 +516,6 @@ export class GardenEngine {
       const stop = stepField(world,state,player,this.elapsed);
       if (stop) {
         this.callbacks.onSound(stop.sound || 'checkpoint');
-        this.skillEffects.burst(player.x,player.y+1.1,this.elapsed,true);
         this.publish(stop.received || stop.label + ' ✓');
         this.callbacks.onLifeChange?.(this.snapshot());
       }

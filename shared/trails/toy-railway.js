@@ -35,7 +35,7 @@ function switches(p) {
   const end=track(p,'fork',[[53,4],[63,4],[75,2],[92,2],[109,5]],{switchKey:'spur',alt:[[53,4],[63,4],[75,9],[92,9],[109,5]]});
   const balcony=p.tile(82,11.8,9);p.prize(balcony);
   const finish=p.path([[116,5,11],[136,5],[153,3]]);
-  p.station('stamp',finish[1],gift,'盖上货运章',{after:[end],goal:true});station(p,finish[1]);p.prize(road[3]);
+  p.station('stamp',finish[1],gift,'盖上货运章',{reaction:'stamp',after:[end],goal:true});station(p,finish[1]);p.prize(road[3]);
   p.finish(road[0],finish[2]);
 }
 function bridge(p) {

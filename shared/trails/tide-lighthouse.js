@@ -7,7 +7,7 @@ function low(p,key,tile,icon,label,options={}) {
 }
 function light(p,key,tile,label,after) {
   p.prop('island-lighthouse',tile,9,9.5,1);
-  p.station(key,tile,lamp,label,{after,goal:true,keep:true,received:'灯亮了，回头看看海面'});
+  p.station(key,tile,lamp,label,{after,reaction:'beam',goal:true,keep:true,received:'灯亮了，回头看看海面'});
 }
 function inlet(p) {
   bay(p,4,104);
@@ -35,7 +35,7 @@ function glassCove(p) {
   const pools=p.path([[24,4],[36,1],[49,-2],[62,-5],[75,-5],[88,-2],[98,5]]);
   low(p,'glass',pools[3],lens,'从潮池取蓝镜片',{carryUntil:'focus'});
   const arch=p.path([[98,5],[86,8],[74,11],[62,13]]);
-  p.station('focus',arch[3],lamp,'镜片对准灯座',{after:['glass'],goal:true,keep:true});
+  p.station('focus',arch[3],lamp,'镜片对准灯座',{after:['glass'],reaction:'beam',goal:true,keep:true});
   p.gate('focus',[[72,13],[92,13],[111,11],[130,8]],{skin:'plank'});
   p.prize(arch[1]);p.prize(pools[4]);p.enemy(upper[4],'jelly');p.finish(upper[0],upper[6]);
 }
@@ -72,7 +72,7 @@ function buoys(p) {
   const bottom=p.mainTrail([[0,1,14],[18,-1],[37,-2],[56,-2],[76,-1],[94,-2],[116,-1],[137,1],[151,3]], [6, -1, -4, 1, -4, -2, 3, -1, 5]);
   const a=p.move(43,-1,7,43,6,{period:12,tide:true,icon:raft,height:1.6});
   const b=p.move(98,-1,7,98,7,{period:12,tide:true,icon:raft,height:1.6});
-  p.station('west',a,'mini-gem-orange','举起西边浮标旗',{atDock:1,wait:'搭浮标升到水线顶'});
+  p.station('west',a,'mini-gem-orange','举起西边浮标旗',{reaction:'flag',atDock:1,wait:'搭浮标升到水线顶'});
   low(p,'note',bottom[4],shell,'退潮取漂流信',{after:['west'],carryUntil:'east'});
   p.station('east',b,'mini-gem-blue','把信交给东浮标',{atDock:1,after:['note'],wait:'乘东浮标到高处',goal:true});
   p.prize(bottom[2]);p.prize(bottom[6]);p.finish(bottom[0],bottom[8]);

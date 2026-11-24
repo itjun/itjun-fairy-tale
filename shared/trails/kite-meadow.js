@@ -46,7 +46,7 @@ function letters(p) {
   const branch=p.path([[19,2],[31,5],[44,8],[56,9]]);
   p.station('mail',lower[3],'meadow-letter','取草地邮袋',{carryUntil:'post'});
   wind(p,63,-3,14,11,-2,7.9,'mail');
-  p.station('stamp',branch[3],tail,'让风车盖个印',{after:['mail']});
+  p.station('stamp',branch[3],tail,'让风车盖个印',{reaction:'stamp',after:['mail']});
   const perch=p.path([[110,9],[125,10],[139,9]]);
   wind(p,103,0,16,9,2.4,8,'stamp');p.station('post',perch[1],'meadow-letter','送到山脊信箱',{after:['stamp'],goal:true,keep:true});
   kiteStand(p,branch[3]);p.prize(lower[4]);p.prize(perch[0]);p.finish(lower[0],lower.at(-1));
@@ -57,7 +57,7 @@ function skyFair(p) {
   const east=p.path([[88,9,11],[104,8],[121,8]]);
   const top=p.path([[139,17,11],[155,16],[171,15],[187,13]]);
   p.station('sail',grass[1],kite,'带纸鸢去风节',{carryUntil:'fly'});
-  wind(p,30,0,12,9.4,0,8,'sail');p.station('blue',cliff[1],tail,'收起蓝飘带',{after:['sail']});
+  wind(p,30,0,12,9.4,0,8,'sail');p.station('blue',cliff[1],tail,'收起蓝飘带',{reaction:'unfold',after:['sail']});
   wind(p,76,3,30,9,5.6,3.5,'blue');p.station('red',east[1],'mini-gem-orange','点亮东风旗',{after:['blue']});
   wind(p,132,6,16,10,2.2,8.3,'red');p.station('fly',top[1],kite,'放飞风节大纸鸢',{after:['red'],goal:true,keep:true});
   kiteStand(p,top[1]);p.prize(east[0]);p.prize(top[2]);p.finish(grass[0],top[3]);
