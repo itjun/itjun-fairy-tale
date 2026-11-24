@@ -281,6 +281,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     };
   }
   const isResult = status === 'completed';
+  const isCycleComplete = isResult && levelIndex === WORLD_ACTS.length - 1;
   const isPickingWorld = status === 'ready' || status === 'worlds';
   const isPauseBook = status === 'paused' || status === 'pause-more';
   const isAdventureDialog = isPickingWorld || isPauseBook || ['reward','camp','life-loot','fallen','ended','overview','options','weapon-bindings'].includes(status);
@@ -356,9 +357,10 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
       <span className="adventure-kicker">带着画里的自己，去看更大的世界</span>
       <h2 id="adventure-heading">{status === 'loading' ? '彩笔世界准备中…' : status === 'error' ? '画面需要一点帮助' : status === 'completed' ? `${level.chapterName || level.name}，挑战成功！` : status === 'ended' ? '生命用完了，这次冒险结束' : status === 'fallen' ? `扣掉一条命，还剩 ${stats.survival?.lives} 条` : '选一个小世界，出发吧'}</h2>
       {status === 'error' ? <p>{error}</p> : status === 'loading' ? <p>把新的风景和小伙伴放进画里。</p> : status === 'fallen' ? <p>在附近安全的位置接着走。武器、本领和宝物都会保留。</p> : isResult ? <><div className="result-score"><Trophy size={38} weight="duotone" /><strong>{stats.score}</strong><span>分</span></div><p>宝物积分 {stats.treasureScore || 0} 分 ＋ 打怪 {stats.combatScore || 0} 分{status==='completed'?` ＋ 通关奖励 ${level.bonus} 分`:''}</p>{stats.rooms && <p>这一章拿到 {stats.rooms.stars} 颗星，最多 {stats.rooms.layers.length * 3} 颗。</p>}<div className="collectible-preview" aria-label="本次收集">{Object.entries(stats.collection || {}).map(([id,total])=><span key={id}><img src={`./assets/${COLLECTIBLES[id].image}.png`} alt={COLLECTIBLES[id].name}/>{COLLECTIBLES[id].name} {total} × {COLLECTIBLES[id].points} = {total * COLLECTIBLES[id].points} 分</span>)}</div><p className={sync.isSaved?'result-saved':'save-pending'} role="status">{sync.isSaved&&<Check size={18}/>} {sync.message}</p>{!sync.isSaved&&<button className="quiet-button" onClick={()=>persist(stats,status)}>重试保存</button>}</> : null}
+      {isCycleComplete && <p>已获得的 {stats.adventure.weapons.length} 种武器和攻击键位都会带到下一轮。</p>}
       <div className="adventure-menu-actions">
         {status === 'fallen' && <button className="primary-button" onClick={() => { if (engine.current.revive()) start(); }}>从这里继续</button>}
-        {isResult&&<><button className="primary-button" onClick={()=>restart(status==='completed'?(levelIndex+1)%WORLD_ACTS.length:0, status==='completed')}>{status==='completed'?(levelIndex===WORLD_ACTS.length-1?`进入第 ${(stats.adventure?.cycle || 1) + 1} 轮`:'去下一关'):'新冒险'}<ArrowRight size={20}/></button></>}
+        {isResult && <button className="primary-button" onClick={() => restart((levelIndex + 1) % WORLD_ACTS.length, true)}>{isCycleComplete ? `进入第 ${stats.adventure.cycle + 1} 轮` : '去下一关'}<ArrowRight size={20}/></button>}
         {status==='error'&&<button className="primary-button" onClick={()=>restart()}>重新打开</button>}
         <button className="text-button" data-gamepad-back onClick={exit}><House size={18}/>回到我的花园</button>
       </div>
