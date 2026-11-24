@@ -17,6 +17,7 @@ const KIND_MARKS = { intro: '起', battle: '战', mechanism: '机', puzzle: '宝
 
 function roomLine(rooms) {
   if (rooms.fieldHint) return rooms.fieldHint;
+  if (rooms.valleyHint && rooms.kind !== 'battle') return rooms.valleyHint;
   if (rooms.forest) return rooms.forest.hint;
   if (rooms.isClimbing || rooms.canDescend || rooms.isDroppingFromGrip || rooms.areaId) return rooms.traversalHint;
   if (rooms.isCleared) return rooms.kind === 'boss' ? '打赢了，往右走到终点' : rooms.kind === 'shop' ? '买完就跳到发光的门上' : '门亮了，跳过去';

@@ -51,10 +51,15 @@ export const FOREST_RESCUE = Object.freeze({
   id: 'forest-rescue', chapterName: '树冠救援', structure: 'forest-rescue',
   subtitle: '带两只猫头鹰宝宝回巢', story: '树冠和树根各传来一声呼唤。先去哪边，由你决定。',
 });
-const NEW_WORLDS = [FOREST_RESCUE, ...fieldStages(WORLD_ACTS)];
-export const WORLD_MAPS = Object.freeze([...WORLD_ACTS, ...NEW_WORLDS]);
-export const PLAYABLE_WORLDS = Object.freeze(WORLD_ACTS.map(stage => NEW_WORLDS.find(map=>map.themeId===stage.themeId) || stage));
-export function findStage(id) { return WORLD_MAPS.find(stage=>stage.id===id) || STAGES.find(stage=>stage.id===id); }
+export const FLOWER_VALLEY = Object.freeze({
+  ...WORLD_ACTS[0], id: 'rainbow-flower-valley', chapterName: '花开成路', structure: 'flower-valley',
+  subtitle: '让雨水浇出一条路', story: '河对岸就是城堡，水槽里的雨会流到哪里？',
+});
+export const WATERWAYS = Object.freeze({ ...FLOWER_VALLEY, id:'rainbow-waterways', chapterName:'花开成路 · 水乡长旅' });
+const NEW_WORLDS = [WATERWAYS, FOREST_RESCUE, ...fieldStages(WORLD_ACTS)];
+export const WORLD_MAPS = Object.freeze([...WORLD_ACTS, FLOWER_VALLEY, ...NEW_WORLDS]);
+export const PLAYABLE_WORLDS = Object.freeze(WORLD_ACTS.map(stage => NEW_WORLDS.find(map => map.themeId === stage.themeId) || stage));
+export function findStage(id) { return WORLD_MAPS.find(stage => stage.id === id) || STAGES.find(stage => stage.id === id); }
 export function findLevel(id) { return LEVELS.find(level => level.id === id) || findStage(id); }
 export function themeFor(level) { return LEVELS.find(theme => theme.id === (level.themeId || level.id)); }
 export function calculateScore(flowers, isCompleted, level) { return (typeof flowers === 'number' ? flowers * 10 : collectionPoints(flowers)) + (isCompleted ? level.bonus : 0); }

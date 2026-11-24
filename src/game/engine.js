@@ -1,6 +1,10 @@
 import { pushInWind } from '../../shared/trails/wind.js';
 import { fieldHint, stepField, syncField } from '../../shared/trails/field-progress.js';
 import { fieldImages } from './field-views.js';
+import { advanceStory, syncStory, storyHint } from '../../shared/story-mechanisms.js';
+import { storyImages } from './story-views.js';
+import { VALLEY_IMAGES, WATER_NOTICES, valleyHint } from './flower-valley-view.js';
+import { syncWaterRoutes, waterUnderfoot } from '../../shared/flower-valley.js';
 import { forestHint, stepForestRescue } from './forest-rescue.js';
 import { FOLLOWING, HOME, syncForestRoutes } from '../../shared/forest-rescue.js';
 import { saveProjectiles, restoreProjectiles } from './projectile-state.js';
@@ -126,11 +130,11 @@ export class GardenEngine {
     try {
       const loader = new THREE.TextureLoader();
       const surfaceImage = this.level.surface || 'grass-texture';
-      const landscape = this.world.field === 'beach' ? 'paper-texture' : ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image;
+      const landscape = this.world.field === 'beach' ? 'paper-texture' : (this.world.valley ? 'water-valley' : ['rainbow','family','meadow'].includes(this.level.id) ? 'landscape-new-drawing' : { forest: 'landscape-forest', sweet: 'landscape-sweet', desert: 'landscape-desert' }[this.level.id] || this.level.image);
       const isDesert = this.level.id === 'desert';
       const poseNames = Object.keys(CHARACTERS).flatMap(character => ['climb', 'crawl'].map(pose => `${character}-${pose}`));
-      this.isNewLandscape = landscape === 'landscape-new-drawing';
-      const names = [...new Set([landscape, ...fieldImages(this.world), ...Object.values(CHARACTERS).flatMap(c => [c.image, c.attack]), ...poseNames, ...TRAVERSAL_IMAGES, ...(isDesert ? DESERT_IMAGES : []), 'flower', 'collectible-rainbow', 'light-wave', 'enemy-burst', 'treehouse-tall', ...(this.world.forest ? ['forest-hollow', 'forest-root-hall', 'forest-nest', 'forest-owlet', 'forest-vine'] : []), 'platform-raft', 'platform-ice', 'platform-gear', 'platform-conveyor', 'island-lighthouse', 'castle-cutaway', 'street-house', 'windmill-tall', 'platform-awning', surfaceImage,
+      this.isNewLandscape = landscape === 'landscape-new-drawing' || !!this.world.valley;
+      const names = [...new Set([landscape, ...fieldImages(this.world), ...storyImages(this.world), ...(this.world.valley ? VALLEY_IMAGES : []), ...Object.values(CHARACTERS).flatMap(c => [c.image, c.attack]), ...poseNames, ...TRAVERSAL_IMAGES, ...(isDesert ? DESERT_IMAGES : []), 'flower', 'collectible-rainbow', 'light-wave', 'enemy-burst', 'treehouse-tall', ...(this.world.forest ? ['forest-hollow', 'forest-root-hall', 'forest-nest', 'forest-owlet', 'forest-vine'] : []), 'platform-raft', 'platform-ice', 'platform-gear', 'platform-conveyor', 'island-lighthouse', 'castle-cutaway', 'street-house', 'windmill-tall', 'platform-awning', surfaceImage,
         'lift-leaf', 'spring-flower', 'bridge-rope', 'checkpoint-flag', 'collectible-star', 'magic-bubble',
         ...LEVEL_COLLECTIBLES[this.level.id].map(id => COLLECTIBLES[id].image), 'new-drawing-tower', 'new-drawing-flowers', 'trap-pendulum', 'trap-thorns', 'trap-steam', 'terrain-blocks', 'platform-cloud', 'life-potion', 'supply-medkit', 'flame-stream', 'collectible-snowflake', 'upgrade-frost', 'upgrade-chain', 'boss-gate', 'boss-chest', 'terrain-bank', 'terrain-cookie', 'terrain-rock', ...ROOM_IMAGES, ...Object.values(MONSTERS).map(m => m.image), ...Object.values(WEAPONS).map(w => w.image), ...this.world.enemies.filter(e=>e.isBoss && e.image).map(e=>e.image), ...this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image))])];
       const textures = await Promise.all(names.map(async name => {
@@ -147,6 +151,7 @@ export class GardenEngine {
       this.textureFor = textureFor; this.spriteMaterial = spriteMaterial;
       const grass = textureFor(surfaceImage);
       grass.wrapS = grass.wrapT = THREE.RepeatWrapping; grass.repeat.set(2, 1);
+      if (this.world.valley) this.waterMaterials = { bank: spriteMaterial('water-bank'), 'water-leaf': spriteMaterial('water-leaf'), 'water-lily': spriteMaterial('water-lily'), 'water-treadle': spriteMaterial('platform-raft') };
       this.grassMaterial = this.material(new THREE.MeshStandardMaterial({ map: grass, color: this.level.topColor || '#ffffff', roughness: 1 }));
       this.collectibleMaterials = Object.fromEntries(LEVEL_COLLECTIBLES[this.level.id].map(id => [id, spriteMaterial(COLLECTIBLES[id].image)]));
       this.waveMaterial = spriteMaterial('light-wave'); this.burstMaterial = spriteMaterial('enemy-burst');
@@ -189,7 +194,7 @@ export class GardenEngine {
       if (this.world.field==='beach') { gardenMaterial.color.set('#fff1d2'); gardenMaterial.opacity=.38; }
       this.backdrops = [0].map(() => {
         const mesh = new THREE.Mesh(this.planeGeometry, gardenMaterial);
-        mesh.scale.set(44, 44 * background.image.height / background.image.width, 1); mesh.position.set(0, 6, -18);
+        mesh.scale.set(44, 44 * background.image.height / background.image.width, 1); mesh.position.set(0, 6, this.world.valley ? -5 : -18);
         this.scene.add(mesh); return mesh;
       });
       this.playerViews = this.players.map(() => {
@@ -207,7 +212,7 @@ export class GardenEngine {
       this.isReady = true; this.callbacks.onReady();
       const room = currentRoom(this.world, this.roomState);
       const cave = caveForPlayer(room, this.players[0]);
-      this.publish(this.world.field && room.stops.length ? fieldHint(this.world,this.roomState,this.players[0],this.elapsed) : this.world.forest ? forestHint(this.world, this.roomState.forest, this.players[0]) : cave?.name ? `继续探索${cave.name}` : cave ? '走到提灯下可以出洞' : room.traversal?.name ? room.traversal.hint : '清完一间房，跳到发光的门上。');
+      this.publish(this.world.field && room.stops.length ? fieldHint(this.world,this.roomState,this.players[0],this.elapsed) : this.world.expedition && room.goals?.length ? storyHint(room,this.roomState.story) : this.world.valley ? valleyHint(this.world, this.roomState, this.players[0]) : this.world.forest ? forestHint(this.world, this.roomState.forest, this.players[0]) : cave?.name ? `继续探索${cave.name}` : cave ? '走到提灯下可以出洞' : room.traversal?.name ? room.traversal.hint : '清完一间房，跳到发光的门上。');
     } catch (error) {
       if (!this.isDisposed) this.callbacks.onError('彩笔素材还没准备好。请检查文件是否完整，再试一次。');
       console.error('花园素材加载失败', error);
@@ -226,7 +231,13 @@ export class GardenEngine {
     const hasFloorBelow=platform=>this.platforms.some(other=>other.id!==platform.id&&!other.isMoving&&other.y<platform.y-.01&&platform.y-other.y<LAYER*2-.2&&Math.min(platform.x+platform.width/2,other.x+other.width/2)-Math.max(platform.x-platform.width/2,other.x-other.width/2)>0);
     for (const platform of this.platforms) {
       const group = new THREE.Group(); group.position.set(platform.x, platform.y, 0);
-      if (platform.isMoving) {
+      if (this.waterMaterials?.[platform.skin]) {
+        const deck = new THREE.Mesh(this.planeGeometry, this.waterMaterials[platform.skin]);
+        const height = platform.skin === 'bank' ? Math.min(7, platform.width * .42) : platform.skin === 'water-treadle' ? .36 : platform.skin === 'water-lily' ? 1.15 : 1.35;
+        deck.scale.set(platform.width, height, 1);
+        deck.position.set(0, (platform.skin === 'bank' ? -.47 : -.37) * height, .3);
+        group.add(deck);
+      } else if (platform.isMoving) {
         const material=this.platformMaterials[platform.skin] || (['windmill','balloon'].includes(platform.skin)?this.platformMaterials.gear:this.liftMaterial);
         const leaf = new THREE.Mesh(this.planeGeometry, material);
         leaf.scale.set(platform.width + 0.25, 1.15, 1); leaf.position.set(0, -0.48, 0.2); group.add(leaf);
@@ -248,7 +259,7 @@ export class GardenEngine {
         // 宽地面横向拼接，不把一整张贴图撑高后盖住地下路。
         const maxHeight=hasFloorBelow(platform)?THIN_ART:platform.skin==='roof'?1.4:platform.skin==='leaf'?1.15:1.8;
         const count=Math.max(1,Math.ceil(platform.width*ratio/maxHeight)),width=platform.width/count,height=width*ratio;
-        if (this.world.forest && count > 1) {
+        if ((this.world.forest || this.world.valley) && count > 1) {
           const leaf = platform.skin === 'leaf';
           if (!leaf && !continuousDecks.has(count)) {
             const geometry = continuousTerrainGeometry(count);
@@ -286,7 +297,8 @@ export class GardenEngine {
     for (const treasure of this.world.treasures) {
       const kind = this.collectibleKinds[treasure.id - 1], item = COLLECTIBLES[kind];
       const mesh = this.sprite(this.collectibleMaterials[kind], treasure.x, treasure.y, item.size * 0.78, item.size * 0.78);
-      this.treasureViews.set(treasure.id, { mesh, kind, isCollected: false, growingPlatform: this.platforms[treasure.platformId]?.fieldGate ? this.platforms[treasure.platformId] : null });
+      const platform = this.platforms[treasure.platformId];
+      this.treasureViews.set(treasure.id, { mesh, kind, isCollected: false, growingPlatform: platform?.channel || platform?.needsMark || platform?.fieldGate ? platform : null });
     }
     for (const enemy of this.world.enemies) {
       this.enemyViews.set(enemy.id, this.sprite(this.material((this.bossMaterials[enemy.image] || this.enemyMaterials[enemy.kind]).clone()), enemy.x, enemy.y + enemy.height / 2, 1.4, enemy.height, 0.5));
@@ -308,16 +320,18 @@ export class GardenEngine {
       const p = this.platforms[zone.startId];
       this.sprite(this.newFlowersMaterial, p.x + 3, p.y + 0.6, 2.4, 1.8, -0.4);
     }
-    if (!this.world.forest) this.sprite(this.newTowerMaterial, 5, this.world.start.y + 2.2, 2.2, 4.4, -2);
+    if (!this.world.forest && !this.world.valley && !this.world.expedition) this.sprite(this.newTowerMaterial, 5, this.world.start.y + 2.2, 2.2, 4.4, -2);
     const tower = this.world.finish;
-    if (!this.world.forest) this.sprite(this.newTowerMaterial, tower.x + 4, tower.y + 5, 4, 10, -1.5);
+    if (!this.world.forest && !this.world.expedition) this.sprite(this.newTowerMaterial, tower.x + 4, tower.y + 5, 4, 10, -1.5);
     for(const arena of this.world.bossArenas || []) { const exit=this.platforms[arena.exitId];this.sprite(this.bossGateMaterial,exit.x+1,exit.y+2,4,4,-.3);this.sprite(this.bossChestMaterial,exit.x-2,exit.y+.8,2.4,1.8,.6); }
   }
   resize() {
     const width = this.host.clientWidth, height = this.host.clientHeight;
     if (!width || !height) return;
     this.renderer.setSize(width, height);
-    const aspect = width / height, halfWidth = Math.max(12, 9 * aspect);
+    const aspect = width / height;
+    const halfHeight = 9;
+    const halfWidth = Math.max(12,halfHeight * aspect);
     if (!this.isReady) this.cameraX = Math.min(16, halfWidth - 4);
     this.camera.left = -halfWidth; this.camera.right = halfWidth;
     this.camera.top = halfWidth / aspect; this.camera.bottom = -halfWidth / aspect; this.camera.updateProjectionMatrix();
@@ -450,6 +464,12 @@ export class GardenEngine {
       const reach = this.camera.right * .72;
       return { x: right - left < reach * 2 ? (left + right) / 2 : Math.max(left + reach, Math.min(right - reach, averageX)), y: Math.max(floorY, averageY) + 2.3 };
     }
+    if (this.world.valley && room.id === 0) {
+      // 水槽、根和池面需要同时可见，入口上方的回渠随人物升高再进入视野。
+      const lookAhead = Math.min(7, this.camera.right * .38);
+      const facing = this.world.valley.layout === 'aqueduct' && averageY > 10 ? -1 : 1;
+      return { x: Math.max(min, Math.min(max, averageX + facing * lookAhead)), y: averageY + 1 };
+    }
     const x = min > max ? (room.left + room.right) / 2 : Math.max(min, Math.min(max, averageX + Math.min(5, this.camera.right * 0.25)));
     // 往上爬的房间多看一点头顶，往下跳的房间多看一点脚下。
     const isAscending = room.traversal?.ridges && averageX < room.traversal.practiceUntilX;
@@ -465,6 +485,25 @@ export class GardenEngine {
         this.callbacks.onSound(stop.sound || 'checkpoint');
         this.skillEffects.burst(player.x,player.y+1.1,this.elapsed,true);
         this.publish(stop.received || stop.label + ' ✓');
+        this.callbacks.onLifeChange?.(this.snapshot());
+      }
+    }
+    if (world.expedition) {
+      const message=advanceStory(world,state,player,this.elapsed);
+      if (message) {
+        syncStory(world,state,this.elapsed);
+        this.callbacks.onSound('checkpoint');
+        this.skillEffects.burst(player.x,player.y+1.2,this.elapsed,true);
+        this.publish(message);
+        this.callbacks.onLifeChange?.(this.snapshot());
+      }
+    }
+    if (world.valley && room.id === 0) {
+      const channel = waterUnderfoot(world, state.water, player, this.elapsed);
+      syncWaterRoutes(world, state.water, this.elapsed);
+      if (channel) {
+        this.callbacks.onSound('flower');
+        this.publish(WATER_NOTICES[channel]);
         this.callbacks.onLifeChange?.(this.snapshot());
       }
     }
@@ -551,7 +590,7 @@ export class GardenEngine {
     rescue(player, start, start.x - 2); player.recoveries--; player.protection = 1;
     this.waves = []; this.enemyShots = []; this.lure = undefined; this.checkpointId = start.id;
     this.snapCamera(); this.callbacks.onSound('checkpoint');
-    this.publish(this.world.field && room.stops.length ? fieldHint(this.world,this.roomState,this.players[0],this.elapsed) : room.traversal?.name ? `${room.traversal.name}，${room.traversal.hint}` : `${ROOM_KINDS[room.kind].name}：${room.puzzle ? PUZZLES[room.puzzle.kind].hint : ROOM_KINDS[room.kind].hint}`);
+    this.publish(this.world.field && room.stops.length ? fieldHint(this.world,this.roomState,this.players[0],this.elapsed) : this.world.expedition && room.goals?.length ? storyHint(room,this.roomState.story) : this.world.valley ? valleyHint(this.world, this.roomState, player) : room.traversal?.name ? `${room.traversal.name}，${room.traversal.hint}` : `${ROOM_KINDS[room.kind].name}：${room.puzzle ? PUZZLES[room.puzzle.kind].hint : ROOM_KINDS[room.kind].hint}`);
     this.callbacks.onLifeChange?.(this.snapshot());
   }
   interact(player) {
@@ -589,6 +628,7 @@ export class GardenEngine {
       roomId: room.id, depth: room.depth, kind: room.kind, name: cave?.name || traversal?.name || room.name || ROOM_KINDS[room.kind].name, isCleared: isRoomCleared(state), trait: room.trait || null,
       fieldHint:world.field ? fieldHint(world,state,player,this.elapsed) : null,
       areaId: cave?.id, isClimbing, canDescend, isDroppingFromGrip, traversalHint,
+      ...(world.expedition && room.goals?.length ? { valleyHint:storyHint(room,state.story) } : world.valley ? { valleyHint:valleyHint(world,state,player) } : {}),
       ...(world.forest ? { forest: { ...state.forest, hint: forestHint(world, state.forest, player) } } : {}),
       ...roomProgress(world, state, this.difficulty.isExtraWave),
       layers: world.zones.map((zone, depth) => ({ kind: depth < state.path.length ? world.rooms[state.path[depth]].kind : depth === world.zones.length - 1 ? 'boss' : null, stars: state.stars[state.path[depth]] || 0 })),
@@ -657,6 +697,7 @@ export class GardenEngine {
     moveCampaignPlatforms(this.world.lifts, this.elapsed);
     stepMechanisms(this.world, this.players[0], this.elapsed, STEP);
     if (this.world.field) syncField(this.world,this.roomState,this.elapsed);
+    if (this.world.expedition) syncStory(this.world,this.roomState,this.elapsed,this.players[0]);
     const nearby = item => this.players.some(p => Math.abs(item.x-p.x)<45 && Math.abs(item.y-p.y)<24);
     const activeRoom = currentRoom(this.world, this.roomState);
     const isInCave = !!this.players[0].safe?.isCave;
@@ -919,6 +960,8 @@ export class GardenEngine {
     this.adventure = migrateAdventure(structuredClone(state.adventure)); this.journey = structuredClone(state.journey); resourcesFor(this.adventure); this.lure = state.lure;
     this.roomState = structuredClone(state.rooms);
     if (this.world.field) syncField(this.world,this.roomState,state.elapsed);
+    if (this.world.valley) syncWaterRoutes(this.world, this.roomState.water, state.elapsed);
+    if (this.world.expedition) syncStory(this.world,this.roomState,state.elapsed);
     if (this.world.forest) syncForestRoutes(this.world, this.roomState.forest);
     this.applyRoomRules();
     this.survival = migrateSurvival(state.survival || newSurvival()); this.checkpointId = state.checkpointId ?? state.players[0].safeId;
@@ -1007,7 +1050,7 @@ export class GardenEngine {
         if(!view){view=this.sprite(this.lifeMaterial,point.x,point.y,1.2,1.65);this.lootViews.set(drop.enemyId,view);}
         view.visible=drop.choice===null;view.position.set(point.x,point.y+(this.isReducedMotion?0:Math.sin(this.elapsed*2.5)*.15),1);
       }
-      this.backdrops.forEach(mesh => { mesh.position.x = this.cameraX; mesh.position.y=this.cameraY-(this.isNewLandscape ? 2 : 1); const aspect=mesh.material.map.image.width/mesh.material.map.image.height;const width=this.isNewLandscape ? Math.max(this.camera.right*2+1,(this.camera.top*2+1)*aspect) : Math.max(44,this.camera.right*2+8,(this.camera.top*2+8)*aspect);mesh.scale.set(width,width/aspect,1); });
+      this.backdrops.forEach(mesh => { mesh.position.x = this.cameraX; mesh.position.y=this.cameraY-(this.world.valley ? .55 : this.isNewLandscape ? 2 : 1); const aspect=mesh.material.map.image.width/mesh.material.map.image.height;const width=this.isNewLandscape ? Math.max(this.camera.right*2+1,(this.camera.top*2+1)*aspect) : Math.max(44,this.camera.right*2+8,(this.camera.top*2+8)*aspect);mesh.scale.set(width,width/aspect,1); });
       const isInCave = !!this.players[0].safe?.isCave;
       const caveId = this.players[0].safe?.caveId;
       for (const mesh of this.backdrops) mesh.visible = !isInCave;

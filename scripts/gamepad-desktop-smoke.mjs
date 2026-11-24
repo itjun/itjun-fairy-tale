@@ -106,7 +106,7 @@ try {
   assert.equal(await evaluate(difficulty), '轻松', 'LB 换回来');
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-play-settings-v1")).difficulty'), 'easy');
   await evaluate('reach(".level-choices button:last-child")');
-  assert.equal(await evaluate('document.activeElement.textContent.includes("第 8 个世界")'), true, '方向键能滚到最后一个世界');
+  assert.equal(await evaluate('document.activeElement === document.querySelector(".level-choices button:last-child")'), true, '方向键能滚到最后一个世界');
   await evaluate('reach(".level-choices button:first-child")');
   await evaluate('choose(".adventure-menu-actions .primary-button")');
   await until(() => evaluate('!!document.querySelector(".character-depart")'), '角色营地');
@@ -116,7 +116,7 @@ try {
   await until(() => evaluate('!document.querySelector(".starter-picker")'), 'B 返回营地');
   await evaluate('tap(0)');
   await until(() => evaluate('!!document.querySelector(".starter-picker")'), '回到已高亮的自己选择后，一次 A 再打开');
-  await evaluate('choose(".starter-options button:nth-child(2)")');
+  await evaluate('choose(".starter-options button:not(:disabled)[aria-pressed=false]")');
   await evaluate('choose(".starter-picker footer button:last-child")');
   await until(() => evaluate('!document.querySelector(".starter-picker")'), '确认出发装备');
   await evaluate('choose("[data-gamepad-practice]")');
@@ -150,7 +150,7 @@ try {
   await until(status('overview'), '暂停里打开本领一览');
   await evaluate('tap(1)');
   await until(status('paused'), 'B 从本领一览回到暂停');
-  await evaluate('choose(".adventure-menu-actions button:nth-child(3)")');
+  await evaluate('choose(".adventure-menu-actions button:nth-child(4)")');
   await until(status('options'), '暂停里打开选项');
   await evaluate('tap(5)');
   await until(() => evaluate('!!document.querySelector(".platform-game .gamepad-settings")'), 'RB 换到手柄分类');

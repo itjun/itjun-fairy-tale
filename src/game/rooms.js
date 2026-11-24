@@ -1,6 +1,8 @@
 import { fieldComplete, validField } from '../../shared/trails/field-progress.js';
 import { DOOR_REWARDS, SHOP_STALLS, doorPosition, spotPosition } from '../../shared/room-world.js';
 
+import { newStoryState, validStoryState, metGoals } from '../../shared/story-mechanisms.js';
+import { canLeaveValley, newWaterState, validWaterState } from '../../shared/flower-valley.js';
 import { newForestProgress, isValidForestProgress } from './forest-rescue.js';
 
 // 房间进度：在哪间房、第几波、门开没开、星星和连击。只由固定游玩步长推进，随局保存。
@@ -15,7 +17,7 @@ function newPuzzle(room) {
   return null;
 }
 export function newRoomState(world) {
-  return { ...(world.field ? { field:{} } : {}), ...(world.forest ? { forest: newForestProgress(world) } : {}), roomId: 0, wave: 0, path: [0], cleared: [], stars: {}, isHurt: false, isFallen: false, downs: 0, combo: 0, comboLeft: 0, drops: [], bought: [], puzzle: newPuzzle(world.rooms[0]) };
+  return { ...(world.field ? { field:{} } : {}), ...(world.expedition ? { story:newStoryState() } : {}), ...(world.valley ? { water: newWaterState() } : {}), ...(world.forest ? { forest: newForestProgress(world) } : {}), roomId: 0, wave: 0, path: [0], cleared: [], stars: {}, isHurt: false, isFallen: false, downs: 0, combo: 0, comboLeft: 0, drops: [], bought: [], puzzle: newPuzzle(world.rooms[0]) };
 }
 export function currentRoom(world, state) { return world.rooms[state.roomId]; }
 export function isRoomCleared(state, roomId = state.roomId) { return state.cleared.includes(roomId); }
@@ -117,7 +119,7 @@ export function stepRoom(world, state, player, dt, isExtraWave = false) {
     else if (room.kind === 'boss') isCleared = world.enemies[room.bossId - 1].isDefeated;
     else if (room.kind === 'puzzle') isCleared = stepPuzzle(world, room, state.puzzle, player, dt, events);
     else if (room.kind === 'shop') isCleared = true;
-    else isCleared = (!world.field || fieldComplete(room,state.field)) && player.isGrounded && room.exitPlatformIds.includes(player.ground?.id);
+    else isCleared = (!world.field || fieldComplete(room,state.field)) && player.isGrounded && room.exitPlatformIds.includes(player.ground?.id) && (!world.valley || room.id !== 0 || canLeaveValley(world, state.water)) && (!world.expedition || metGoals(room,state.story));
     if (isCleared) {
       state.cleared.push(room.id);
       state.stars[room.id] = 1 + Number(!state.isHurt) + Number(!state.isFallen);
@@ -165,6 +167,8 @@ export function isValidRoomState(state, world) {
   const isFlag = value => typeof value === 'boolean';
   const isCount = (value, max) => Number.isInteger(value) && value >= 0 && value <= max;
   if (!state || !Array.isArray(state.path) || !Array.isArray(state.cleared) || !Array.isArray(state.drops) || !Array.isArray(state.bought) || !state.stars || Array.isArray(state.stars)) return false;
+  if (world.valley && (!validWaterState(world, state.water) || state.cleared.includes(0) && !canLeaveValley(world, state.water))) return false;
+  if (world.expedition && !validStoryState(world,state)) return false;
   if (world.field && !validField(world,state)) return false;
   if (world.forest && !isValidForestProgress(state.forest)) return false;
   const room = world.rooms[state.roomId];

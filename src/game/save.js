@@ -8,6 +8,8 @@ import { ADVENTURE_GENERATION_VERSION, WEAPONS } from '../../shared/adventure-ca
 import { isValidBossState } from './bosses.js';
 import { isValidCombatLoot } from './combat-loot.js';
 import { findStage } from '../../shared/levels.js';
+import { validStoryState } from '../../shared/story-mechanisms.js';
+import { WATER_CHANNELS, growthFraction } from '../../shared/flower-valley.js';
 import { isValidRoomState } from './rooms.js';
 import { saveEnemy } from './enemies.js';
 const KEY = ['garden','active','adventure','v1'].join('-');
@@ -71,6 +73,17 @@ export function readAdventure(storage=localStorage) {
     if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
     // 房间进度要和地图对得上，人也得站在当前这间房里。
     if (!isValidRoomState(state.rooms, world) || state.players.some(p => world.platforms[p.safeId].roomId !== state.rooms.roomId)) return null;
+    if (world.expedition) {
+      if (!validStoryState(world,state.rooms,state.elapsed)) return null;
+      const safe = [...state.players.map(p=>p.safeId),state.revival?.platformId].filter(id=>id!=null);
+      if (safe.some(id=>world.platforms[id].needsMark && !Object.hasOwn(state.rooms.story.marks,world.platforms[id].needsMark))) return null;
+    }
+    if (world.valley) {
+      const water = state.rooms.water;
+      if (WATER_CHANNELS.some(key => water[key] > state.elapsed)) return null;
+      const savedTiles = [...state.players.map(p => p.safeId), state.revival?.platformId].filter(id => id != null);
+      if (savedTiles.some(id => world.platforms[id].channel && growthFraction(world.platforms[id], water, state.elapsed) < .8)) return null;
+    }
     for (const {ride} of state.players) {
       if (ride===undefined) continue;
       const deck=world.platforms[ride?.id];

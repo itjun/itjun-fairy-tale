@@ -94,8 +94,8 @@ export async function runSmoke({ win, requestClose }) {
     await evaluate('document.querySelector(".death-menu .text-button").click()');
     await until('document.querySelector(".platform-game")?.dataset.gameStatus === "playing"');
     const fresh = await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1"))');
-    // 重来是一次新冒险，用最新的选门地图，从第一个世界的开场房出发。
-    assert.equal(fresh.state.levelId,'rainbow-world');assert.equal(fresh.state.version,ADVENTURE_GENERATION_VERSION);assert.equal(fresh.state.rooms.roomId,0);assert.equal(fresh.state.survival.lives,3);assert.equal(fresh.state.survival.hp,100);assert.equal(fresh.state.survival.character,'mom');
+    // 旧局重来时，从当前第一世界的河谷重新出发。
+    assert.equal(fresh.state.levelId,'rainbow-waterways');assert.equal(fresh.state.version,ADVENTURE_GENERATION_VERSION);assert.equal(fresh.state.rooms.roomId,0);assert.equal(fresh.state.survival.lives,3);assert.equal(fresh.state.survival.hp,100);assert.equal(fresh.state.survival.character,'mom');
     await writeFile(join(profile,'zero-life-reopen.png'),(await capture()).toPNG());
     requestClose(); return;
   }
@@ -120,20 +120,20 @@ export async function runSmoke({ win, requestClose }) {
   assert.equal(await evaluate('document.querySelectorAll(".reward-panel").length'),0);
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.survival.lives'),3);
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.survival.hp'),100);
-  // 新冒险是选门闯房间：顶上是这一章的五层，暂停里有本领一览和选项两张整页。
-  await until('document.querySelectorAll(".room-hud-path li").length === 5');
+  // 新花谷的进度条包含八个区域。
+  await until('document.querySelectorAll(".room-hud-path li").length === 8');
   assert.equal(await evaluate('JSON.parse(localStorage.getItem("garden-active-adventure-v1")).state.rooms.roomId'),0);
   await writeFile(join(profile, 'room.png'), (await capture()).toPNG());
   await evaluate('document.querySelector("[aria-label=暂停探险]").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button"), button => button.textContent.trim())'), ['继续探险', '本领一览', '选项', '回到我的花园']);
-  await evaluate('document.querySelectorAll(".adventure-menu-actions .quiet-button")[0].click()');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button"), button => button.textContent.trim())'), ['继续探险', '武器搭配', '本领一览', '选项', '回到我的花园']);
+  await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button")).find(b=>b.textContent.trim()==="本领一览").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "overview"');
   assert.equal(await evaluate('document.querySelectorAll(".platform-game [role=dialog], .platform-game .adventure-overlay").length'),0,'本领一览是整页，不是弹窗');
   await writeFile(join(profile, 'overview.png'), (await capture()).toPNG());
   await evaluate('document.querySelector(".run-overview .home-back").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "paused"');
-  await evaluate('document.querySelectorAll(".adventure-menu-actions .quiet-button")[1].click()');
+  await evaluate('Array.from(document.querySelectorAll(".adventure-menu-actions button")).find(b=>b.textContent.trim()==="选项").click()');
   await until('document.querySelector(".platform-game")?.dataset.gameStatus === "options"');
   await writeFile(join(profile, 'game-options.png'), (await capture()).toPNG());
   await evaluate('document.querySelector(".home-options .home-back").click()');

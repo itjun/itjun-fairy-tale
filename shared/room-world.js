@@ -2,7 +2,8 @@ import { buildFieldWorld } from './trails/field-world.js';
 import { randomGenerator } from './random.js';
 import { applyCycleHealth } from './adventure-cycle.js';
 import { buildForestRescue } from './forest-rescue.js';
-import { WORLD_MAPS, FOREST_RESCUE, themeFor } from './levels.js';
+import { buildFlowerValley } from './flower-valley.js';
+import { WORLD_MAPS, FLOWER_VALLEY, WATERWAYS, FOREST_RESCUE, themeFor } from './levels.js';
 import { LEVEL_COLLECTIBLES } from './collectibles.js';
 import { ADVENTURE_GENERATION_VERSION, EXPANDED_THEME_MONSTERS, MONSTERS } from './adventure-catalog.js';
 import { bossBaseline } from './boss-health.js';
@@ -351,8 +352,9 @@ export function createRoomWorld(seed, selected, cycle = 1) {
     applyCycleHealth(world, cycle);
     return world;
   }
-  if (stage === FOREST_RESCUE) {
-    buildForestRescue(world, stage, builder, placeBoss);
+  if ([FOREST_RESCUE,FLOWER_VALLEY,WATERWAYS].includes(stage)) {
+    if (stage === FOREST_RESCUE) buildForestRescue(world, stage, builder, placeBoss);
+    else buildFlowerValley(world, stage, builder, placeBoss, stage === WATERWAYS);
     applyCycleHealth(world, cycle);
     return world;
   }

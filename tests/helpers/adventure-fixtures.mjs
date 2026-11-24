@@ -18,6 +18,18 @@ function clearRoom(world, rooms, defeatedIds) {
   const room = world.rooms[rooms.roomId];
   for (const id of room.enemyIds) defeat(world.enemies[id - 1], defeatedIds);
   if (room.bossId) defeat(world.enemies[room.bossId - 1], defeatedIds);
+  if (world.valley && room.id === 0) {
+    Object.assign(rooms.water, { demo: 1, flower: 2, flow: 'flower', bridge: world.valley.layout === 'aqueduct' ? 3 : null });
+  }
+  if (world.expedition) {
+    for (const ball of room.runs || []) {
+      rooms.story.launches[ball.release] = 1;
+      rooms.story.marks[ball.wall] = 12;
+    }
+    for (const station of room.stations || []) {
+      if (station.goal && station.kind !== 'release') rooms.story.marks[station.key] = 16;
+    }
+  }
   if (world.field) {
     for (const stop of room.stops) rooms.field[room.id+'/'+stop.key] = 10;
   }
