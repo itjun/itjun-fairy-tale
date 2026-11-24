@@ -48,11 +48,10 @@ export function addForestViews(views) {
       const sign = views.paper(p.x, p.y + 3.1, 4.9, 1.05, 370, 82);
       update((progress, player) => {
         const near = Math.abs(player.x - p.x) < 25 && Math.abs(player.y - p.y) < 10 && !!player.safe.isCave === (side === 'roots');
-        sign.mesh.visible = near;
-        if (item) item.visible = near;
-        if (!near) return;
-        const active = progress[side] === index, done = progress[side] > index;
-        sign.draw(String(progress[side]), (ctx, width) => views.text(ctx, done ? stop.name + ' ✓' : active ? stop.action : stop.name, width / 2, 54, 42, active ? '#79501b' : '#50614b'));
+        if (item) item.visible = near && progress[side] >= index;
+        const isWaitingForLights = side === 'roots' && index === 0 && progress.lights !== 7;
+        sign.mesh.visible = near && progress[side] === index && !isWaitingForLights;
+        if (sign.mesh.visible) sign.draw(stop.action, (ctx, width) => views.text(ctx, stop.action, width / 2, 54, 42, '#79501b'));
       });
     }
     // 转弯处告诉玩家下一片地形在上一层还是下一层。

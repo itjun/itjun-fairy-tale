@@ -17,11 +17,12 @@ export function paintWind(views,r) {
   for(const jet of r.wind) {
     const arrows=Array.from({length:Math.max(5,Math.ceil(jet.width/2.5))},()=>g.sprite(mat,jet.x,jet.y,3.2,1.65,-.74));
     const sign=views.paper(jet.x,jet.y+1.1,4.2,.8,320,66);
+    const destination=r.stops.find(stop=>stop.after.includes(jet.after));
     views.items.push({roomId:r.id,update:(state,here)=>{
       const on=!jet.after||hasMark(r,state.field,jet.after);
       const horizontal=Math.abs(jet.dx)>jet.dy;
-      sign.mesh.visible=here && Math.abs(g.players[0].x-jet.x)<14;
-      sign.draw(String(on),(ctx,w)=>views.text(ctx,on?(horizontal?'跳入横风 →':'起跳乘上升风 ↑'):'风筒还没打开',w/2,44,29,on?'#3b7166':'#867063'));
+      sign.mesh.visible=here && on && (!destination || !hasMark(r,state.field,destination.key)) && Math.abs(g.players[0].x-jet.x)<14;
+      if(sign.mesh.visible) sign.draw('wind',(ctx,w)=>views.text(ctx,horizontal?'跳入横风 →':'起跳乘上升风 ↑',w/2,44,29,'#3b7166'));
       for(const [i,arrow] of arrows.entries()){
         arrow.visible=here && on;if(!arrow.visible)continue;
         const u=(i/arrows.length+(g.isReducedMotion?0:g.elapsed*.22))%1;

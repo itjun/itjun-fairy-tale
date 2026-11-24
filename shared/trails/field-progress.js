@@ -4,6 +4,14 @@ export const hasMark = (room,marks,key) => Object.hasOwn(marks,idOf(room,key));
 export const canUse = (room,marks,stop) => stop.after.every(key=>hasMark(room,marks,key));
 export const fieldComplete = (room,marks) => room.stops.every(s=>!s.goal || hasMark(room,marks,s.key));
 
+function nextRequiredStop(room,marks) {
+  return room.stops.find(s=>!s.optional && !hasMark(room,marks,s.key) && canUse(room,marks,s));
+}
+export function isFieldStopActive(room,marks,stop) {
+  if(stop.optional) return !hasMark(room,marks,stop.key) && canUse(room,marks,stop);
+  return nextRequiredStop(room,marks)===stop;
+}
+
 export const tideHeight = (time,period) => (1-Math.cos(2*Math.PI*time/period))/2;
 export function fieldMotion(room,m,marks,time) {
   const start=m.after ? marks[idOf(room,m.after)] : 0;
@@ -35,7 +43,7 @@ export function syncField(world,rooms,time) {
   }
 }
 export function fieldStopReady(room,marks,stop,time) {
-  if(!canUse(room,marks,stop)) return false;
+  if(!isFieldStopActive(room,marks,stop)) return false;
   if(stop.atDock!==undefined) {
     const moving=room.moving.find(m=>m.platformId===stop.platformId);
     if(Math.abs(fieldMotion(room,moving,marks,time)-stop.atDock)>(moving.rail ? .001 : .065)) return false;
@@ -64,9 +72,7 @@ export function fieldHint(world,rooms,player,time) {
   const room=world.rooms[rooms.roomId],marks=rooms.field;
   if(!room.stops.length) return '';
   if(fieldComplete(room,marks)) return '通路打开了　去发光的门';
-  const active=room.stops.filter(s=>!s.optional&&!hasMark(room,marks,s.key)&&canUse(room,marks,s));
-  const distance=s=>Math.abs(player.x-world.platforms[s.platformId].x);
-  const next=active.sort((a,b)=>distance(a)-distance(b))[0];
+  const next=nextRequiredStop(room,marks);
   if(!next)return room.clue || '看看附近的机关';
   const p=world.platforms[next.platformId],dx=p.x-player.x,dy=p.y-player.y;
   const cave=room.traversal?.cave;
