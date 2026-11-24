@@ -28,8 +28,42 @@ html[data-input-mode="gamepad"] #root :is(.atlas-mark, .family-portrait):focus {
 }
 #root .level-choices button:focus :is(span, strong, small) { color: #1c340f; }
 .gamepad-notice { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 2000; max-width: 85vw; padding: 9px 18px; background: #fff8e9; color: #4e583b; border: 2px solid #9d9b71; border-radius: 9px; pointer-events: none; font-size: 18px; }
-.gamepad-guide { position: fixed; bottom: 0; left: 0; right: 0; z-index: 1800; display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 30px; padding: 7px 16px; background: #fff8e9ee; color: #4e583b; font-size: 18px; pointer-events: none; }
-.pad-hint { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+:root {
+  --pad-guide-side: clamp(12px, 2.5vw, 64px);
+  --pad-guide-bottom: max(clamp(9px, 2vh, 32px), env(safe-area-inset-bottom));
+  --pad-guide-clearance: calc(var(--pad-guide-bottom) + 50px);
+}
+.gamepad-guide {
+  position: fixed;
+  z-index: 1800;
+  right: max(var(--pad-guide-side), env(safe-area-inset-right));
+  bottom: var(--pad-guide-bottom);
+  width: max-content;
+  max-width: calc(100% - max(var(--pad-guide-side), env(safe-area-inset-left)) - max(var(--pad-guide-side), env(safe-area-inset-right)));
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px clamp(12px, 1.4vw, 26px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #faf8f1f2;
+  color: #343a30;
+  font-size: clamp(15px, 1.1vw, 21px);
+  line-height: 1.25;
+  pointer-events: none;
+}
+.pad-hint { display: inline-flex; align-items: center; gap: .35em; white-space: nowrap; }
+.gamepad-guide .pad-key {
+  min-width: 1.6em;
+  height: 1.6em;
+  padding-inline: .25em;
+  border-width: 1.5px;
+  font-size: 1em;
+  font-weight: bold;
+}
+.gamepad-guide .pad-key + .pad-key { margin-left: -.16em; }
 /* 按键小图标：粗黑边、略歪的圆，颜色跟手柄上的字母一致。 */
 .pad-key { display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; box-sizing: border-box; border: 2.5px solid #2f2a25; border-radius: 52% 48% 50% 50% / 48% 52% 48% 52%; background: #fffdf6; color: #2f2a25; font: 17px/1 var(--hand-font, sans-serif); font-style: normal; }
 .pad-key-a { background: #9bd66b; }
@@ -39,7 +73,10 @@ html[data-input-mode="gamepad"] #root :is(.atlas-mark, .family-portrait):focus {
 .pad-key-lb, .pad-key-rb, .pad-key-rt, .pad-key-view, .pad-key-menu, .pad-key-stick { border-radius: 11px 13px 12px 10px; font-size: 15px; }
 .pad-map dt { display: flex; gap: 6px; align-items: center; }
 body:has([data-game-status="playing"]) .gamepad-guide { display: none; }
-html[data-input-mode="gamepad"] body:not(:has([data-game-status="playing"])) { padding-bottom: 42px; }
+body:has(.gamepad-guide) :is(.home-page, .mini-game, .score-screen, .reward-panel) {
+  padding-bottom: var(--pad-guide-clearance);
+}
+body:has(.gamepad-guide) .home-slideshow { bottom: var(--pad-guide-clearance); }
 .gamepad-settings { grid-column: 1 / -1; padding: 18px 0; text-align: left; }
 .gamepad-settings h2 { font-size: 25px; }
 .gamepad-settings p, .gamepad-settings small { overflow-wrap: anywhere; }
@@ -50,5 +87,12 @@ html[data-input-mode="gamepad"] body:not(:has([data-game-status="playing"])) { p
 .gamepad-settings small { display: block; line-height: 1.8; }
 .gamepad-stamp-cursor { position: absolute; width: 44px; height: 44px; border: 3px dashed #58753a; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; background: #fff8e980; z-index: 6; }
 .world:not(:focus) .gamepad-stamp-cursor { display: none; }
-@media (max-width: 700px) { .gamepad-guide { font-size: 13px; } .gamepad-settings dl { grid-template-columns: 1fr 2fr; } }
+@media (max-width: 600px) {
+  .gamepad-guide { column-gap: 9px; padding-inline: 4px; }
+  body:has(.gamepad-guide) .home-navigation { bottom: calc(var(--pad-guide-clearance) + 62px); }
+}
+@media (max-width: 360px) {
+  :root { --pad-guide-clearance: calc(var(--pad-guide-bottom) + 76px); }
+}
+@media (max-width: 700px) { .gamepad-settings dl { grid-template-columns: 1fr 2fr; } }
 html[data-input-mode="gamepad"] :is(button, a, input, select, [data-gamepad-canvas]) { scroll-margin-block: 12px 72px; }
