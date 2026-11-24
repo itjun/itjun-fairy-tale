@@ -36,7 +36,8 @@ test('八个世界关各一场首领，30 种怪物都会出场，首领房门�
   assert.equal(w.bossArenas.length,1);
   w.enemies.forEach(e=>seen.add(e.kind));
   const bossRoom=w.rooms.at(-1);
-  assert.deepEqual(w.supplies.map(s=>s.kind).sort(),['life','medkit']);assert.ok(w.supplies.every(s=>w.platforms[s.platformId].roomId===bossRoom.id));
+  const lifeSupplies=w.supplies.filter(s=>s.kind!=='hotAirBalloon');
+  assert.deepEqual(lifeSupplies.map(s=>s.kind).sort(),['life','medkit']);assert.ok(lifeSupplies.every(s=>w.platforms[s.platformId].roomId===bossRoom.id));
  }
  assert.equal(seen.size,30);
 });

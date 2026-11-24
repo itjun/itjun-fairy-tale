@@ -1,5 +1,6 @@
 import { heal, resourcesFor } from './expedition.js';
 import { addLife } from './characters.js';
+import { TIMED_ITEMS } from '../../shared/adventure-catalog.js';
 
 export const ICICLE_SIZE = { width: 2.4, height: 1.7 };
 
@@ -50,11 +51,17 @@ export function touchingHazard(player,hazard,elapsed){
   if(hazard.kind==='icicle')return state.isActive&&Math.abs(player.x-hazard.x)<1.1&&Math.abs(player.y+.8-state.y-.8)<1.6;
   return state.isActive&&Math.abs(player.x-hazard.x)<1.3&&player.y<hazard.y+(hazard.kind==='thorns'?1.2:3)&&player.y+1.6>hazard.y;
 }
-export function takeLifeSupply(world,claimed,player,survival,adventure,powers={}){
-  const item=world.supplies?.find(s=>!claimed.includes(s.id)&&Math.abs(player.x-s.x)<1&&Math.abs(player.y+.8-s.y)<1.5);
+export function takeRoomSupply(world,claimed,player,survival,adventure,powers={}){
+  const item=world.supplies?.find(s=>!claimed.includes(s.id) && world.platforms[s.platformId].roomId===player.safe.roomId
+    && !player.safe.isCave && !player.crawl && Math.abs(player.x-s.x)<1&&Math.abs(player.y+.8-s.y)<1.5);
   if(!item||survival.phase!=='alive')return null;
   if(item.bossId && !world.enemies[item.bossId-1]?.isDefeated)return null;
-  if(item.kind==='medkit'){if(!heal(survival,25)){if(!adventure||!powers.snack||resourcesFor(adventure).snack)return null;adventure.resources.snack=1;}}else if(!addLife(survival))return null;
+  if (item.kind === 'hotAirBalloon') {
+    adventure.effects.hotAirBalloon = TIMED_ITEMS.hotAirBalloon.duration;
+    adventure.revision++;
+    Object.assign(player, { grip: null, launch: null, ground: null, isGrounded: false,
+      vy: 0, coyote: 0, buffer: 0, fallPeak: player.y });
+  } else if(item.kind==='medkit'){if(!heal(survival,25)){if(!adventure||!powers.snack||resourcesFor(adventure).snack)return null;adventure.resources.snack=1;}}else if(!addLife(survival))return null;
   claimed.push(item.id);return item;
 }
 export function mechanismSave(world){return world.platforms.filter(p=>p.collapseAt!==undefined||p.isSeesaw).map(p=>({id:p.id,...(p.collapseAt!==undefined?{collapseAt:p.collapseAt}:{}),...(p.isSeesaw?{slope:p.slope}:{})}));}

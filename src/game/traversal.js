@@ -11,6 +11,11 @@ export function caveForPlayer(room, player) {
   return player.safe.caveId === route?.cave?.id ? route?.cave : route?.legacyCave;
 }
 
+export function balloonCeiling(room, player) {
+  const cave = caveForPlayer(room, player);
+  return cave ? Math.max(player.safe.y + 7, cave.floorY + 8) : room.top + 5;
+}
+
 export function caveMouthAt(room, player) {
   if (!player.isGrounded || player.crawl) return null;
   const cave = caveForPlayer(room, player) ?? room.traversal?.cave;
@@ -158,7 +163,7 @@ function findGrab(player, route, direction, beforeX, isReachingUp) {
 
 // 攀爬和钻洞只在房间内生效，普通移动仍交给原平台物理。
 export function stepTraversal(player, input, platforms, allPlatforms, dt, bounds, route) {
-  if (!route) return stepPlayer(player, input, platforms, dt, bounds);
+  if (!route || input.isFlying && !player.crawl) return stepPlayer(player, input, platforms, dt, bounds);
   if (player.grip && player.knockTime > 0) player.grip = null;
   if (player.crawl || player.grip) {
     player.protection = Math.max(0, player.protection - dt);

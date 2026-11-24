@@ -12,6 +12,7 @@ import { validStoryState } from '../../shared/story-mechanisms.js';
 import { WATER_CHANNELS, growthFraction } from '../../shared/flower-valley.js';
 import { isValidRoomState } from './rooms.js';
 import { saveEnemy } from './enemies.js';
+import { balloonCeiling, caveForPlayer } from './traversal.js';
 const KEY = ['garden','active','adventure','v1'].join('-');
 const PARKED_PREFIX = 'garden-parked-adventure-v1:';
 // 以前换规则时留下的旧存档备份，现在跟旧地图一起清掉。
@@ -129,6 +130,16 @@ function readSave(key, storage) {
     if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
     // 房间进度要和地图对得上，人也得站在当前这间房里。
     if (!isValidRoomState(state.rooms, world) || state.players.some(p => world.platforms[p.safeId].roomId !== state.rooms.roomId)) return null;
+    for (const player of state.players) {
+      const position = player.balloonPosition;
+      if (position === undefined) continue;
+      const room = world.rooms[state.rooms.roomId], safe = world.platforms[player.safeId];
+      const cave = caveForPlayer(room, { safe });
+      if (!state.adventure.effects?.hotAirBalloon || state.survival.phase !== 'alive' || player.ride ||
+          !Number.isFinite(position?.x) || !Number.isFinite(position.y) ||
+          position.x < (cave?.left ?? room.left) || position.x > (cave?.right ?? room.right) ||
+          position.y < (cave ? cave.floorY - 4 : room.fallY) || position.y > balloonCeiling(room, { safe })) return null;
+    }
     if (world.expedition) {
       if (!validStoryState(world,state.rooms,state.elapsed)) return null;
       const safe = [...state.players.map(p=>p.safeId),state.revival?.platformId].filter(id=>id!=null);

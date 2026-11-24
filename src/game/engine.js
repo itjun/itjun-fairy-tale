@@ -33,14 +33,14 @@ import { canStartAttack, fireLoadout, stepAdventureWave, areaAttack, attackSourc
 import { ATTACK_KEYS, attackBindings, attackInput, bindAttack } from './attack-bindings.js';
 import { stepAdventureEnemies, releaseCandyChildren } from './adventure-enemies.js';
 import { createPlayer, landingDamage, rescue, revivalPoint } from './physics.js';
-import { beginCrawl, caveForPlayer, caveMouthAt, climbEntryAt, stepTraversal } from './traversal.js';
+import { balloonCeiling, beginCrawl, caveForPlayer, caveMouthAt, climbEntryAt, stepTraversal } from './traversal.js';
 import { DESERT_IMAGES, TRAVERSAL_IMAGES, TraversalViews } from './traversal-view.js';
 import { addSunlightDeck } from './oasis-light.js';
 import { campaignScore } from '../../shared/campaign.js';
 import { moveCampaignPlatforms } from './combat.js';
 import { SkillEffects } from './skill-effects.js';
 import { touchEnemy, touchSpring, saveEnemy, restoreEnemy } from './enemies.js';
-import { ICICLE_SIZE, hazardState, icicleTargets, stepMechanisms, touchingHazard, takeLifeSupply, mechanismSave, restoreMechanisms } from './hazards.js';
+import { ICICLE_SIZE, hazardState, icicleTargets, stepMechanisms, touchingHazard, takeRoomSupply, mechanismSave, restoreMechanisms } from './hazards.js';
 import { LEVELS, themeFor } from '../../shared/levels.js';
 import { COLLECTIBLES, LEVEL_COLLECTIBLES } from './collectibles.js';
 
@@ -138,7 +138,7 @@ export class GardenEngine {
       const poseNames = Object.keys(CHARACTERS).flatMap(character => ['climb', 'crawl'].map(pose => `${character}-${pose}`));
       this.isNewLandscape = landscape === 'landscape-new-drawing' || !!this.world.valley || !!storyBackdrop;
       const names = [...new Set([landscape, ...fieldImages(this.world), ...storyImages(this.world), ...(this.world.valley ? VALLEY_IMAGES : []), ...Object.values(CHARACTERS).flatMap(c => [c.image, c.attack]), ...poseNames, ...TRAVERSAL_IMAGES, ...(isDesert ? DESERT_IMAGES : []), 'flower', 'collectible-rainbow', 'light-wave', 'enemy-burst', 'treehouse-tall', ...(this.world.forest ? ['forest-hollow', 'forest-root-hall', 'forest-nest', 'forest-owlet', 'forest-vine'] : []), 'platform-raft', 'platform-ice', 'platform-gear', 'platform-conveyor', 'island-lighthouse', 'castle-cutaway', 'street-house', 'windmill-tall', 'platform-awning', surfaceImage,
-        'lift-leaf', 'spring-flower', 'bridge-rope', 'checkpoint-flag', 'collectible-star', 'magic-bubble',
+        'lift-leaf', 'spring-flower', 'bridge-rope', 'checkpoint-flag', 'collectible-star', 'magic-bubble', 'hot-air-balloon',
         ...LEVEL_COLLECTIBLES[this.level.id].map(id => COLLECTIBLES[id].image), 'new-drawing-tower', 'new-drawing-flowers', 'trap-pendulum', 'trap-thorns', 'trap-steam', 'terrain-blocks', 'platform-cloud', 'life-potion', 'supply-medkit', 'flame-stream', 'collectible-snowflake', 'upgrade-frost', 'upgrade-chain', 'boss-gate', 'boss-chest', 'terrain-bank', 'terrain-cookie', 'terrain-rock', ...ROOM_IMAGES, ...Object.values(MONSTERS).map(m => m.image), ...Object.values(WEAPONS).map(w => w.image), ...this.world.enemies.filter(e=>e.isBoss && e.image).map(e=>e.image), ...this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image))])];
       const textures = await Promise.all(names.map(async name => {
         const texture = await loader.loadAsync(`./assets/${name}.png`);
@@ -177,6 +177,7 @@ export class GardenEngine {
       this.bossMaterials = Object.fromEntries(this.world.enemies.filter(e=>e.isBoss && e.image).map(e=>[e.image,spriteMaterial(e.image)]));
       this.enemyShotMaterials=Object.fromEntries([...new Set(this.world.enemies.flatMap(e=>(e.skills || []).map(skill=>skill.image)))].map(name=>[name,spriteMaterial(name)]));
       this.lifeMaterial = spriteMaterial('life-potion');this.medkitMaterial=spriteMaterial('supply-medkit');
+      this.balloonMaterial = spriteMaterial('hot-air-balloon');
       this.bossGateMaterial=spriteMaterial('boss-gate');this.bossChestMaterial=spriteMaterial('boss-chest');
       this.trapMaterials = {pendulum:spriteMaterial('trap-pendulum'),thorns:spriteMaterial('trap-thorns'),steam:spriteMaterial('trap-steam'),icicle:spriteMaterial('monster-icicle')};
       if (this.world.hazards.some(h=>h.kind==='geyser')) this.trapMaterials.geyser=trailMaterial(this,'water-geyser');
@@ -310,7 +311,11 @@ export class GardenEngine {
       mesh.scale.set(width,height,1);mesh.position.y=h.kind==='pendulum'?-height*.45:height/2;
       group.add(mesh);this.scene.add(group);this.hazardViews.set(h.id,{group,mesh});
     }
-    for (const supply of this.world.supplies || []) this.supplyViews.set(supply.id,this.sprite(supply.kind==='medkit'?this.medkitMaterial:this.lifeMaterial,supply.x,supply.y,.9,1.25));
+    for (const supply of this.world.supplies || []) {
+      const isBalloon = supply.kind === 'hotAirBalloon';
+      const material = isBalloon ? this.balloonMaterial : supply.kind === 'medkit' ? this.medkitMaterial : this.lifeMaterial;
+      this.supplyViews.set(supply.id, this.sprite(material, supply.x, supply.y, isBalloon ? 1.8 : .9, isBalloon ? 2.7 : 1.25));
+    }
     for (const treasure of this.world.treasures) {
       const kind = this.collectibleKinds[treasure.id - 1], item = COLLECTIBLES[kind];
       const mesh = this.sprite(this.collectibleMaterials[kind], treasure.x, treasure.y, item.size * 0.78, item.size * 0.78);
@@ -375,7 +380,8 @@ export class GardenEngine {
     if (!this.keys.has(event.code)) {
       // 站在摊位前，“上”用来买东西，不跳。门是跳上去就进。
       const player = this.players[0];
-      if (['KeyW', 'ArrowUp'].includes(event.code) && this.canInteract()) this.isInteracting = true;
+      const isFlying = !!this.adventure.effects?.hotAirBalloon;
+      if ((isFlying ? event.code === 'Space' : ['KeyW', 'ArrowUp'].includes(event.code)) && this.canInteract()) this.isInteracting = true;
       else if (event.code === 'Space' || !player.grip && !player.launch?.isDrop && (event.code === 'KeyW' || this.players.length === 1 && event.code === 'ArrowUp')) this.jumps[0] = true;
     }
     this.keys.add(event.code);
@@ -396,11 +402,13 @@ export class GardenEngine {
     if (this.isPaused) return;
     const actions = input?.actions || new Set();
     if (actions.has('confirm') && !this.gamepad.has('jump')) this.jumps[0] = true;
-    if (actions.has('up') && !this.gamepad.has('up') && this.canInteract()) this.isInteracting = true;
+    const isFlying = !!this.adventure?.effects?.hotAirBalloon;
+    if (actions.has(isFlying ? 'confirm' : 'up') && !this.gamepad.has(isFlying ? 'jump' : 'up') && this.canInteract()) this.isInteracting = true;
     this.gamepad = new Set([...actions].map(action => action === 'confirm' ? 'jump' : action === 'down' ? 'drop' : action));
     this.gamepadDirection = input?.direction || 0;
+    this.gamepadVertical = input?.vertical ?? Number(actions.has('up')) - Number(actions.has('down'));
   }
-  releaseGamepad() { this.gamepad?.clear(); this.gamepadDirection = 0; }
+  releaseGamepad() { this.gamepad?.clear(); this.gamepadDirection = 0; this.gamepadVertical = 0; }
   hasControl(action) { return this.touch.has(action) || this.gamepad?.has(action); }
   clearInput() { this.releaseGamepad(); this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; this.isInteracting = false; this.attackInput = { down: [] }; }
   pause(isPaused) { if (!isPaused && (this.survival.phase !== 'alive'||this.combatLoot?.pendingId!=null)) return; this.isPaused = isPaused; if(isPaused)this.callbacks.onSound('pause'); this.clearInput(); this.accumulator = 0; }
@@ -739,7 +747,12 @@ export class GardenEngine {
     const isInCave = !!this.players[0].safe?.isCave;
     const caveId = this.players[0].safe?.caveId;
     const platforms = this.platforms.filter(p => !!p.isCave === isInCave && p.caveId === caveId && nearby(p)), enemies = this.world.enemies.filter(nearby);
+    const wasFlying = !!this.adventure.effects?.hotAirBalloon;
     tickResources(this.adventure, STEP); tickEffects(this.adventure, STEP);
+    if (wasFlying && !this.adventure.effects.hotAirBalloon) {
+      this.players[0].vy = 0;
+      this.publish('热气球时间到，往平台上落吧！');
+    }
     if (useRecovery(this.adventure, this.survival, upgradePower(this.adventure))) this.publish('回血 +10！');
     // 同屏主动出手的怪最多 3 只。
     const practiceEnd = activeRoom.traversal?.practiceUntilX;
@@ -776,8 +789,10 @@ export class GardenEngine {
       const isSingle = this.players.length === 1;
       const left = index === 0 ? this.keys.has('KeyA') || this.hasControl('left') || isSingle && this.keys.has('ArrowLeft') : this.keys.has('ArrowLeft');
       const right = index === 0 ? this.keys.has('KeyD') || this.hasControl('right') || isSingle && this.keys.has('ArrowRight') : this.keys.has('ArrowRight');
-      const down = index === 0 ? this.keys.has('KeyS') || this.hasControl('drop') || isSingle && this.keys.has('ArrowDown') : this.keys.has('ArrowDown');
-      const up = this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.hasControl('up');
+      const manualDown = this.keys.has('KeyS') || this.keys.has('ArrowDown') || this.touch.has('drop');
+      const manualUp = this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.touch.has('up');
+      const down = manualDown || this.hasControl('drop');
+      const up = manualUp || this.hasControl('up');
       const previousY = player.y, wasGrounded = player.isGrounded;
       const wasClimbing = !!player.grip;
       const powers = upgradePower(this.adventure, index);
@@ -786,10 +801,15 @@ export class GardenEngine {
       if (isBraking) player.vy = -3;
       player.fallPeak = wasGrounded || wasClimbing || isBraking || player.vy > 0 ? player.y : Math.max(player.fallPeak ?? player.y, player.y);
       const isManualHorizontal = ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'].some(key => this.keys.has(key)) || this.touch.has('left') || this.touch.has('right');
-      if (activeRoom.wind) pushInWind(activeRoom,this.roomState.field,player,STEP);
-      const result = stepTraversal(player, { direction: isManualHorizontal ? Number(right) - Number(left) : (this.gamepadDirection || 0), vertical: Number(up) - Number(down), speedMultiplier, jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, this.platforms, STEP, { isFiniteLife: true, ...this.roomBounds() }, activeRoom.traversal);
+      const isFlying = !!powers.balloonFlight;
+      let vertical = Number(up) - Number(down);
+      if (isFlying) vertical = manualUp || manualDown ? Number(manualUp) - Number(manualDown) : this.gamepadVertical || 0;
+      if (activeRoom.wind && !isFlying) pushInWind(activeRoom,this.roomState.field,player,STEP);
+      const bounds = this.roomBounds();
+      if (isFlying) bounds.maxY = nextBoss ? this.world.bossArenas[nextBoss.arenaId].y + 7 : balloonCeiling(activeRoom, player);
+      const result = stepTraversal(player, { direction: isManualHorizontal ? Number(right) - Number(left) : (this.gamepadDirection || 0), vertical, speedMultiplier, isFlying, jump: this.jumps[index] && !down, drop: this.jumps[index] && down }, platforms, this.platforms, STEP, { isFiniteLife: true, ...bounds }, activeRoom.traversal);
       this.jumps[index] = false;
-      if (result.isJumped || result.isDropped || player.grip) player.fallPeak = player.y;
+      if (isFlying || result.isJumped || result.isDropped || player.grip) player.fallPeak = player.y;
       if (result.isTraversed) {
         player.fallPeak = player.y;
         this.snapCamera();
@@ -832,12 +852,18 @@ export class GardenEngine {
       while (this.visited.has(this.furthestPlatform+1)) this.furthestPlatform++;
       this.stepPlayerAttack(player, index, powers);
       for (const hazard of this.world.hazards) if (touchingHazard(player,hazard,this.elapsed)) { player.protection=1; this.hurt(false,15); if(this.survival.phase!=='alive')return; }
-      const supply=takeLifeSupply(this.world,this.claimedSupplies,player,this.survival,this.adventure,powers);
-      if(supply){this.supplyViews.get(supply.id).visible=false;this.skillEffects.burst(supply.x,supply.y,this.elapsed,true);this.publish(supply.kind==='medkit'?'回血 +25！':'血瓶 +1 条命！');this.callbacks.onLifeChange?.(this.snapshot());}
+      const supply = takeRoomSupply(this.world,this.claimedSupplies,player,this.survival,this.adventure,powers);
+      if (supply) {
+        this.supplyViews.get(supply.id).visible = false;
+        this.skillEffects.burst(supply.x,supply.y,this.elapsed,true);
+        if (supply.kind === 'hotAirBalloon') this.callbacks.onSound('skill');
+        this.publish({ hotAirBalloon: '坐上热气球啦！上下左右飞，松开就停。', medkit: '回血 +25！', life: '血瓶 +1 条命！' }[supply.kind]);
+        this.callbacks.onLifeChange?.(this.snapshot());
+      }
       for (const sw of this.world.switches) if (!sw.isOpen && player.ground?.id === sw.platformId && Math.abs(player.x-sw.x)<1) {
         sw.isOpen=true; this.platforms[sw.bridgeId].isEnabled=true; this.publish('星星亮了，小桥打开啦！');
       }
-      for (const spring of this.world.springs) if (touchSpring(player, spring)) {
+      for (const spring of this.world.springs) if (!isFlying && touchSpring(player, spring)) {
         this.springViews.get(spring).userData.pressedAt=this.elapsed;
         this.callbacks.onSound('jump'); this.publish('弹簧花送你跳高高！');
       }
@@ -989,6 +1015,7 @@ export class GardenEngine {
       brokenIcicles: this.world.hazards.filter(hazard => hazard.isBroken).map(hazard => hazard.id),
       enemies:this.world.enemies.map(saveEnemy),
       players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),
+        ...(this.adventure.effects?.hotAirBalloon && !p.isGrounded && !p.crawl && this.survival.phase === 'alive' ? { balloonPosition: { x: p.x, y: p.y } } : {}),
         ...(this.world.field && p.isGrounded && p.ground?.isMoving ? {ride:{id:p.ground.id,offset:p.x-p.ground.x}} : {}),
         attackRemaining: Math.max(0, (p.nextAttackAt || 0) - this.elapsed),
         companionRemaining: Math.max(0, (p.nextCompanion || 0) - this.elapsed),
@@ -1028,6 +1055,10 @@ export class GardenEngine {
       if (saved.ride && this.world.field) {
         const deck=this.platforms[saved.ride.id];
         Object.assign(p,{ground:deck,x:deck.x+saved.ride.offset,y:deck.y});
+      }
+      if (saved.balloonPosition) {
+        const { x, y } = saved.balloonPosition;
+        Object.assign(p, { x, y, ground: null, isGrounded: false, coyote: 0, fallPeak: y });
       }
       if(saved.protection!==undefined)p.protection=saved.protection;
       p.nextShot=this.elapsed+(saved.shotRemaining || 0);p.inkUntil=this.elapsed+(saved.inkRemaining || 0);
@@ -1092,6 +1123,12 @@ export class GardenEngine {
       this.backdrops.forEach(mesh => { mesh.position.x = this.cameraX; mesh.position.y=this.cameraY-(this.world.valley ? .55 : this.isNewLandscape ? 2 : 1); const aspect=mesh.material.map.image.width/mesh.material.map.image.height;const width=this.isNewLandscape ? Math.max(this.camera.right*2+1,(this.camera.top*2+1)*aspect) : Math.max(44,this.camera.right*2+8,(this.camera.top*2+8)*aspect);mesh.scale.set(width,width/aspect,1); });
       const isInCave = !!this.players[0].safe?.isCave;
       const caveId = this.players[0].safe?.caveId;
+      for (const item of this.world.supplies) {
+        if (item.kind !== 'hotAirBalloon') continue;
+        const view = this.supplyViews.get(item.id);
+        view.visible = !isInCave && this.platforms[item.platformId].roomId === this.roomState.roomId && !this.claimedSupplies.includes(item.id);
+        if (view.visible && !this.isReducedMotion) view.position.y = item.y + Math.sin(this.elapsed * 2.4) * .12;
+      }
       for (const mesh of this.backdrops) mesh.visible = !isInCave;
       for (const p of this.platforms) {const view=this.platformViews.get(p.id);view.position.set(p.x,p.y,0);view.rotation.z=Math.atan(p.slope || 0);if(p.collapseAt!==undefined&&this.elapsed<p.collapseAt)view.position.y+=Math.sin(this.elapsed*40)*.04;view.visible=!!p.isCave===isInCave && p.caveId===caveId && p.isEnabled!==false && Math.abs(p.x-this.cameraX)<this.camera.right+p.width/2+12 && Math.abs(p.y-this.cameraY)<this.camera.top+12;}
       this.traversalViews?.update(this.roomState.roomId, this.players[0], this.cameraX, this.cameraY, this.camera);
@@ -1135,6 +1172,14 @@ export class GardenEngine {
       }
       this.players.forEach((player, index) => {
         const mesh = this.playerViews[index], size = CHARACTERS[this.survival.character].height;
+        if (this.adventure.effects?.hotAirBalloon && !player.crawl) {
+          const height = size * 2.6;
+          this.ridingBalloon ??= this.sprite(this.balloonMaterial, player.x, player.y, 1, 1, .82);
+          this.ridingBalloon.visible = true;
+          this.ridingBalloon.scale.set(height * 2 / 3, height, 1);
+          this.ridingBalloon.position.set(player.x, player.y + height / 2 - .15, .82);
+          this.ridingBalloon.rotation.z = this.isReducedMotion ? 0 : Math.sin(this.elapsed * 2) * .012 - player.vx * .006;
+        } else if (this.ridingBalloon) this.ridingBalloon.visible = false;
         const poseName = player.crawl ? 'crawl' : player.grip ? 'climb' : null;
         const pose = poseName && this.traversalMaterials[`${this.survival.character}-${poseName}`];
         const height = size * (player.crawl ? .6 : player.grip ? .93 : 1);

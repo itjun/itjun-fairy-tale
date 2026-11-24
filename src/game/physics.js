@@ -27,13 +27,7 @@ export function revivalPoint(player, platforms, isFall) {
   const margin = Math.max(0, platform.width / 2 - 0.35);
   return { platformId: platform.id, offsetX: Math.max(-margin, Math.min(margin, x-platform.x)) };
 }
-// 固定 120 Hz 步长。落地只检查下降穿过台面，孩子可从下方跳上台。
-export function stepPlayer(player, input, platforms, dt, bounds = {}) {
-  player.protection = Math.max(0, player.protection - dt);
-  player.knockTime = Math.max(0, player.knockTime - dt);
-  player.dropTime = Math.max(0, player.dropTime - dt);
-  player.springTime = Math.max(0, player.springTime - dt);
-  if (player.isGrounded && player.ground?.isMoving) { player.y += player.ground.deltaY || 0; player.x += player.ground.deltaX || 0; }
+function stepWalkingVelocity(player, input, dt) {
   if (input.drop && player.isGrounded && player.ground?.isOneWay) {
     player.ignoredPlatform = player.ground.id; player.dropTime = 0.3;
     player.isGrounded = false; player.coyote = 0; player.buffer = 0; player.y -= 0.08;
@@ -58,12 +52,32 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
     player.vy = player.character === 'little' ? RULES.jump * 1.16 : RULES.jump;
     player.buffer = 0; player.coyote = 0; player.isAirJumpUsed = true; isJumped = true;
   }
-  const support = player.isGrounded && player.ground && (player.ground.slope || player.ground.isSeesaw || player.ground.skin === 'safety-net') && Math.abs(player.y-platformY(player.ground,player.x))<.05 ? player.ground : null;
+  player.vy -= RULES.gravity * dt;
+  return isJumped;
+}
+
+// 固定 120 Hz 步长。落地只检查下降穿过台面，孩子可从下方跳上台。
+export function stepPlayer(player, input, platforms, dt, bounds = {}) {
+  player.protection = Math.max(0, player.protection - dt);
+  player.knockTime = Math.max(0, player.knockTime - dt);
+  player.dropTime = Math.max(0, player.dropTime - dt);
+  player.springTime = Math.max(0, player.springTime - dt);
+  if (player.isGrounded && player.ground?.isMoving) { player.y += player.ground.deltaY || 0; player.x += player.ground.deltaX || 0; }
+  let isJumped = false;
+  if (input.isFlying) {
+    const scale = RULES.speed * (input.speedMultiplier ?? 1) / Math.max(1, Math.hypot(input.direction, input.vertical));
+    player.vx = player.knockTime > 0 ? player.knockVx : input.direction * scale;
+    player.vy = input.vertical * scale;
+    if (input.direction) player.facing = Math.sign(input.direction);
+  } else {
+    isJumped = stepWalkingVelocity(player, input, dt);
+  }
+  const support = (!input.isFlying || player.vy <= 0) && player.isGrounded && player.ground && (player.ground.slope || player.ground.isSeesaw || player.ground.skin === 'safety-net') && Math.abs(player.y-platformY(player.ground,player.x))<.05 ? player.ground : null;
   const previousY = player.y, previousX = player.x;
   player.x += player.vx * dt;
   player.x = Math.max(bounds.minX ?? platforms[0].x - platforms[0].width / 2 + RULES.radius, Math.min(bounds.maxX ?? Infinity, player.x));
-  player.vy -= RULES.gravity * dt;
   player.y += player.vy * dt;
+  if (input.isFlying) player.y = Math.max(bounds.minY + 1, Math.min(bounds.maxY, player.y));
   const previousGround = player.isGrounded ? player.ground : null;
   player.isGrounded = false;
   let landing = support?.isEnabled !== false && support && Math.abs(player.x-support.x)<support.width/2+RULES.radius ? support : null;

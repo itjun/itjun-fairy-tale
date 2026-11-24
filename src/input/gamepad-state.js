@@ -4,7 +4,9 @@ export function readXboxPad(pad, deadzone = 0.22) {
   const button = index => !!pad.buttons[index]?.pressed || pad.buttons[index]?.value > 0.5;
   const axis = index => Number.isFinite(pad.axes[index]) ? Math.max(-1, Math.min(1, pad.axes[index])) : 0;
   const x = axis(0), y = axis(1);
-  const direction = button(14) ? -1 : button(15) ? 1 : Math.abs(x) <= deadzone ? 0 : Math.sign(x) * (Math.abs(x) - deadzone) / (1 - deadzone);
+  const travel = value => Math.abs(value) <= deadzone ? 0 : Math.sign(value) * (Math.abs(value) - deadzone) / (1 - deadzone);
+  const direction = button(14) ? -1 : button(15) ? 1 : travel(x);
+  const vertical = button(12) ? 1 : button(13) ? -1 : travel(-y);
   const actions = new Set();
   if (direction < 0) actions.add('left');
   if (direction > 0) actions.add('right');
@@ -13,7 +15,7 @@ export function readXboxPad(pad, deadzone = 0.22) {
   for (const [name, index] of Object.entries({ confirm: 0, back: 1, attack: 2, spell: 3, previous: 4, next: 5, interact: 8, pause: 9 })) if (button(index)) actions.add(name);
   if (button(7)) actions.add('attack');
   const stick = { x: button(14) ? -1 : button(15) ? 1 : x, y: button(12) ? -1 : button(13) ? 1 : y };
-  return { actions, direction, stick, faceX: button(2), scroll: Math.abs(axis(3)) > 0.25 ? axis(3) : 0,
+  return { actions, direction, vertical, stick, faceX: button(2), scroll: Math.abs(axis(3)) > 0.25 ? axis(3) : 0,
     isNeutral: !pad.buttons.some((_, index) => button(index)) && pad.axes.every(value => Math.abs(value) <= deadzone) };
 }
 

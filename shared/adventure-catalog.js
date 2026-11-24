@@ -97,6 +97,7 @@ export const FAMILY_LABELS = { power: '光刃强化', bubble: '泡泡强化', fl
 
 export const CATEGORY_LABELS = { attack: '攻击', survival: '生存', resource: '资源', utility: '探索' };
 export const TIMED_ITEMS = Object.freeze({
+  hotAirBalloon: { name: '热气球', hint: '上下左右飞，松开就悬停', image: 'hot-air-balloon', duration: 15, powers: { balloonFlight: 1 }, family: 'flight', category: 'utility' },
   rainbowBoost: { name: '彩虹祝福', hint: '所有武器双重发射，持续 60 秒', image: 'collectible-rainbow', duration: 60, powers: { double: 1 }, family: 'power', category: 'attack' },
   frostTreat: { name: '冰霜点心', hint: '所有武器附带冰霜，持续 90 秒', image: 'upgrade-frost', duration: 90, powers: { frost: 2 }, family: 'frost', category: 'attack' },
   quickTreat: { name: '轻快点心', hint: '所有武器加快发射，持续 90 秒', image: 'icecream', duration: 90, powers: { rapid: 2 }, family: 'flight', category: 'attack' },

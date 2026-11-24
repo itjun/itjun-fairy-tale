@@ -34,6 +34,7 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
   const firingClass = id => !id ? '' : id === stats.busyAttack ? 'is-busy' : magic?.ready.includes(id) ? 'is-ready' : '';
   const talent = person.name === '爸爸' ? (survival.shieldRemaining > 0 ? `护盾 ${Math.ceil(survival.shieldRemaining)} 秒后好` : '护盾准备好了') : ['妈妈', '姐姐'].includes(person.name) ? `${person.talent} ${survival.attacks || 0}/4` : '';
   const line = roomLine(rooms);
+  const flightSeconds = Math.ceil(stats.timedEffects?.hotAirBalloon || 0);
   return <div className="room-hud" inert={!isPlaying}>
     <div key={rooms.areaId || rooms.roomId} className="room-fade" aria-hidden="true" />
     <aside className="room-hud-life" aria-label="玩家血量与命数">
@@ -42,6 +43,7 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
         <span className="room-hud-lives" aria-label={`还有 ${survival.lives} 条命`}>{Array.from({ length: Math.min(survival.lives, 6) }, (_, index) => <img key={index} src="./assets/life-potion.png" alt="" />)}{survival.lives > 6 && <b>×{survival.lives}</b>}</span>
         <progress aria-label="玩家血量" value={survival.hp} max={survival.maxHp} />
         <small>血量 {survival.hp} / {survival.maxHp}{talent && <em>{talent}</em>}</small>
+        {flightSeconds > 0 && <span className="balloon-timer" role="timer" data-ending={flightSeconds <= 3}><img src="./assets/hot-air-balloon.png" alt="" />热气球 <b>{flightSeconds} 秒</b></span>}
       </div>
     </aside>
     <aside className="room-hud-path" aria-label="这一章的房间">
@@ -68,14 +70,14 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
       {warning && <small className="save-pending">{warning}</small>}
       <button aria-label="暂停探险" disabled={!isPlaying} onClick={onPause}>{isGamepad ? <PadKey name="menu" /> : <Pause size={24} weight="fill" />}</button>
     </aside>
-    {isPlaying && rooms.prompt && <div className="room-hud-prompt" role="status">{isGamepad ? <><PadKey name="stick" />往上推</> : <kbd>W</kbd>}<span>{rooms.prompt}</span></div>}
+    {isPlaying && rooms.prompt && <div className="room-hud-prompt" role="status">{isGamepad ? flightSeconds ? <PadKey name="A" /> : <><PadKey name="stick" />往上推</> : <kbd>{flightSeconds ? '空格' : 'W'}</kbd>}<span>{rooms.prompt}</span></div>}
     <aside className="room-hud-keys" aria-label="按键">
-      <span>{isGamepad ? <PadKey name="A" /> : <kbd>空格</kbd>}跳</span>
+      {flightSeconds ? <span>{isGamepad ? <PadKey name="stick" /> : <kbd>↑↓←→</kbd>}飞行</span> : <span>{isGamepad ? <PadKey name="A" /> : <kbd>空格</kbd>}跳</span>}
       {bindings.map((id, slot) => <span key={slot} className={firingClass(id)}><AttackSlotContent {...{ slot, id, magic, isGamepad }} /></span>)}
     </aside>
     {isPlaying && <div className="touch-controls room-touch" aria-label="触屏操作">
-      <div><button aria-label="向左走" {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label="向右走" {...touchProps('right')}><ArrowRight size={30} /></button>{(rooms.isClimbing || rooms.isDroppingFromGrip) && <button aria-label={rooms.isClimbing ? '往上爬' : '抓住岩壁'} {...touchProps('up')}><ArrowUp size={27} /></button>}<button aria-label={rooms.isOnLightBridge ? '沿光桥下滑' : rooms.isClimbing || rooms.canDescend ? '往下爬' : '向下跳台'} {...touchProps('drop')}><ArrowDown size={27} /></button></div>
-      <div>{rooms.prompt && <button aria-label={rooms.prompt} {...touchProps('enter')}>进</button>}<button className="touch-jump" aria-label="跳跃" {...touchProps('jump')}><ArrowUp size={29} /><span>跳</span></button></div>
+      <div><button aria-label={flightSeconds ? '向左飞' : '向左走'} {...touchProps('left')}><ArrowLeft size={30} /></button><button aria-label={flightSeconds ? '向右飞' : '向右走'} {...touchProps('right')}><ArrowRight size={30} /></button>{(flightSeconds > 0 || rooms.isClimbing || rooms.isDroppingFromGrip) && <button aria-label={flightSeconds ? '向上飞' : rooms.isClimbing ? '往上爬' : '抓住岩壁'} {...touchProps('up')}><ArrowUp size={27} /></button>}<button aria-label={flightSeconds ? '向下飞' : rooms.isOnLightBridge ? '沿光桥下滑' : rooms.isClimbing || rooms.canDescend ? '往下爬' : '向下跳台'} {...touchProps('drop')}><ArrowDown size={27} /></button></div>
+      <div>{rooms.prompt && <button aria-label={rooms.prompt} {...touchProps('enter')}>进</button>}{!flightSeconds && <button className="touch-jump" aria-label="跳跃" {...touchProps('jump')}><ArrowUp size={29} /><span>跳</span></button>}</div>
       <div className="room-touch-attacks" aria-label="武器快捷键">
         {bindings.map((id, slot) => <button key={slot} className={firingClass(id)} disabled={!id}
           aria-label={id ? `攻击 ${ATTACK_KEYS[slot].pad} ${attackItem(id).name}` : `${ATTACK_KEYS[slot].pad} 空位`}
