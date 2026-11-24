@@ -54,6 +54,15 @@ export function readAdventure(storage = localStorage) {
   } catch { return null; }
 }
 
+// 旧档记的是原台边的位置。只有原本在台面内的落脚点才移到收窄后的边缘。
+function fitSavedPosition(platform, x, center, margin) {
+  if (!platform?.previousWidth || !Number.isFinite(x)) return x;
+  const offset = x - center;
+  if (Math.abs(offset) > platform.previousWidth / 2 - margin) return x;
+  const limit = Math.max(0, platform.width / 2 - Math.max(.35, margin));
+  return Math.abs(offset) > limit ? center + Math.sign(offset) * limit : x;
+}
+
 function readSave(key, storage) {
   try {
     let saved;
@@ -76,6 +85,19 @@ function readSave(key, storage) {
       for (const enemy of world.enemies.slice(originalCount)) {
         const isCurrent = enemy.roomId === state.rooms.roomId && !state.rooms.cleared.includes(enemy.roomId);
         state.enemies.push(saveEnemy({ ...enemy, isDormant:!isCurrent || enemy.wave !== state.rooms.wave }));
+      }
+      if (world.field) {
+        for (const player of state.players) {
+          const p = world.platforms[player.safeId];
+          if (p && player.safeX !== undefined) player.safeX = fitSavedPosition(p, player.safeX, p.x, 0);
+        }
+        if (state.revival) {
+          const r = state.revival;
+          r.offsetX = fitSavedPosition(world.platforms[r.platformId], r.offsetX, 0, .35);
+        }
+        for (const drop of state.combatLoot?.drops || []) {
+          drop.offsetX = fitSavedPosition(world.platforms[drop.platformId], drop.offsetX, 0, 0);
+        }
       }
     }
     if(!Array.isArray(state.players)||state.players.length!==1||state.players.some(p=>!world.platforms[p.safeId]||world.platforms[p.safeId].isMoving))return null;

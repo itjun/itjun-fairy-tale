@@ -274,7 +274,7 @@ export class GardenEngine {
         // 宽地面横向拼接，不把一整张贴图撑高后盖住地下路。
         const maxHeight=hasFloorBelow(platform)?THIN_ART:platform.skin==='roof'?1.4:platform.skin==='leaf'?1.15:1.8;
         const count=Math.max(1,Math.ceil(platform.width*ratio/maxHeight)),width=platform.width/count,height=width*ratio;
-        if ((this.world.forest || this.world.valley) && count > 1) {
+        if ((this.world.forest || this.world.valley || this.world.field) && count > 1) {
           const leaf = platform.skin === 'leaf';
           if (!leaf && !continuousDecks.has(count)) {
             const geometry = continuousTerrainGeometry(count);

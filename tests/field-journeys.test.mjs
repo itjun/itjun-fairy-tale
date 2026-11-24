@@ -189,6 +189,17 @@ for(const theme of fieldThemes) test(theme.title+'：两组种子逐段走到每
   } finally {store.close();}
 });
 
+test('暗河水纹地面与洞内各层留出跳台间隙', () => {
+  const world = createRoomWorld(42, 'desert-oasis-springs');
+  const room = world.rooms.find(r => r.name === '暗河水纹');
+  const tiles = room.platformIds.map(id => world.platforms[id]);
+  for (const [index, a] of tiles.entries()) for (const b of tiles.slice(index + 1)) {
+    if (a.slope || b.slope || a.caveId !== b.caveId || Math.abs(a.y - b.y) >= 2.4) continue;
+    const gap = Math.abs(a.x - b.x) - (a.width + b.width) / 2;
+    assert.ok(gap >= 1.1 - 1e-6, `平台 ${a.id}、${b.id} 的间隙为 ${gap}`);
+  }
+});
+
 test('暗河水纹沿途和洞内都能遇到守卫，洞口、机关和出生点留空', () => {
   const world = createRoomWorld(42, 'desert-oasis-springs');
   const room = world.rooms.find(r => r.name === '暗河水纹');

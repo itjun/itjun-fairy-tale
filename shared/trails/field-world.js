@@ -1,4 +1,4 @@
-import { placeEnemy } from '../room-terrain.js';
+import { LAYER, MIN_GAP, placeEnemy } from '../room-terrain.js';
 import { LEVEL_COLLECTIBLES } from '../collectibles.js';
 import { fieldThemes } from './themes.js';
 
@@ -16,20 +16,41 @@ function roomBuilder(world, builder, stage, name, kind, theme) {
     return p;
   }
   const points = new Map();
+  const fittedWidths = new Map();
   function path(nodes, extra={}) {
-    const anchors=[];
-    for (let i=0;i<nodes.length;i++) {
-      const [x,y,width=8] = nodes[i], key=x+','+y;
-      if (i) {
-        const [lastX,lastY]=nodes[i-1];
-        const pieces=Math.max(1,Math.ceil(Math.abs(x-lastX)/10),Math.ceil(Math.abs(y-lastY)/2.65));
-        for(let j=1;j<pieces;j++) {
-          const u=j/pieces;
-          tile(lastX+(x-lastX)*u,lastY+(y-lastY)*u,Math.max(4.2,Math.abs(x-lastX)/pieces-1.35),extra);
+    const samples=[];
+    for (const [i,[x,y,width=8]] of nodes.entries()) {
+      const split=!i;
+      if (!split) {
+        const [px,py]=nodes[i-1];
+        const steps=Math.max(1,Math.ceil(Math.abs(x-px)/10),Math.ceil(Math.abs(y-py)/2.65));
+        for (let j=1;j<steps;j++) {
+          const u=j/steps;
+          samples.push({x:px+(x-px)*u,y:py+(y-py)*u,width:Math.max(4.2,Math.abs(x-px)/steps-1.35)});
         }
       }
-      if(!points.has(key)) points.set(key,tile(x,y,width,extra));
-      anchors.push(points.get(key));
+      samples.push({x,y,width,isAnchor:true,split});
+    }
+    for (let i=1;i<samples.length;i++) {
+      const a=samples[i-1], b=samples[i];
+      if (b.split || Math.abs(a.y-b.y)>=LAYER) continue;
+      const scale=2*(Math.abs(a.x-b.x)-MIN_GAP)/(a.width+b.width);
+      if (scale<1) for (const t of [a,b]) t.fitted=Math.min(t.fitted??t.width,t.width*scale);
+    }
+    const anchors=[];
+    for (const sample of samples) {
+      const {x,y,width,fitted,isAnchor}=sample;
+      const key=x+','+y;
+      // 旧局中只有地标共用台面，保留插入次序及原有房间边界供续关使用。
+      let platform=isAnchor && points.get(key);
+      if (!platform) {
+        platform=tile(x,y,width,extra);
+        if (isAnchor) points.set(key,platform);
+      }
+      if (fitted!==undefined) {
+        fittedWidths.set(platform,Math.min(fittedWidths.get(platform)??platform.width,fitted));
+      }
+      if (isAnchor) anchors.push(platform);
     }
     return anchors;
   }
@@ -65,6 +86,16 @@ function roomBuilder(world, builder, stage, name, kind, theme) {
       bottom:Math.min(...tiles.map(p=>p.y)),top:Math.max(...tiles.map(p=>p.y))+3});
     for(const m of room.moving) { room.top=Math.max(room.top,m.toY+3);room.bottom=Math.min(room.bottom,m.toY); }
     room.fallY=room.bottom-7;exit.milestone=id+1;
+    // 保留房间原点和每个台心，收窄同一路线上挤在一起的台边。
+    for (const [platform, width] of fittedWidths) {
+      platform.previousWidth = platform.width;
+      platform.width = width;
+    }
+    for (const id of room.enemyIds) {
+      const guard = world.enemies[id - 1], home = world.platforms[guard.platformId];
+      guard.minX = home.x - home.width / 2 + 1;
+      guard.maxX = home.x + home.width / 2 - 1;
+    }
     if(!id) world.start=start;
     world.mainPath.push(...room.path);
     world.zones.push({id,kind,name,isBoss:kind==='boss',roomIds:[id],startId:start.id,exitId:exit.id,
