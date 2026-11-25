@@ -31,7 +31,7 @@ function roomLine(rooms) {
 export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause, touchProps }) {
   const rooms = stats.rooms, survival = stats.survival, magic = stats.adventure?.magic;
   const bindings = attackBindings(stats.adventure);
-  const firingClass = id => !id ? '' : id === stats.busyAttack ? 'is-busy' : magic?.ready.includes(id) ? 'is-ready' : '';
+  const firingClass = id => !id ? '' : stats.busyAttacks?.includes(id) ? 'is-busy' : magic?.ready.includes(id) ? 'is-ready' : '';
   const talent = person.name === '爸爸' ? (survival.shieldRemaining > 0 ? `护盾 ${Math.ceil(survival.shieldRemaining)} 秒后好` : '护盾准备好了') : ['妈妈', '姐姐'].includes(person.name) ? `${person.talent} ${survival.attacks || 0}/4` : '';
   const line = roomLine(rooms);
   const flightSeconds = Math.ceil(stats.timedEffects?.hotAirBalloon || 0);

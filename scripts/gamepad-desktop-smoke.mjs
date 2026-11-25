@@ -512,6 +512,13 @@ try {
     await loadFixture(fixture);
     await until(status('paused'), '测试局暂停');
     await evaluate('tap(9)'); await until(status('playing'), '手柄继续探险');
+    await evaluate('testPad.buttons[3]={pressed:true,value:1};waitPadFrames()');
+    try {
+      await evaluate('testPad.buttons[2]={pressed:true,value:1};waitPadFrames()');
+      await until(() => evaluate('document.querySelectorAll(".room-hud-keys > .is-busy").length === 2'), '按住 Y 发弯刀时，X 也能挥光刀');
+    } finally {
+      await evaluate('testPad.buttons[2]=testPad.buttons[3]={pressed:false,value:0};waitPadFrames()');
+    }
     await evaluate('tap(9)'); await until(status('paused'), 'Menu 暂停');
     await evaluate('choose("[data-pause-action=weapon-bindings]")');
     await until(status('weapon-bindings'), '暂停菜单打开圆环');

@@ -29,8 +29,8 @@ import { starterAdventure } from './starter-build.js';
 import { newCombatLoot, rollCombatLoot, lootPosition, nearbyLoot, chooseLifeLoot, LIFE_CHOICES } from './combat-loot.js';
 import { MONSTERS, WEAPONS } from '../../shared/adventure-catalog.js';
 import { newAdventure, newJourney, upgradePower, activeWeapons, weaponRank, weaponShotCount, migrateAdventure, tickEffects, chooseReward, recycleReward } from './adventure.js';
-import { canStartAttack, fireLoadout, stepAdventureWave, areaAttack, attackSource } from './adventure-combat.js';
-import { ATTACK_KEYS, attackBindings, attackInput, bindAttack } from './attack-bindings.js';
+import { fireLoadout, stepAdventureWave, areaAttack, attackSource } from './adventure-combat.js';
+import { ATTACK_KEYS, attackBindings, bindAttack } from './attack-bindings.js';
 import { stepAdventureEnemies, releaseCandyChildren } from './adventure-enemies.js';
 import { createPlayer, landingDamage, rescue, revivalPoint } from './physics.js';
 import { balloonCeiling, beginCrawl, caveForPlayer, caveMouthAt, climbEntryAt, stepTraversal } from './traversal.js';
@@ -77,7 +77,7 @@ export class GardenEngine {
     this.world = createRoomWorld(seed, level, this.adventure.cycle);
     // 选门闯房间：房间进度单独记，难度和画册里还没解锁的东西跟着这次冒险走。
     this.roomState = newRoomState(this.world);
-    this.spellHits = 0; this.isInteracting = false; this.attackInput = { down: [] }; this.rewardAt = 0;
+    this.spellHits = 0; this.isInteracting = false; this.attackPresses = new Set(); this.rewardAt = 0;
     this.applyRoomRules(difficulty, locked);
     this.journey = newJourney(); this.levelKey = `${level.id}:${seed}`; this.attackGate = { next: 0 }; this.enemyShots = []; this.enemyShotViews = new Map();
     this.claimedSupplies = []; this.hazardViews = new Map(); this.supplyViews = new Map();
@@ -378,6 +378,7 @@ export class GardenEngine {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'KeyL', 'Escape', 'KeyP'].includes(event.code)) event.preventDefault();
     if (event.code === 'Escape' || event.code === 'KeyP') { if (!event.repeat) this.requestPause(); return; }
     if (!this.keys.has(event.code)) {
+      this.attackPresses.add(event.code);
       // 站在摊位前，“上”用来买东西，不跳。门是跳上去就进。
       const player = this.players[0];
       const isFlying = !!this.adventure.effects?.hotAirBalloon;
@@ -392,6 +393,7 @@ export class GardenEngine {
     if(isPressed)this.heldKeys?.add(`touch:${action}`);
     if (isPressed && action === 'enter') { this.isInteracting = true; return; }
     if (isPressed) {
+      if (!this.touch.has(action)) this.attackPresses.add(action);
       const player = this.players[0];
       if (!this.touch.has(action) && (action === 'jump' || action === 'drop' && player.ground?.skin !== 'sunlight' && !player.grip && !climbEntryAt(currentRoom(this.world, this.roomState).traversal, player))) this.jumps[0] = true;
       this.touch.add(action);
@@ -401,6 +403,9 @@ export class GardenEngine {
   setGamepadInput(input) {
     if (this.isPaused) return;
     const actions = input?.actions || new Set();
+    for (const { action } of ATTACK_KEYS) {
+      if (actions.has(action) && !this.gamepad.has(action)) this.attackPresses.add(action);
+    }
     if (actions.has('confirm') && !this.gamepad.has('jump')) this.jumps[0] = true;
     const isFlying = !!this.adventure?.effects?.hotAirBalloon;
     if (actions.has(isFlying ? 'confirm' : 'up') && !this.gamepad.has(isFlying ? 'jump' : 'up') && this.canInteract()) this.isInteracting = true;
@@ -410,7 +415,7 @@ export class GardenEngine {
   }
   releaseGamepad() { this.gamepad?.clear(); this.gamepadDirection = 0; this.gamepadVertical = 0; }
   hasControl(action) { return this.touch.has(action) || this.gamepad?.has(action); }
-  clearInput() { this.releaseGamepad(); this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; this.isInteracting = false; this.attackInput = { down: [] }; }
+  clearInput() { this.releaseGamepad(); this.keys.clear(); this.touch.clear(); this.jumps = [false, false]; this.isInteracting = false; this.attackPresses = new Set(); }
   pause(isPaused) { if (!isPaused && (this.survival.phase !== 'alive'||this.combatLoot?.pendingId!=null)) return; this.isPaused = isPaused; if(isPaused)this.callbacks.onSound('pause'); this.clearInput(); this.accumulator = 0; }
   requestPause() { if (!this.isPaused) { this.pause(true); this.callbacks.onPause(); } }
   returnToSafety() {
@@ -911,29 +916,33 @@ export class GardenEngine {
   }
   stepPlayerAttack(player, index, powers) {
     const adventure = this.adventure, bindings = attackBindings(adventure), magic = adventure.magic;
-    const down = [];
-    ATTACK_KEYS.forEach(({ code, action }, slot) => {
-      if (this.keys.has(code) || this.hasControl(action)) down.push(slot);
-    });
-    const canStart = !player.grip && !player.crawl && canStartAttack(player, this.elapsed, adventure, this.waves, index);
-    const input = attackInput(this.attackInput, down, slot => {
-      const id = bindings[slot];
-      return canStart && id && (WEAPONS[id] ? this.elapsed >= (player.weaponShots?.[id] || 0) : magic.ready.includes(id) && magic.gap <= STEP);
-    });
-    const id = canStart && input ? bindings[input.slot] : null;
     const bounds = { left: this.cameraX - this.camera.right, right: this.cameraX + this.camera.right,
       bottom: this.cameraY - (this.camera.top || 18), top: this.cameraY + (this.camera.top || 18) };
+    let castId = null;
+    if (!player.grip && !player.crawl && !magic.active.length) {
+      for (const [slot, { code, action }] of ATTACK_KEYS.entries()) {
+        const id = bindings[slot];
+        const isPressed = this.attackPresses.has(code) || this.attackPresses.has(action);
+        if (WEAPONS[id] && (isPressed || this.keys.has(code) || this.hasControl(action))) {
+          this.firePlayerWeapon(player, index, powers, bounds, id);
+        } else if (SPELLS[id] && isPressed && magic.ready.includes(id) && magic.gap <= STEP
+            && !this.waves.length && !Object.values(player.weaponShots || {}).some(time => time > this.elapsed)) {
+          castId = id;
+          break;
+        }
+      }
+    }
+    this.attackPresses.clear();
     const result = stepMagic(adventure, this.survival, player, this.world.enemies, this.enemyShots, STEP, this.elapsed,
-      bounds, { hits: this.spellHits, castId: input?.isPressed && SPELLS[id] ? id : null });
+      bounds, { hits: this.spellHits, castId });
     this.spellHits = 0;
     for (const hit of result.hits) this.recordHit(hit);
     for (const effect of magic.active) this.callbacks.onSound(`${effect.id}:loop`);
-    for (const event of result.events) {
-      if (event.type === 'cast') player.nextAttackAt = this.elapsed + magic.gap;
-      this.callbacks.onSound(`${event.id}:${event.type}`);
-    }
+    for (const event of result.events) this.callbacks.onSound(`${event.id}:${event.type}`);
     this.callbacks.onSound(this.waves.some(wave => wave.firingWeapon === 'flame') ? 'flame:loop' : 'flame:stop');
-    if (!WEAPONS[id]) return;
+  }
+  firePlayerWeapon(player, index, powers, bounds, id) {
+    const adventure = this.adventure;
     const shots = fireLoadout(player, this.elapsed, bounds, adventure, index, this.waves, id);
     if (!shots.length) return;
     const resources = resourcesFor(adventure);
@@ -1017,7 +1026,6 @@ export class GardenEngine {
       players:this.players.map(p=>({safeId:p.safe.id,safeX:p.safeX,recoveries:p.recoveries,facing:p.facing,protection:p.protection,shotRemaining:Math.max(0,(p.nextShot || 0)-this.elapsed),inkRemaining:Math.max(0,(p.inkUntil || 0)-this.elapsed),
         ...(this.adventure.effects?.hotAirBalloon && !p.isGrounded && !p.crawl && this.survival.phase === 'alive' ? { balloonPosition: { x: p.x, y: p.y } } : {}),
         ...(this.world.field && p.isGrounded && p.ground?.isMoving ? {ride:{id:p.ground.id,offset:p.x-p.ground.x}} : {}),
-        attackRemaining: Math.max(0, (p.nextAttackAt || 0) - this.elapsed),
         companionRemaining: Math.max(0, (p.nextCompanion || 0) - this.elapsed),
         weaponCycles:{...p.weaponCycles},weaponShots:Object.fromEntries(Object.entries(p.weaponShots || {}).map(([id,value])=>[id,Math.max(0,value-this.elapsed)]))}))};
   }
@@ -1043,7 +1051,7 @@ export class GardenEngine {
     Object.assign(this,restoreProjectiles(state.projectiles));
     this.enemyShots=this.shots;delete this.shots;
     this.elapsed=state.elapsed; this.collectedIds=[...state.collectedIds];this.collected=this.collectedIds.length;this.defeatedIds=[...state.defeatedIds];this.visited=new Set(state.visited);
-    this.attackInput = { down: [] };
+    this.attackPresses = new Set();
     this.furthestPlatform=0;while(this.visited.has(this.furthestPlatform+1))this.furthestPlatform++;
     for(const id of this.collectedIds){const v=this.treasureViews.get(id);if(v){v.isCollected=true;v.mesh.visible=false;}}
     for(const saved of state.enemies) restoreEnemy(this.world.enemies[saved.id-1],saved);
@@ -1062,8 +1070,6 @@ export class GardenEngine {
       }
       if(saved.protection!==undefined)p.protection=saved.protection;
       p.nextShot=this.elapsed+(saved.shotRemaining || 0);p.inkUntil=this.elapsed+(saved.inkRemaining || 0);
-      const attackRemaining = saved.attackRemaining ?? Math.max(0, ...Object.values(saved.weaponShots || {}));
-      p.nextAttackAt = attackRemaining ? this.elapsed + attackRemaining : 0;
       p.nextCompanion = saved.companionRemaining ? this.elapsed + saved.companionRemaining : 0;
       p.weaponCycles={...saved.weaponCycles};p.weaponShots=Object.fromEntries(Object.entries(saved.weaponShots || {}).map(([id,value])=>[id,this.elapsed+value]));
     });
@@ -1086,7 +1092,7 @@ export class GardenEngine {
     const boss=bossStatus(this.world,this.elapsed);
     return { ...score, boss, bossTarget:boss?.warning?project(boss.warningX,boss.warningY):null, damageNumbers:this.damageNumbers.map(hit=>({...hit,...project(hit.x,hit.y+(this.elapsed-hit.at)*1.4)})), weaponStats:Object.fromEntries(activeWeapons(this.adventure).map(id=>[id,weaponDamage(id,this.adventure.growth?.power || 0,weaponRank(this.adventure,id))])), weaponCounts:Object.fromEntries(activeWeapons(this.adventure).map(id=>[id,weaponShotCount(id,upgradePower(this.adventure,0,id))])), activeWeapons:activeWeapons(this.adventure), timedEffects:{...this.adventure.effects}, hazards:(this.world.hazards || []).filter(h=>Math.abs(h.x-this.players[0].x)<12).map(h=>({...h,...hazardState(h,this.elapsed),...project(h.x,h.y+3)})), survival: structuredClone(this.survival), skill:this.adventure.loadouts[0].weapon, skillRevision:this.adventure.revision,
       adventure: structuredClone(this.adventure), pendingReward: this.journey.pending ? structuredClone(this.journey.pending) : null,
-      busyAttack: this.adventure.magic.active[0]?.id || this.waves[0]?.firingWeapon,
+      busyAttacks: [...new Set([...this.adventure.magic.active.map(effect => effect.id), ...this.waves.map(attackSource)])],
       pendingLifeLoot:this.combatLoot?.pendingId??null,
       rooms: this.roomSnapshot(),
       enemyGuide: this.players[0].safe?.isCave ? null : roomEnemyGuide(this.world, this.roomState, this.players[0], project, this.difficulty.isExtraWave, { width: this.host.clientWidth, height: this.host.clientHeight }),

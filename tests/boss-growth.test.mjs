@@ -43,8 +43,10 @@ test('各武器独立发射，按各自伤害扣真实血量',()=>{
   const result=stepAdventureWave(blade,[enemy],[],.2,.2);
   assert.equal(enemy.hp,64);assert.equal(result.hits[0].damage,36);
   assert.equal(stepAdventureWave(blade,[enemy],[],.01,.21).hits.length,0);
-  assert.deepEqual(fireLoadout(p,.29,bounds,a,0,[blade],'firefly'),[], '光刃收招前不能换键抢发');
-  assert.deepEqual(fireLoadout(p,.41,bounds,a,0,[blade],'firefly').map(s=>s.kind),['firefly']);
+  assert.deepEqual(fireLoadout(p,.29,bounds,a,0,[blade],'blade'),[], '光刃命中后仍有自己的出手间隔');
+  const fireflies=fireLoadout(p,.29,bounds,a,0,[blade],'firefly');
+  assert.deepEqual(fireflies.map(s=>s.kind),['firefly']);
+  assert.deepEqual(fireLoadout(p,.41,bounds,a,0,fireflies,'blade').map(s=>s.kind),['blade']);
 });
 
 test('收集四份材料增长血量上限和全部武器攻击，命数不变',()=>{

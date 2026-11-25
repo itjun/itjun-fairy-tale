@@ -9,20 +9,16 @@ export function attackSource(wave) {
   return WEAPONS[wave.firingWeapon] ? wave.firingWeapon : wave.source || wave.kind;
 }
 
-export function canStartAttack(player, elapsed, adventure, activeWaves, index = 0) {
-  return elapsed >= (player.nextAttackAt || 0) && !adventure.magic?.active.length
-    && !activeWaves.some(wave => wave.isActive && (wave.ownerIndex ?? 0) === index);
-}
-
 export function fireLoadout(player, elapsed, bounds, adventure, index = 0, activeWaves = player.weaponWaves || [], weapon = attackBindings(adventure)[0]) {
   if (!WEAPONS[weapon] || !attackBindings(adventure).includes(weapon)
-      || !canStartAttack(player, elapsed, adventure, activeWaves, index)
-      || elapsed < (player.weaponShots?.[weapon] || 0)) return [];
+      || adventure.magic?.active.length || adventure.magic?.gap > 0
+      || elapsed < (player.weaponShots?.[weapon] || 0)
+      || activeWaves.some(wave => wave.isActive && (wave.ownerIndex ?? 0) === index && attackSource(wave) === weapon)) return [];
   player.weaponShots ||= {}; player.weaponCycles ||= {};
   const emitter = { ...player, nextShot: player.weaponShots[weapon] || 0 };
   const waves = fireAdventureWeapon(emitter, elapsed, bounds, weapon, upgradePower(adventure, index, weapon));
   if (!waves.length) return waves;
-  player.weaponShots[weapon] = player.nextAttackAt = emitter.nextShot;
+  player.weaponShots[weapon] = emitter.nextShot;
   player.attackUntil = Math.max(player.attackUntil || 0, emitter.attackUntil);
   player.weaponCycles[weapon] = ((player.weaponCycles[weapon] || 0) + 1) % 60;
   if (adventure.qualities?.[`weapon:${weapon}`] === 'legendary') {
@@ -32,7 +28,7 @@ export function fireLoadout(player, elapsed, bounds, adventure, index = 0, activ
     if(weapon==='flame'&&player.weaponCycles[weapon]%15===0)for(let i=0;i<4;i++)waves.push({...root,kind:'pulse',source:'flame',x:root.x+root.direction*4,y:root.y+1.5,delay:.3*i,age:0,radius:3,damage:Math.round(root.damage*1.5),powers:{}});
   }
   waves.forEach(wave => { wave.firingWeapon = weapon; wave.ownerIndex = index; });
-  player.weaponWaves = waves;
+  player.weaponWaves = activeWaves.filter(wave => wave.isActive).concat(waves);
   return waves;
 }
 
@@ -160,6 +156,6 @@ export function stepAdventureWave(wave, enemies, platforms, dt, elapsed, owner, 
     }
     if (powers.split && !wave.isSplit) for (const slope of [-0.25, 0.25]) spawned.push({ ...wave, kind: 'stars', speed:wave.speed || 28*(1+.18*(powers.rapid || 0)), damage:Math.max(1,Math.round(wave.damage*0.4)), x: hit.enemy.x, y: hit.enemy.y + 1, slope, remaining: 8, age: 0, isActive: true, isSplit: true, powers: {}, hitIds: new Set([hit.enemy.id]) });
   }
-  for (const child of spawned) { child.firingWeapon = wave.firingWeapon || wave.kind; child.ownerIndex = wave.ownerIndex ?? 0; }
+  for (const child of spawned) { child.firingWeapon = wave.firingWeapon || attackSource(wave); child.ownerIndex = wave.ownerIndex ?? 0; }
   return { hits, spawned };
 }

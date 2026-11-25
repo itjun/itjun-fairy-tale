@@ -53,35 +53,65 @@ test('旧档以旧主武器优先填槽，交换保留其余攻法与充能，�
   }
 });
 
-test('实战同时按 X/Y/B 只发 X，途中换装与读档仍由同一轮弹道和冷却锁定', () => {
-  const game = headless('room'), a = game.adventure;
-  game.survival.character = 'dad';
-  a.weapons.push('moonblade', 'lightblade'); teachSpell(a, 'snow');
-  a.attackBindings = ['moonblade', 'lightblade', 'snow'];
-  const sounds = [];
-  game.callbacks.onSound = sound => sounds.push(sound);
-  timedInput(game, ['attack', 'spell', 'back']);
-  assert.deepEqual(sounds.filter(sound => /:(fire|cast)$/.test(sound)), ['moonblade:fire']);
-  timedInput(game, ['back'], .1);
-  assert.equal(a.magic.active.length, 0);
+test('弯刀在飞时可按其他武器键，三个键也可同按，同一把只打一轮', () => {
+  for (const isSimultaneous of [false, true]) {
+    const game = headless('room'), a = game.adventure;
+    a.weapons.push('moonblade', 'lightblade');
+    a.attackBindings = ['lightblade', 'moonblade', 'stars'];
+    const fired = [];
+    game.callbacks.onSound = sound => { if (sound.endsWith(':fire')) fired.push(sound); };
+    if (!isSimultaneous) timedInput(game, ['spell']);
+    timedInput(game, ['attack', 'spell', 'back']);
+    assert.deepEqual([...fired].sort(), ['lightblade:fire', 'moonblade:fire', 'stars:fire']);
+    assert.deepEqual(game.waves.map(w => w.firingWeapon).sort(), ['lightblade', 'moonblade', 'stars']);
+    for (let tap = 0; tap < 4; tap++) {
+      timedInput(game, [], .008);
+      timedInput(game, ['spell', 'attack'], .008);
+    }
+    assert.equal(fired.length, 3);
+    timedInput(game, ['spell', 'attack'], 3);
+    for (const id of ['moonblade', 'lightblade']) assert.ok(fired.filter(s => s === id + ':fire').length > 1);
+    assert.equal(fired.filter(s => s === 'stars:fire').length, 1);
+  }
+});
 
+test('两把武器同在途中时换键并读档，未出手的第三把立刻可用', () => {
+  const game = headless('room'), a = game.adventure;
+  a.weapons.push('moonblade', 'lightblade');
+  a.attackBindings = ['moonblade', 'lightblade', 'stars'];
+  timedInput(game, ['attack', 'spell']);
   game.pause(true);
   assert.ok(game.equipAttack(0, 'lightblade'));
-  assert.deepEqual(a.attackBindings, ['lightblade', 'moonblade', 'snow']);
-  const score = roomFixture('room').run, mem = storage();
-  writeAdventure(score, game.exportState(), mem);
-  const loaded = readAdventure(mem);
+  const mem = storage();
+  writeAdventure(roomFixture('room').run, game.exportState(), mem);
   const restored = headless('room');
-  restored.restoreState(loaded.state);
-  assert.deepEqual(restored.adventure.attackBindings, a.attackBindings);
-  assert.ok(restored.players[0].nextAttackAt > restored.elapsed);
-  timedInput(restored, ['attack'], .05);
-  assert.deepEqual(restored.waves.map(wave => wave.firingWeapon), ['moonblade']);
-  timedInput(restored, ['attack'], 3);
-  assert.equal(restored.waves.length, 0, '锁定期间按下的另一把武器不会补发');
-  timedInput(restored, []);
-  timedInput(restored, ['attack']);
-  assert.ok(restored.waves.some(wave => wave.firingWeapon === 'lightblade'));
+  restored.restoreState(readAdventure(mem).state);
+  const fired = [];
+  restored.callbacks.onSound = sound => { if (sound.endsWith(':fire')) fired.push(sound); };
+  timedInput(restored, ['back', 'attack', 'spell']);
+  assert.deepEqual(fired, ['stars:fire']);
+  assert.deepEqual(restored.waves.map(w => w.firingWeapon).sort(), ['lightblade', 'moonblade', 'stars']);
+});
+
+test('两个物理步之间快速点按键盘和触屏，各自只触发一次，暂停清掉短按', () => {
+  const game = headless('room'), a = game.adventure;
+  game.heldKeys = new Set();
+  a.weapons.push('moonblade');
+  a.attackBindings = ['stars', 'moonblade', null];
+  const fired = [];
+  game.callbacks.onSound = sound => { if (sound.endsWith(':fire')) fired.push(sound); };
+  game.setTouch('attack', true);
+  game.setTouch('attack', false);
+  game.pause(true);
+  game.pause(false);
+  run(game, .01);
+  assert.deepEqual(fired, []);
+  game.setTouch('attack', true);
+  game.setTouch('attack', false);
+  game.keyDown({ code: 'KeyK', preventDefault() {} });
+  game.keys.delete('KeyK');
+  run(game, 1);
+  assert.deepEqual(fired, ['stars:fire', 'moonblade:fire']);
 });
 
 test('B 只施放自己绑定的已蓄满大招，施法期间 X 与另一种大招都不能出手', () => {

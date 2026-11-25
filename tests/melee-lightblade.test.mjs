@@ -130,14 +130,15 @@ test('近战存档拒绝损坏范围和时序，最高 99 级双重连斩仍可�
   assert.equal(fireLoadout(p, 16.2, bounds, a, 0, restored.waves).length, 198);
 });
 
-test('近战与远程独立绑定，远程在途锁住下一刀', () => {
+test('近战与远程独立绑定，远程在途时可再次挥刀', () => {
   const p = owner(), a = build(['moonblade', 'lightblade']), waves = fireLoadout(p, 0, bounds, a);
   assert.deepEqual(waves.map(w => w.kind), ['moonblade']);
   step(waves, [], p, .45);
   assert.equal(waves[0].isActive, true);
-  assert.deepEqual(fireLoadout(p, .45, bounds, a, 0, waves, 'lightblade'), []);
-  step(waves, [], p, 2.5, .45);
-  const next = fireLoadout(p, 3, bounds, a, 0, waves, 'lightblade');
+  const slash = fireLoadout(p, .45, bounds, a, 0, waves, 'lightblade');
+  assert.deepEqual(slash.map(w => w.kind), ['lightblade']);
+  step(slash, [], p, .5, .45);
+  const next = fireLoadout(p, .95, bounds, a, 0, [...waves, ...slash], 'lightblade');
   assert.deepEqual(next.map(w => w.kind), ['lightblade']);
   assert.deepEqual(activeWeapons(a), ['moonblade', 'lightblade']);
   assert.ok(isValidAdventure(a, 1));
@@ -168,16 +169,15 @@ test('真实引擎手柄长按、暂停和恢复遵循同一挥斩轮次', () =>
   assert.deepEqual(game.exportState().projectiles, state.projectiles);
   const restored = headless('room'); restored.restoreState(state);
   restored.world.enemies.forEach(e => { e.isDormant = true; });
-  restored.setGamepadInput({ actions: new Set(['spell']), direction: 0 });
+  const after = [];
+  restored.callbacks.onSound = sound => { if (sound.endsWith(':fire')) after.push(sound); };
+  restored.setGamepadInput({ actions: new Set(['attack', 'spell']), direction: 0 });
   run(restored, .08);
   assert.equal(restored.waves.filter(w => w.kind === 'lightblade').length, 1, '恢复后不能叠出额外一刀');
-  assert.equal(restored.waves.filter(w => w.kind === 'moonblade').length, 0);
-  const after = []; restored.callbacks.onSound = sound => after.push(sound);
+  assert.equal(restored.waves.filter(w => w.kind === 'moonblade').length, 1);
+  assert.deepEqual(after, ['moonblade:fire']);
   run(restored, .5);
-  assert.ok(!after.some(sound => sound.endsWith(':fire')), '读档后忙碌时按下 Y 不补发');
-  restored.setGamepadInput({ actions: new Set(), direction: 0 }); run(restored, .02);
-  restored.setGamepadInput({ actions: new Set(['spell']), direction: 0 }); run(restored, .02);
-  assert.ok(after.includes('moonblade:fire'));
+  assert.ok(after.includes('lightblade:fire'), '按住光刀会在收招后继续挥斩');
 });
 
 test('真实引擎派生攻击音效保留原武器归属', () => {

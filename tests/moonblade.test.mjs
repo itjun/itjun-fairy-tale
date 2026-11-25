@@ -5,7 +5,7 @@ import { newAdventure, activeWeapons, isValidAdventure } from '../src/game/adven
 import { fireLoadout, fireAdventureWeapon, stepAdventureWave } from '../src/game/adventure-combat.js';
 import { bindAttack } from '../src/game/attack-bindings.js';
 
-test('新冒险只带一把弯刀，其他武器基础也只发一枚，换键遵守同一轮',()=>{
+test('新冒险只带一把弯刀，其他武器基础也只发一枚，不同武器各自等一轮',()=>{
   const adventure=newAdventure(1),player={x:0,y:0,facing:1},bounds={left:-25,right:25};
   assert.ok(isValidAdventure(adventure,1));assert.deepEqual(adventure.weapons,['moonblade']);assert.deepEqual(activeWeapons(adventure),['moonblade']);
   const first=fireLoadout(player,0,bounds,adventure);
@@ -18,9 +18,11 @@ test('新冒险只带一把弯刀，其他武器基础也只发一枚，换键�
   for(const weapon of ['blade','moonblade','stars','bubble','boomerang','seed','firefly'])assert.equal(fireAdventureWeapon({x:0,y:0,facing:1},0,bounds,weapon).length,1,weapon);
   adventure.weapons.push('blade');adventure.loadouts[0].weapons.push('blade');
   bindAttack(adventure,1,'blade');
-  assert.deepEqual(fireLoadout(player,2.41,bounds,adventure,0,player.weaponWaves,'blade'),[]);
-  stepAdventureWave(player.weaponWaves[0],[],[],2,4);
-  assert.deepEqual(fireLoadout(player,4,bounds,adventure,0,player.weaponWaves,'blade').map(s=>s.kind),['blade']);
+  const blade=fireLoadout(player,2.01,bounds,adventure,0,undefined,'blade');
+  assert.deepEqual(blade.map(s=>s.kind),['blade']);
+  assert.deepEqual(fireLoadout(player,2.5,bounds,adventure),[], '光刃出手后仍记得上一轮弯刀在飞');
+  stepAdventureWave(blade[0],[],[],2,4);
+  assert.deepEqual(fireLoadout(player,4,bounds,adventure,0,undefined,'blade').map(s=>s.kind),['blade']);
 });
 
 test('没有敌人也能持续发射弯刀，朝左右前方直飞并在射程耗尽后清理',()=>{

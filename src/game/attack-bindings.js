@@ -48,14 +48,3 @@ export function wheelSector(x, y, count) {
   const turns = (Math.atan2(x, -y) / (2 * Math.PI) + 1) % 1;
   return Math.round(turns * count) % count;
 }
-
-// Hold one weapon to repeat it. Buttons pressed during a busy round never queue an attack.
-export function attackInput(state, down, canChoose) {
-  const pressed = down.filter(index => !state.down.includes(index));
-  state.down = down;
-  if (!down.includes(state.slot)) state.slot = undefined;
-  const choice = pressed.find(canChoose);
-  if (choice !== undefined) state.slot = choice;
-  if (state.slot === undefined || choice === undefined && down.length > 1) return null;
-  return { slot: state.slot, isPressed: choice !== undefined };
-}
