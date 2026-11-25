@@ -12,7 +12,7 @@ export const AREA_NAMES = [
   '太阳表面',
   '太阳内部',
 ];
-export const GUN_NAMES = ['散射', '爆破球', '追踪月牙', '火龙', '宽幅光束'];
+export const GUN_NAMES = ['散射', '爆破球', '圆月弯刀', '火龙', '宽幅光束'];
 export const BOMB_NAMES = { F: '火环', B: '冰壁', T: '雷电', W: '水弹' };
 
 const roads = [
@@ -54,12 +54,12 @@ const roads = [
     '!tower',
   ],
   [
-    'Y V Y S C Y G W Y P S Y W C Y V P Y G Y W G Y V Y C S W Y P G Y W',
+    'I Y V Y S C Y G W Y P S Y W C Y V P Y G Y W G Y V Y C S W Y P G Y W',
     'Y S G Y W C Y V P Y S Y G W Y P Y C Y V Y W G Y S P Y V Y C Y W',
     '!moon',
   ],
   [
-    'T X S X C G T P X V T W X G C V T P X W',
+    'I T X S X C G T P X V T W X G C V T P X W',
     '!orb',
     'X G T W P X S T C V T X W C S T',
     '!acorn',
@@ -125,6 +125,11 @@ export const BOSS = {
 };
 export const SHIP_SPEED = [0, 2.8125, 3.75, 4.6875, 5.625];
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+export function playBounds(s) {
+  void s;
+  // 飞行战场固定 256×240（4∶3），左右侧栏放 HUD，不再随窗口拓宽。
+  return { width: 256, left: 0, right: 256, span: 1 };
+}
 export function random(s) {
   s.seed = (Math.imul(s.seed, 1664525) + 1013904223) >>> 0;
   return s.seed / 4294967296;
@@ -151,16 +156,19 @@ export function spawnFoe(s, kind, x, y, path = 'sine', sign = 1, delay = 0) {
   return enemy;
 }
 
+export const OPENING_LANES = [34, 81, 128, 175, 222];
+
 export function openingPoint(e, t) {
   return {
-    x: e.sign > 0 ? 128 + 96 * Math.sin((t - 33) * 0.0438) : 128 + 68 * Math.cos((t + 3) * 0.045),
-    y: e.oy + t * 0.5625,
+    x: e.ox,
+    y: e.oy + t * 0.58,
   };
 }
 export function launchWave(s, wave) {
+  const { width, left, right } = playBounds(s);
   const sign = random(s) < 0.5 ? -1 : 1;
-  const side = sign > 0 ? 18 : 238;
-  const center = 62 + random(s) * 132;
+  const side = sign > 0 ? left + 18 : right - 18;
+  const center = left + 40 + random(s) * (width - 80);
   const local = ['scout', 'rabbitDrone', 'ember', 'fish', 'nut', 'coin', 'arrow', 'fighter', 'fighter'][
     s.area
   ];
@@ -168,11 +176,15 @@ export function launchWave(s, wave) {
     for (let i = 0; i < count; i++) spawnFoe(s, kind, start, -8, path, sign, i * interval);
   };
   switch (wave) {
-    case 'I':
-      // The opening line of yellow carriers crosses left to right at a shallow angle.
-      spawnFoe(s, 'courier', 128, 11, 'opening', 1).hp = 1;
-      spawnFoe(s, 'courier', 128, 11, 'opening', -1, 130).hp = 1;
+    case 'I': {
+      // 每关开局按左至右 5 条独立航道单架稀疏入场（前架过半屏再出下一架），绝不扎堆。
+      OPENING_LANES.forEach((laneX, idx) => {
+        const foe = spawnFoe(s, 'courier', laneX, -14, 'opening', 1, idx * 200);
+        foe.hp = 1;
+        foe.dropGun = idx + 1;
+      });
       break;
+    }
     case 'V':
       for (let i = -2; i <= 2; i++)
         spawnFoe(s, 'scout', center + i * 15, -8 - Math.abs(i) * 11, 'sine', sign);
@@ -185,7 +197,8 @@ export function launchWave(s, wave) {
       for (let i = 0; i < 4; i++) spawnFoe(s, 'fighter', 256 - side, -8, 'cross', -sign, 52 + i * 21);
       break;
     case 'D':
-      for (let i = 0; i < 5; i++) spawnFoe(s, local, 36 + i * 46, 250, 'rear', sign, i * 14);
+      for (let i = 0; i < 5; i++)
+        spawnFoe(s, local, left + 36 + i * ((width - 72) / 4), 250, 'rear', sign, i * 14);
       break;
     case 'W':
       line(local, 'weave', 6, 22);
@@ -245,7 +258,7 @@ export function launchWave(s, wave) {
       const bands = s.index > 30 && s.index % 3 === 0 ? [height, height + 32] : [height];
       for (const y of bands) {
         const dir = sunAt(s.scroll + 35, y);
-        s.hazards.push({ kind: 'flare', x: dir === 1 ? 0 : 256, y, sign: dir, age: 0, life: 132 });
+        s.hazards.push({ kind: 'flare', x: dir === 1 ? left : right, y, sign: dir, age: 0, life: 132 });
       }
       line('fighter', 'cross', 3, 23, side);
       break;

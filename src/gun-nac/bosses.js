@@ -1,4 +1,4 @@
-import { BOSS, clamp, random, spawnFoe } from './stages.js';
+import { BOSS, clamp, playBounds, random, spawnFoe } from './stages.js';
 import { aim, fan, hostile, ring } from './arsenal.js';
 
 const DOWN = Math.PI / 2;
@@ -59,9 +59,11 @@ export function updateBoss(s) {
   }
   const t = b.age - 72,
     start = (x) => t % x === 1;
+  const { width, left, right, span } = playBounds(s);
+  const scale = Math.min(1.55, span);
   const aimed = (n, spread, v, type, opts) =>
     fan(s, b.x, b.y + 5, aim(s, b.x, b.y), n, spread, v, type, opts);
-  const wobble = (range, speed = 0.018) => 128 + Math.sin(t * speed) * range;
+  const wobble = (range, speed = 0.018) => 128 + Math.sin(t * speed) * range * scale;
   switch (kind) {
     case 'orb':
       b.x += clamp(p.x - b.x, -0.52, 0.52);
@@ -104,7 +106,7 @@ export function updateBoss(s) {
     case 'clay': {
       const cycle = t % 180;
       b.open = cycle >= 85;
-      if (cycle === 1) b.anchor = 40 + random(s) * 176;
+      if (cycle === 1) b.anchor = left + 40 + random(s) * (width - 80);
       if (!b.open) b.x += clamp(b.anchor - b.x, -1.4, 1.4);
       b.y = s.area === 0 ? 179 : 75 + Math.sin(t * 0.014) * 19;
       if (cycle === 96) {
@@ -146,13 +148,21 @@ export function updateBoss(s) {
       const tide = t % 225;
       b.open = tide < 102;
       if (tide === 200) {
-        b.x = 44 + random(s) * 168;
+        b.x = left + 44 + random(s) * (width - 88);
         b.y = 46 + random(s) * 54;
       }
       if (tide === 23 || tide === 79) ring(s, b.x, b.y, 8, 1.18, t * 0.006);
       if (tide === 119)
         for (let i = 0; i < 4; i++)
-          spawnFoe(s, 'tentacle', 30 + i * 62 + random(s) * 12, 100 + random(s) * 65, 'tentacle', 1, i * 12);
+          spawnFoe(
+            s,
+            'tentacle',
+            left + 30 + i * ((width - 72) / 3) + random(s) * 12,
+            100 + random(s) * 65,
+            'tentacle',
+            1,
+            i * 12,
+          );
       break;
     }
     case 'tree': {
@@ -178,7 +188,7 @@ export function updateBoss(s) {
             turnFrames: 65,
           });
       if (start(98)) {
-        const x = clamp(p.x + (random(s) - 0.5) * 66, 8, 248);
+        const x = clamp(p.x + (random(s) - 0.5) * 66, left + 8, right - 8);
         s.hazards.push({ kind: 'tile', x, y: clamp(p.y + 12, 70, 219), age: 0, life: 49 });
       }
       break;
@@ -186,7 +196,7 @@ export function updateBoss(s) {
       const cycle = t % 172;
       b.open = cycle >= 37 && cycle < 132;
       if (cycle === 1) {
-        b.x = 32 + random(s) * 192;
+        b.x = left + 32 + random(s) * (width - 64);
         b.y = 38 + random(s) * 90;
       }
       if (cycle === 62) {
@@ -205,12 +215,12 @@ export function updateBoss(s) {
       b.open = cycle >= 37 && cycle < 151;
       if (t < 130 && b.tiles?.some((tile) => tile.hp > 0)) b.open = false;
       if (cycle === 1) {
-        b.anchor = t === 1 ? 128 : 38 + random(s) * 173;
+        b.anchor = t === 1 ? 128 : left + 38 + random(s) * (width - 76);
         b.x = b.anchor;
         b.y = 77;
       }
       if (b.open) {
-        b.x = clamp(b.anchor + Math.sin((cycle - 38) * 0.033) * 86, 19, 237);
+        b.x = clamp(b.anchor + Math.sin((cycle - 38) * 0.033) * 86 * scale, left + 19, right - 19);
         b.y = 74 + Math.sin((cycle - 38) * 0.028) * 96;
       }
       if (cycle === 48 || cycle === 99) ring(s, b.x, b.y, 7, 1.13, t * 0.04, 'shard');

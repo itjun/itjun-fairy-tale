@@ -1,5 +1,5 @@
 // 测试飞手只给方向、射击和炸弹，运行的是游戏自己的逐帧战斗。
-import { bossTargets } from '../../src/gun-nac/bosses.js';
+import { bossTargets, rabbitEye } from '../../src/gun-nac/bosses.js';
 import { clamp, SHIP_SPEED } from '../../src/gun-nac/stages.js';
 export const moves = [
   [0, 0],
@@ -21,8 +21,10 @@ export function makePilot() {
     const p = s.ship,
       v = SHIP_SPEED[p.speed];
     const zones = bossTargets(s.boss);
+    const rabbitAim =
+      s.boss?.kind === 'rabbit' ? rabbitEye(s.boss, s.boss.eyes[0] > 0 ? -1 : 1) : null;
     const target =
-      zones[0] || s.boss || s.enemies.find((e) => e.age >= 0 && e.x > 8 && e.x < 248 && e.y < p.y - 8);
+      zones[0] || rabbitAim || s.boss || s.enemies.find((e) => e.age >= 0 && e.x > 8 && e.x < 248 && e.y < p.y - 8);
     let targetX = target?.x ?? 128,
       targetY = s.boss ? 195 : 174;
     if (p.gun === 4 && target) targetY = target.y + 34;
@@ -82,8 +84,8 @@ export function makePilot() {
               danger += 300;
         }
       }
-      const px = clamp(p.x + dx * v * 12 * unit, 6, 250),
-        py = clamp(p.y + dy * v * 12 * unit, 8, 231);
+      const px = clamp(p.x + dx * v * 6 * unit, 6, 250),
+        py = clamp(p.y + dy * v * 6 * unit, 8, 231);
       const cost =
         danger +
         Math.abs(targetX - px) * 1.1 +

@@ -5,6 +5,7 @@ import {
   ROUTES,
   SHIP_SPEED,
   clamp,
+  playBounds,
   random,
   openingPoint,
   launchWave,
@@ -19,6 +20,7 @@ import {
   bombGeometry,
   bombTouches,
   collect,
+  combatDrop,
   drop,
   equip,
   supply,
@@ -28,10 +30,20 @@ import { branchTip, bossTargets, enterBoss, hitBoss, updateBoss } from './bosses
 
 export const SAVE_KEY = 'garden-gun-nac-flight-v1';
 export const RECORD_KEY = 'garden-gun-nac-record-v1';
+const INITIAL_LIVES = 30;
 const DOWN = Math.PI / 2;
-export function newFlight({ area = 1, difficulty = 2, ricochet = false, seed = 0x47554e } = {}) {
+export function newFlight({
+  area = 1,
+  difficulty = 2,
+  gun = 1,
+  ricochet = false,
+  seed = 0x47554e,
+  width: _width = 256,
+} = {}) {
+  void _width;
   const s = {
     version: 1,
+    width: 256,
     area: clamp(area | 0, 0, 8),
     difficulty: clamp(difficulty | 0, 1, 4),
     ricochet,
@@ -47,9 +59,9 @@ export function newFlight({ area = 1, difficulty = 2, ricochet = false, seed = 0
       y: 161,
       dx: 0,
       speed: 1,
-      lives: 2,
+      lives: INITIAL_LIVES,
       wing: false,
-      gun: 1,
+      gun: clamp(gun | 0, 1, 5),
       power: 1,
       turbo: 0,
       chips: 0,
@@ -92,7 +104,7 @@ function startArea(s, area) {
 }
 export function continueFlight(s) {
   if (s.phase !== 'over') return false;
-  Object.assign(s.ship, { lives: 2, stock: 4, gun: 1, power: 1, wing: false, chips: 0, bombPower: 1 });
+  Object.assign(s.ship, { lives: INITIAL_LIVES, stock: Math.max(4, s.ship.stock) });
   s.orders = s.orders.map((n) => Math.floor(n / 2));
   startArea(s, s.area);
   return true;
@@ -135,8 +147,27 @@ export function depart(s) {
 export function nextSpeed(s, delta = 1) {
   if (s.phase === 'flight') s.ship.speed = ((((s.ship.speed - 1 + delta) % 4) + 4) % 4) + 1;
 }
+export function setFlightWidth(s, width = 256) {
+  if (!s) return;
+  void width;
+  s.width = 256;
+  const { left, right } = playBounds(s);
+  s.ship.x = clamp(s.ship.x, left + 6, right - 6);
+}
+export function isSelectingOpeningWeapon(s) {
+  if (!s || s.phase !== 'flight' || s.index !== 1 || s.boss) return false;
+  return (
+    s.enemies.some((e) => !e.dead && e.path === 'opening') ||
+    s.items.some((i) => !i.dead && i.isOpening)
+  );
+}
 function advance(s) {
-  if (s.boss || --s.wait > 0) return;
+  if (s.boss) return;
+  if (isSelectingOpeningWeapon(s)) {
+    s.wait = Math.max(s.wait, 42);
+    return;
+  }
+  if (--s.wait > 0) return;
   const entry = ROUTES[s.area][s.index++];
   if (!entry) {
     s.phase = s.area === 8 ? 'ending' : 'shop';
@@ -165,14 +196,9 @@ function damageShip(s) {
   s.sounds.push('hurt');
   if (p.wing) {
     p.wing = false;
-    p.power = 1;
     return;
   }
   p.cash = Math.floor(p.cash / 2);
-  p.power = 1;
-  p.gun = 1;
-  p.chips = 0;
-  p.bombPower = 1;
   p.stock = Math.max(4, p.stock);
   if (p.lives <= 0) {
     s.phase = 'over';
@@ -232,6 +258,7 @@ function fireEnemy(s, e) {
 function moveEnemy(s, e) {
   e.age++;
   if (e.age < 0) return;
+  const { left, right, span } = playBounds(s);
   const t = e.age,
     sign = e.sign,
     speed = 1 + 0.065 * (s.difficulty - 1);
@@ -248,7 +275,7 @@ function moveEnemy(s, e) {
       e.y = e.oy - t * 0.92 * speed;
       break;
     case 'weave':
-      e.x = clamp(e.ox + Math.sin(t * 0.029) * 69 * sign, 5, 251);
+      e.x = clamp(e.ox + Math.sin(t * 0.029) * 69 * span * sign, left + 5, right - 5);
       e.y = e.oy + t * 0.62 * speed;
       break;
     case 'ground':
@@ -287,7 +314,7 @@ function moveEnemy(s, e) {
       e.x = e.ox + Math.sin(t * 0.025) * 22 * sign;
       e.y = e.oy + t * 0.68 * speed;
   }
-  if (e.x < -25 || e.x > 281 || e.y > 261 || (e.path === 'rear' && e.y < -16)) {
+  if (e.x < left - 25 || e.x > right + 25 || e.y > 261 || (e.path === 'rear' && e.y < -16)) {
     e.dead = true;
     return;
   }
@@ -303,10 +330,11 @@ function defeat(s, e) {
   s.score += e.score;
   burst(s, e.x, e.y, 'pop', 21);
   if (e.path === 'opening') {
-    drop(s, e.x, e.y, 'gun' + (1 + (s.supplyCount++ % 5)), 53);
+    const gun = e.dropGun >= 1 && e.dropGun <= 5 ? e.dropGun : 1 + (s.supplyCount++ % 5);
+    drop(s, e.x, Math.max(16, e.y), 'gun' + gun, 0, { isOpening: true });
     s.score += 600 - e.score;
   } else if (e.kind === 'courier' || e.kind === 'barge') supply(s, e.x, e.y);
-  else if (e.kind !== 'tentacle' && s.kills % 5 === 0) drop(s, e.x, e.y, 'money');
+  else if (e.kind !== 'tentacle' && s.kills % 6 === 0) combatDrop(s, e.x, e.y);
   if (s.ricochet) hostile(s, e.x, e.y, aim(s, e.x, e.y), 1.55);
 }
 function nearestTarget(s, x, y) {
@@ -334,15 +362,20 @@ function hits(a, b, extra = 0) {
 }
 function moveShot(s, b) {
   b.age++;
-  if (b.gun === 3 && b.age > 4) {
-    const goal = nearestTarget(s, b.x, b.y);
-    if (goal) {
-      const old = Math.atan2(b.vy, b.vx),
-        to = Math.atan2(goal.y - b.y, goal.x - b.x);
-      const angle = old + clamp(Math.atan2(Math.sin(to - old), Math.cos(to - old)), -0.095, 0.095);
-      const v = Math.hypot(b.vx, b.vy);
-      b.vx = Math.cos(angle) * v;
-      b.vy = Math.sin(angle) * v;
+  if (b.gun === 3) {
+    // 前几帧保持外展起手弧，随后大弧线回旋追敌，速度缓缓抬升。
+    if (b.flare > 0) b.flare -= 1;
+    if (b.age > 5 && b.flare <= 0) {
+      const goal = nearestTarget(s, b.x, b.y);
+      if (goal) {
+        const old = Math.atan2(b.vy, b.vx),
+          to = Math.atan2(goal.y - b.y, goal.x - b.x);
+        const turn = clamp(Math.atan2(Math.sin(to - old), Math.cos(to - old)), -0.18, 0.18);
+        const angle = old + turn;
+        const v = Math.min(5.2, Math.hypot(b.vx, b.vy) + 0.028);
+        b.vx = Math.cos(angle) * v;
+        b.vy = Math.sin(angle) * v;
+      }
     }
   }
   if (b.gun === 4) b.bend = (b.bend || 0) * 0.79 + s.ship.dx * 0.16;
@@ -358,35 +391,36 @@ function moveShot(s, b) {
       }
     }
   }
-  let impacted = false;
+  let isImpacted = false;
   for (const e of s.enemies) {
     if (!enemyOpen(e) || !hits(b, e) || b.hit?.includes(e.id)) continue;
     if (e.kind === 'barge' && Math.abs(b.x - e.x) > 6) continue;
     e.hp -= b.damage;
     b.hit?.push(e.id);
-    impacted = true;
+    isImpacted = true;
     if (e.hp <= 0) defeat(s, e);
-    if (!b.hit) break;
+    if (!b.hit || (b.pierce && b.hit.length >= b.pierce)) break;
   }
   if (s.boss?.kind === 'burrow' && !s.boss.open && s.boss.tiles?.length) {
     const tile = s.boss.tiles.find((t) => t.hp > 0 && hits(b, t));
     if (tile) {
       tile.hp = Math.max(0, tile.hp - b.damage);
-      impacted = true;
+      b.hit?.push('tile');
+      isImpacted = true;
       burst(s, tile.x, tile.y, 'pop', 18);
     }
   }
-  if (!impacted || b.hit) {
+  if ((!isImpacted || b.hit) && (!b.pierce || (b.hit?.length || 0) < b.pierce)) {
     for (const zone of bossTargets(s.boss)) {
       const key = 'boss' + (zone.part ?? 0);
       if (!hits(b, zone) || b.hit?.includes(key)) continue;
       hitBoss(s.boss, zone, b.damage);
       b.hit?.push(key);
-      impacted = true;
+      isImpacted = true;
       break;
     }
   }
-  if (impacted) {
+  if (isImpacted) {
     if (b.blast) {
       burst(s, b.x, b.y, 'blast', 18);
       for (const e of s.enemies)
@@ -396,9 +430,12 @@ function moveShot(s, b) {
         }
     } else burst(s, b.x, b.y);
     if (!s.sounds.includes('hit' + b.gun)) s.sounds.push('hit' + b.gun);
-    if (!b.hit) b.dead = true;
+    if (!b.hit || (b.pierce && b.hit.length >= b.pierce)) b.dead = true;
   }
-  if (b.age >= b.life || b.y < -14 || b.y > 255 || b.x < -12 || b.x > 268) b.dead = true;
+  const { left, right } = playBounds(s);
+  const margin = Math.max(14, b.r + 6);
+  if (b.age >= b.life || b.y < -margin || b.y > 255 + margin * 0.5 || b.x < left - margin || b.x > right + margin)
+    b.dead = true;
 }
 
 function moveHostile(s, b) {
@@ -425,17 +462,20 @@ function moveHostile(s, b) {
     else ring(s, b.x, b.y, 7, 1.15);
     b.dead = true;
   }
-  if (b.age > b.life || b.x < -18 || b.x > 274 || b.y > 255 || (b.y < -24 && b.kind !== 'lob')) b.dead = true;
+  const { left, right } = playBounds(s);
+  if (b.age > b.life || b.x < left - 18 || b.x > right + 18 || b.y > 255 || (b.y < -24 && b.kind !== 'lob'))
+    b.dead = true;
 }
 
-export function flareWidth(h) {
-  return h.age < 42 ? 0 : Math.max(0, Math.sin(((h.age - 42) / (h.life - 42)) * Math.PI)) * 211;
+export function flareWidth(h, width = 256) {
+  return h.age < 42 ? 0 : Math.max(0, Math.sin(((h.age - 42) / (h.life - 42)) * Math.PI)) * (211 * (width / 256));
 }
 function updateHazards(s) {
   const p = s.ship;
+  const { width } = playBounds(s);
   for (const h of s.hazards) {
     h.age++;
-    if (h.kind === 'flare' && h.age > 42 && Math.abs(p.y - h.y) < 5 && (p.x - h.x) * h.sign <= flareWidth(h))
+    if (h.kind === 'flare' && h.age > 42 && Math.abs(p.y - h.y) < 5 && (p.x - h.x) * h.sign <= flareWidth(h, width))
       damageShip(s);
     if (h.kind === 'pillar' && Math.abs(p.x - h.x) <= 4.4) damageShip(s);
     if (h.kind === 'tile' && h.age === 46) ring(s, h.x, h.y, 6, 1.25, random(s), 'shard');
@@ -448,9 +488,10 @@ function updateHazards(s) {
   s.hazards = s.hazards.filter((h) => h.age < h.life);
 }
 function updateBombs(s) {
+  const { width } = playBounds(s);
   for (const b of s.bombs) {
     b.age++;
-    const g = bombGeometry(b, s.ship);
+    const g = bombGeometry(b, s.ship, width);
     if (b.age === 25 || b.age % 45 === 0) s.sounds.push('pulse' + b.kind);
     for (const h of s.hostile) if (bombTouches(b, g, h.x, h.y, h.r)) h.dead = true;
     if (b.age % 8 === 0) {
@@ -473,19 +514,22 @@ export function tick(s, input = {}) {
   s.areaTick++;
   s.banner = Math.max(0, s.banner - 1);
   s.scroll += s.boss?.kind === 'rabbit' ? 0 : 0.54;
+  const { left, right } = playBounds(s);
   const p = s.ship;
   const dx = clamp(input.x || 0, -1, 1),
     dy = clamp(input.y || 0, -1, 1),
     norm = Math.max(1, Math.hypot(dx, dy));
   const v = SHIP_SPEED[p.speed];
   p.dx = (dx * v) / norm;
-  p.x = clamp(p.x + p.dx, 6, 250);
+  p.x = clamp(p.x + p.dx, left + 6, right - 6);
   p.y = clamp(p.y + (dy * v) / norm, 8, 231);
   if (p.inv > 0) p.inv--;
   if (s.cooldown > 0) s.cooldown--;
   if (input.bomb) bomb(s);
-  s.fireRun = input.fire ? Math.min(180, (s.fireRun ?? 0) + 1) : 0;
-  if (input.fire && !s.cooldown) shoot(s);
+  // 默认自动开火；手动按射击键只是同样在开火，不再要求按住。
+  const isFiring = input.autoFire !== false || !!input.fire;
+  s.fireRun = isFiring ? Math.min(180, (s.fireRun ?? 0) + 1) : 0;
+  if (isFiring && !s.cooldown) shoot(s);
   advance(s);
   if (s.phase !== 'flight') return;
   if (s.boss) updateBoss(s);
@@ -512,9 +556,14 @@ export function tick(s, input = {}) {
   for (const i of s.items) {
     i.age++;
     if (i.age < 0) continue;
-    i.y += 0.43;
-    i.x = clamp(i.ox + Math.sin(i.age * 0.037) * 13, 6, 250);
-    if (hits(i, player, 3)) {
+    if (i.isOpening) {
+      i.y += 0.35;
+      i.x = clamp(i.ox, left + 8, right - 8);
+    } else {
+      i.y += 0.43;
+      i.x = clamp(i.ox + Math.sin(i.age * 0.035) * 6, left + 8, right - 8);
+    }
+    if (hits(i, player, p.wing ? 4.5 : 3.5)) {
       collect(s, i);
       i.dead = true;
     }
@@ -625,6 +674,8 @@ export function decodeFlight(raw) {
         !s.boss.eyes.every(Number.isFinite))
     )
       return null;
+    s.width = 256;
+    s.ship.x = clamp(s.ship.x, 6, 250);
     s.sounds = [];
     return s;
   } catch {

@@ -14,12 +14,45 @@
 .gn-screen {
   position: relative;
   isolation: isolate;
-  width: min(100vw, 133.333333dvh);
-  aspect-ratio: 4/3;
-  max-height: 100dvh;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background: #0b1430;
+  container-type: size;
+}
+.gn-stage {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background:
+    repeating-linear-gradient(-18deg, transparent 0 14px, rgba(112, 220, 255, 0.035) 14px 15px),
+    linear-gradient(180deg, #121c40 0%, #0b1430 55%, #0a1228 100%);
+}
+.gn-arena {
+  position: relative;
+  flex: 0 1 auto;
+  align-self: center;
+  width: min(calc(100dvh * 4 / 3), calc(100vw - 12rem));
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 100%;
+  height: auto;
   overflow: hidden;
   background: #101d42;
-  container-type: inline-size;
+  box-shadow: 0 0 0 2px #3a5078, 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.gn-page:not([data-gn-page='flight']) .gn-arena {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+  box-shadow: none;
+}
+.gn-page:not([data-gn-page='flight']) .gn-rail {
+  display: none;
 }
 .gn-field,
 .gn-field canvas,
@@ -30,6 +63,88 @@
   height: 100%;
   display: block;
   touch-action: none;
+}
+.gn-rail {
+  flex: 1 1 0;
+  min-width: 5.75rem;
+  max-width: 15rem;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.35em, 1.2cqh, 0.85em);
+  padding: clamp(12px, 2.4cqh, 28px) clamp(10px, 1.6cqw, 22px);
+  color: #fff4da;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(13px, 2.1cqw, 28px);
+  line-height: 1.2;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.gn-rail-left {
+  align-items: flex-start;
+  text-align: left;
+}
+.gn-rail-right {
+  align-items: flex-end;
+  text-align: right;
+}
+.gn-rail-score {
+  font-size: 1.35em;
+  color: #ffdf7b;
+  letter-spacing: 0.04em;
+}
+.gn-rail-bomb {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25em;
+}
+.gn-rail-bomb small,
+.gn-rail-loadout {
+  font-size: 0.72em;
+  color: #c8d6ef;
+}
+.gn-rail-loadout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  margin-top: 0.35em;
+}
+.gn-rail .gn-hud-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  color: #ffdf7b;
+  font-size: 0.92em;
+}
+.gn-rail .gn-hud-area small {
+  font-size: 0.78em;
+  color: #9be8fa;
+}
+#root .gn-rail button {
+  color: #ffebc6;
+  background: #222f56;
+  border: 2px solid #829bab;
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0.28em;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.2em;
+}
+#root .gn-rail button:is(:focus-visible, :hover) {
+  color: #172448;
+  background: #ffe39a;
+  border-color: #fff0c4;
+  outline: 2px solid #102040;
+  outline-offset: 1px;
+}
+.gn-rail button svg {
+  width: 1em;
+  height: 1em;
+}
+.gn-rail button .pad-key {
+  min-width: 1.4em;
+  height: 1.4em;
+  font-size: 0.65em;
 }
 .gn-panel {
   position: absolute;
@@ -216,6 +331,37 @@
 .gn-pad-bar .pad-key + .pad-key {
   margin-left: -0.14em;
 }
+.gn-key-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  white-space: nowrap;
+}
+.gn-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5em;
+  height: 1.48em;
+  padding: 0 0.36em;
+  border: 1.5px solid #c9d8e8;
+  border-radius: 5px 7px 6px 6px;
+  background: rgba(25, 39, 76, 0.92);
+  color: #ffe39a;
+  font: inherit;
+  font-size: 0.84em;
+  line-height: 1;
+  box-sizing: border-box;
+}
+#root .gn-panel button .gn-kbd {
+  font-size: 0.72em;
+  height: 1.42em;
+}
+#root .gn-panel button:is(:focus-visible, :hover) .gn-kbd,
+#root .gn-panel [data-gn-first]:focus .gn-kbd {
+  border-color: #172448;
+  background: #172448;
+  color: #ffe39a;
+}
 body:has(.gn-page) .gamepad-guide {
   display: none;
 }
@@ -244,79 +390,89 @@ body:has(.gn-page) .gamepad-guide {
   color: #a8eaff;
   min-height: 1.2em;
 }
-.gn-hud {
-  position: absolute;
-  inset: 3% 3.6% auto;
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
-  text-shadow:
-    1px 2px 2px #0e1732,
-    -1px -1px 1px #0e1732;
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(12px, 2.9cqw, 38px);
-  line-height: 1.04;
-}
-.gn-hud > div {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 0.2em;
-}
-.gn-hud .gn-hud-right {
-  align-items: flex-end;
-}
-.gn-hud span {
-  display: flex;
-  align-items: center;
-  gap: 0.18em;
-}
-.gn-hud small {
-  font-size: 0.55em;
-}
 .gn-plane-icon {
   display: inline-block;
   width: 1.12em;
   height: 1.12em;
   background: url('/gun-nac/craft.webp') 0 0 / 500% 400%;
+  vertical-align: -0.15em;
 }
-#root .gn-hud button {
-  border: 0;
-  color: #ffebc6;
-  background: #152440bd;
-  pointer-events: auto;
-  cursor: pointer;
-  border-radius: 50%;
-  padding: 0.23em;
-  display: grid;
-  place-items: center;
+.gn-rail span {
+  display: flex;
+  align-items: center;
+  gap: 0.18em;
 }
-.gn-hud button svg {
-  width: 1em;
-  height: 1em;
+.gn-boss-bar {
+  position: absolute;
+  left: 50%;
+  top: 2.4%;
+  transform: translateX(-50%);
+  width: min(52%, 420px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 0.45cqw, 6px);
+  padding: 0.32em 0.65em 0.42em;
+  border: 1.5px solid rgba(255, 223, 123, 0.55);
+  border-radius: 9px 11px 8px 10px;
+  background: rgba(13, 22, 56, 0.82);
+  pointer-events: none;
+  font-size: clamp(11px, 1.7cqw, 22px);
+  line-height: 1.1;
+  text-shadow: 1px 1px 2px #0b132b;
+  box-sizing: border-box;
 }
-.gn-hud button .pad-key {
-  min-width: 1.4em;
-  height: 1.4em;
-  font-size: 0.65em;
+.gn-boss-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5em;
+  white-space: nowrap;
+}
+.gn-boss-head strong {
+  color: #ffdf7b;
+  font-weight: normal;
+  letter-spacing: 0.03em;
+}
+.gn-boss-head span {
+  color: #fff4da;
+  font-size: 0.84em;
+  font-variant-numeric: tabular-nums;
+}
+.gn-boss-track {
+  height: clamp(6px, 0.9cqw, 11px);
+  border: 1.5px solid #fff3d9cc;
+  border-radius: 999px;
+  background: rgba(16, 25, 52, 0.92);
+  overflow: hidden;
+}
+.gn-boss-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff5442, #ffae3b);
+  transition: width 70ms linear;
+}
+.gn-boss-bar[data-hit='true'] .gn-boss-fill {
+  background: linear-gradient(90deg, #fff2a6, #ffffff);
+}
+.gn-boss-bar[data-guarded='true'] .gn-boss-fill {
+  background: linear-gradient(90deg, #6e86a8, #9ab4d4);
 }
 .gn-flight-keys {
-  position: absolute;
-  right: 3.2%;
-  bottom: 2.2%;
+  margin-top: auto;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.3em 0.78em;
-  padding: 0.25em 0.6em;
-  border-radius: 9px 11px 8px 10px;
-  background: rgba(12, 21, 50, 0.66);
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.35em;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   color: #fff4da;
-  font-size: clamp(10px, 1.48cqw, 19px);
+  font-size: clamp(11px, 1.35cqw, 17px);
   line-height: 1.2;
   pointer-events: none;
-  text-shadow: 1px 1px 2px #0b132b;
 }
 .gn-flight-keys > span {
   display: inline-flex;
@@ -350,6 +506,22 @@ body:has(.gn-page) .gamepad-guide {
 .gn-banner small {
   display: block;
   font-size: 0.43em;
+}
+.gn-opening-tip {
+  position: absolute;
+  left: 50%;
+  top: 3%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.28em 0.78em;
+  border: 1.5px solid rgba(255, 223, 123, 0.55);
+  border-radius: 999px;
+  background: rgba(13, 22, 56, 0.78);
+  color: #ffe8a3;
+  font-size: clamp(11px, 1.55cqw, 19px);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 1px 1px 2px #0b132b;
 }
 .gn-touch-buttons {
   display: none;
@@ -400,7 +572,446 @@ html[data-input-mode='gamepad'] .gn-touch-buttons {
   padding-bottom: clamp(54px, 9.5cqw, 96px);
 }
 .gn-ending-plane {
-  width: 11cqw;
+  width: clamp(136px, 18.5cqw, 246px);
+  height: auto;
   aspect-ratio: 1;
-  background: url('/gun-nac/craft.webp') 25% 0 / 500% 400%;
+  display: block;
+  filter: drop-shadow(0 8px 22px rgba(108, 246, 255, 0.45));
+}
+.gn-panel.gn-armory {
+  gap: clamp(10px, 1.5cqh, 18px);
+  padding: clamp(18px, 3cqh, 34px) clamp(18px, 3.2cqw, 44px) clamp(54px, 8cqh, 80px);
+}
+.gn-armory-sub {
+  margin: 0;
+  color: #bfe8ff;
+  font-size: clamp(13px, 1.75cqw, 22px);
+}
+.gn-armory-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(10px, 1.5cqw, 20px);
+  width: min(94%, 1120px);
+  margin: 0.35em auto;
+  align-items: stretch;
+}
+#root .gn-armory-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.48em;
+  padding: clamp(14px, 2.2cqh, 24px) clamp(10px, 1.2cqw, 16px) clamp(12px, 1.8cqh, 20px);
+  border: 2.5px solid #7ea2c9aa;
+  border-radius: 14px 18px 13px 16px;
+  background: rgba(19, 34, 76, 0.9);
+  color: #fff6de;
+  text-align: center;
+  box-sizing: border-box;
+  transition: transform 0.12s ease;
+}
+#root .gn-armory-card.is-best {
+  border-color: #ffd85c;
+  background: linear-gradient(180deg, rgba(46, 58, 114, 0.96), rgba(24, 38, 86, 0.94));
+  box-shadow: 0 6px 20px rgba(255, 214, 76, 0.22);
+}
+.gn-armory-crown {
+  position: absolute;
+  top: -0.78em;
+  padding: 0.14em 0.68em;
+  border: 2px solid #162348;
+  border-radius: 999px;
+  background: #ffd84d;
+  color: #162348;
+  font-style: normal;
+  font-size: clamp(11px, 1.25cqw, 16px);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.gn-armory-moonblade {
+  width: clamp(46px, 6.2cqw, 82px);
+  height: clamp(46px, 6.2cqw, 82px);
+  object-fit: contain;
+  filter: drop-shadow(0 3px 10px rgba(114, 244, 255, 0.45));
+}
+.gn-armory-badge {
+  display: grid;
+  place-items: center;
+  width: clamp(44px, 5.8cqw, 76px);
+  height: clamp(44px, 5.8cqw, 76px);
+  border: 3px solid #fff8e2;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: clamp(20px, 3cqw, 38px);
+  color: #162246;
+  box-sizing: border-box;
+}
+.gn-armory-badge-1 {
+  background: #ffd95e;
+}
+.gn-armory-badge-2 {
+  background: #ff8c5a;
+}
+.gn-armory-badge-4 {
+  background: #ff6b6b;
+}
+.gn-armory-badge-5 {
+  background: #7ae5ff;
+}
+#root .gn-armory-card strong {
+  font-weight: normal;
+  font-size: clamp(15px, 2cqw, 26px);
+  color: #ffe280;
+  line-height: 1.2;
+}
+.gn-armory-tag {
+  display: inline-block;
+  padding: 0.1em 0.55em;
+  border-radius: 999px;
+  background: rgba(122, 229, 255, 0.18);
+  color: #9be8fa;
+  font-size: clamp(11px, 1.35cqw, 17px);
+}
+#root .gn-armory-card small {
+  color: #d6e4fa;
+  font-size: clamp(11px, 1.35cqw, 17px);
+  line-height: 1.38;
+}
+#root .gn-armory-card:is(:focus-visible, :hover),
+#root .gn-panel .gn-armory-card:focus {
+  background: #ffe07d;
+  border-color: #fff8e2;
+  color: #152246;
+  transform: translateY(-3px);
+}
+#root .gn-armory-card:is(:focus-visible, :hover) strong,
+#root .gn-panel .gn-armory-card:focus strong {
+  color: #152246;
+}
+#root .gn-armory-card:is(:focus-visible, :hover) .gn-armory-tag,
+#root .gn-panel .gn-armory-card:focus .gn-armory-tag {
+  background: rgba(21, 34, 70, 0.14);
+  color: #1d356b;
+}
+#root .gn-armory-card:is(:focus-visible, :hover) small,
+#root .gn-panel .gn-armory-card:focus small {
+  color: #263966;
+}
+@media (max-width: 860px) {
+  .gn-armory-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.gn-panel.gn-manual {
+  justify-content: stretch;
+  align-items: stretch;
+  text-align: left;
+  padding: 0;
+  overflow: hidden;
+  background: rgba(11, 20, 48, 0.96);
+}
+.gn-manual-shell {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.2cqh, 14px);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: clamp(12px, 2.2cqh, 22px) clamp(14px, 2.4cqw, 28px) clamp(48px, 7cqh, 72px);
+  box-sizing: border-box;
+}
+.gn-manual-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(8px, 1.2cqw, 16px);
+  flex: 0 0 auto;
+}
+.gn-manual-head h2 {
+  font-size: clamp(18px, 3.2cqw, 40px);
+  white-space: nowrap;
+}
+.gn-manual-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.55cqw;
+  min-width: 0;
+}
+#root .gn-manual-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.3em 0.45em;
+  font-size: clamp(11px, 1.7cqw, 22px);
+}
+#root .gn-manual-tabs button[aria-selected='true'] {
+  background: #ffdf7b;
+  color: #172448;
+  border-color: #fff6de;
+}
+.gn-manual-stage {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 26%) minmax(0, 1fr);
+  gap: clamp(10px, 1.5cqw, 20px);
+}
+.gn-manual-rail {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1cqh, 12px);
+  min-height: 0;
+  min-width: 0;
+}
+.gn-manual-lead {
+  margin: 0;
+  padding: 0.55em 0.75em;
+  border: 1.5px solid #829bab99;
+  border-radius: 8px 10px 7px 9px;
+  background: rgba(20, 34, 74, 0.88);
+  color: #fff4da;
+  font-size: clamp(11px, 1.45cqw, 18px);
+  line-height: 1.4;
+}
+.gn-manual-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+  overflow: auto;
+  min-height: 0;
+}
+.gn-manual-picker li {
+  margin: 0;
+  padding: 0;
+}
+#root .gn-manual-pick {
+  width: 100%;
+  display: grid;
+  grid-template-columns: clamp(34px, 3.6cqw, 48px) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65em;
+  padding: 0.45em 0.65em;
+  text-align: left;
+  border: 1.5px solid #6f89a677;
+  border-radius: 8px 11px 7px 10px;
+  background: rgba(20, 32, 68, 0.88);
+  color: #fff4da;
+  font-size: clamp(12px, 1.55cqw, 20px);
+}
+#root .gn-manual-pick span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+  min-width: 0;
+}
+#root .gn-manual-pick strong {
+  color: #ffdf7b;
+  font-weight: normal;
+  font-size: 1.05em;
+  line-height: 1.2;
+}
+#root .gn-manual-pick small {
+  color: #c8d6ef;
+  font-size: 0.82em;
+  line-height: 1.25;
+}
+#root .gn-manual-pick[aria-pressed='true'],
+#root .gn-manual-pick:is(:focus-visible, :hover),
+#root .gn-panel .gn-manual-pick:focus {
+  color: #172448;
+  background: #ffe39a;
+  border-color: #fff0c4;
+}
+#root .gn-manual-pick[aria-pressed='true'] strong,
+#root .gn-manual-pick:is(:focus-visible, :hover) strong,
+#root .gn-panel .gn-manual-pick:focus strong {
+  color: #172448;
+}
+#root .gn-manual-pick[aria-pressed='true'] small,
+#root .gn-manual-pick:is(:focus-visible, :hover) small,
+#root .gn-panel .gn-manual-pick:focus small {
+  color: #3a4a72;
+}
+.gn-manual-detail {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 1fr);
+  gap: clamp(10px, 1.4cqw, 18px);
+  align-items: stretch;
+}
+.gn-manual-showcase {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.55em;
+  min-height: 0;
+}
+.gn-manual-demo {
+  flex: 0 1 auto;
+  width: min(100%, calc((100cqh - 11rem) * 256 / 240));
+  max-width: 100%;
+  aspect-ratio: 256 / 240;
+  max-height: calc(100cqh - 11rem);
+  border: 2px solid #6f89a6aa;
+  border-radius: 10px 12px 9px 11px;
+  background: #101a3a;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 246, 222, 0.08);
+  align-self: center;
+}
+.gn-manual-demo canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.gn-manual-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45em;
+}
+#root .gn-manual-levels button {
+  flex: 1 1 0;
+  min-width: 4.5em;
+  font-size: clamp(11px, 1.4cqw, 18px);
+  padding: 0.28em 0.5em;
+}
+#root .gn-manual-levels button[aria-pressed='true'] {
+  background: #ffdf7b;
+  color: #172448;
+  border-color: #fff6de;
+}
+.gn-manual-copy {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55em;
+  padding: 0.35em 0.2em 0.35em 0.15em;
+}
+.gn-manual-copy h3 {
+  margin: 0;
+  color: #ffdf7b;
+  font-size: clamp(18px, 2.8cqw, 36px);
+  font-weight: normal;
+  line-height: 1.15;
+}
+.gn-manual-blurb {
+  margin: 0;
+  color: #9be8fa;
+  font-size: clamp(13px, 1.7cqw, 22px);
+}
+.gn-manual-copy > p {
+  margin: 0;
+  color: #fff4da;
+  font-size: clamp(12px, 1.55cqw, 20px);
+  line-height: 1.45;
+}
+.gn-manual-facts {
+  margin: 0.35em 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55em;
+}
+.gn-manual-facts > div {
+  padding: 0.55em 0.7em;
+  border: 1.5px solid #6f89a677;
+  border-radius: 8px 10px 7px 9px;
+  background: rgba(20, 32, 68, 0.82);
+}
+.gn-manual-facts dt {
+  color: #ffdf7b;
+  font-size: clamp(12px, 1.45cqw, 18px);
+  margin-bottom: 0.2em;
+}
+.gn-manual-facts dd {
+  margin: 0;
+  color: #f4ead6;
+  font-size: clamp(12px, 1.5cqw, 19px);
+  line-height: 1.4;
+}
+@media (max-width: 900px), (max-height: 560px) {
+  .gn-manual-head {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+  }
+  .gn-manual-head h2 {
+    grid-column: 1;
+  }
+  .gn-manual-head > button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .gn-manual-tabs {
+    grid-column: 1 / -1;
+  }
+  .gn-manual-stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .gn-manual-rail {
+    max-height: 32%;
+  }
+  .gn-manual-picker {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .gn-manual-picker li {
+    flex: 0 0 auto;
+  }
+  #root .gn-manual-pick {
+    width: max-content;
+    max-width: 14em;
+  }
+  .gn-manual-detail {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .gn-manual-detail {
+    grid-template-columns: 1fr;
+  }
+}
+.gn-badge {
+  display: grid;
+  place-items: center;
+  width: clamp(30px, 4.2cqw, 52px);
+  height: clamp(30px, 4.2cqw, 52px);
+  border: 2.5px solid #fff6de;
+  border-radius: 9px 11px 8px 10px;
+  color: #192047;
+  font-style: normal;
+  font-weight: bold;
+  font-size: clamp(15px, 2.35cqw, 30px);
+  line-height: 1;
+  box-sizing: border-box;
+}
+.gn-badge-gun {
+  background: #aceaf1;
+}
+.gn-badge-bomb {
+  background: #fac081;
+}
+.gn-item-sprite {
+  display: block;
+  width: clamp(32px, 4.5cqw, 54px);
+  height: clamp(32px, 4.5cqw, 54px);
+  background-image: url('/gun-nac/craft.webp');
+  background-size: 500% 400%;
+}
+.gn-sprite-wing {
+  background-position: 75% 100%;
+}
+.gn-sprite-money {
+  background-position: 50% 100%;
+}
+.gn-sprite-life {
+  background-position: 100% 100%;
+}
+.gn-sprite-courier {
+  background-position: 100% 0%;
 }

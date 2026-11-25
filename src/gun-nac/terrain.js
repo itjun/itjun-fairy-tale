@@ -70,19 +70,21 @@ const sectors = [
 const rowSpacing = [0, 118, 95, 136, 85, 104, 122, 151, 100];
 // Flight frames from the appearance of the area banner to the near edge of the planet.
 export const ENTRY_FRAME = [0, 1392, 832, 804, 812, 514, 513, 0, 0];
-export function visibleTerrain(area, scroll, areaTick) {
+export function visibleTerrain(area, scroll, areaTick, width = 256) {
   const route = sectors[area];
   if (!route.length || areaTick < ENTRY_FRAME[area]) return [];
   const travelled = scroll - ENTRY_FRAME[area] * 0.54;
   const spacing = rowSpacing[area],
     first = Math.max(0, Math.ceil((travelled - 275) / spacing));
   const last = Math.floor((travelled + 40) / spacing);
+  const left = 128 - width / 2;
   const marks = [];
   for (let row = first; row <= last; row++) {
-    const [tile, side, width] = route[row % route.length];
+    const [tile, side, size] = route[row % route.length];
     const turn = Math.floor(row / route.length);
-    const x = turn % 2 ? 256 - side : side;
-    marks.push({ tile, x, y: travelled - row * spacing, width, turn: ((row % 3) - 1) * 0.08 });
+    const base = turn % 2 ? 256 - side : side;
+    const x = left + (base / 256) * width;
+    marks.push({ tile, x, y: travelled - row * spacing, width: size, turn: ((row % 3) - 1) * 0.08 });
   }
   return marks;
 }

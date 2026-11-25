@@ -3,7 +3,7 @@ import { Pause, SpeakerHigh, SpeakerSlash } from '@phosphor-icons/react';
 import { registerGamepadPlayer, navigate, vibrateGamepad } from '../input/gamepad.js';
 import { useGamepad } from '../input/GamepadSupport.jsx';
 import { PadHint, PadKey } from '../input/PadKey.jsx';
-import { AREA_NAMES, GUN_NAMES } from './stages.js';
+import { AREA_NAMES, BOSS, GUN_NAMES } from './stages.js';
 import {
   SAVE_KEY,
   RECORD_KEY,
@@ -12,11 +12,15 @@ import {
   tick,
   continueFlight,
   nextSpeed,
+  setFlightWidth,
   shopBuy,
   depart,
+  isSelectingOpeningWeapon,
 } from './flight.js';
 import { createFlightView } from './view.js';
 import { FlightSound } from './sound.js';
+import { FlightManual } from './Manual.jsx';
+import { SHIP_CANVAS_SIZE, paintWingedShip } from './ship-art.js';
 import './flight.css';
 
 const keys = {
@@ -55,36 +59,101 @@ function readRecord() {
     return 0;
   }
 }
-function HUD({ state, isGamepad, onPause }) {
+const GUN_ARMORY_CARDS = [
+  { id: 1, tag: '广角清场', desc: '多向扇面齐射，轻松覆盖大片空域' },
+  { id: 2, tag: '范围轰炸', desc: '命中炸开烈焰冲击波，重创扎堆敌群' },
+  { id: 3, tag: '最强王牌', desc: '超大原画弯刀自动追敌、连斩穿透并劈碎敌弹', isBest: true },
+  { id: 4, tag: '持续烈焰', desc: '前方喷吐贯穿火柱，近身持续高伤压制' },
+  { id: 5, tag: '极速贯穿', desc: '多束高速并排激光，瞬间贯穿整列目标' },
+];
+
+function ArmoryGlyph({ id }) {
+  if (id === 3) {
+    return <img className="gn-armory-moonblade" src="./assets/weapon-moonblade.png" alt="" aria-hidden="true" />;
+  }
+  return (
+    <span className={'gn-armory-badge gn-armory-badge-' + id} aria-hidden="true">
+      {id}
+    </span>
+  );
+}
+
+function EndingWingedCraft() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, SHIP_CANVAS_SIZE, SHIP_CANVAS_SIZE);
+    paintWingedShip(ctx);
+  }, []);
+  return <canvas ref={ref} width={SHIP_CANVAS_SIZE} height={SHIP_CANVAS_SIZE} className="gn-ending-plane" aria-hidden="true" />;
+}
+function BossBar({ boss }) {
+  if (!boss) return null;
+  const bossName = BOSS[boss.kind]?.[0] || '首领';
+  const bossHp = boss.hp > 0 ? Math.max(1, Math.ceil(boss.hp)) : 0;
+  const bossMaxHp = Math.max(1, Math.ceil(boss.maxHp));
+  const bossPct = Math.max(0, Math.min(100, (boss.hp / bossMaxHp) * 100));
+  return (
+    <div
+      className="gn-boss-bar"
+      role="status"
+      aria-label={`${bossName} 血量 ${bossHp} / ${bossMaxHp}`}
+      data-hit={boss.flash > 0}
+      data-guarded={boss.age >= 72 && !boss.open}
+    >
+      <div className="gn-boss-head">
+        <strong>{bossName}</strong>
+        <span>
+          {bossHp} / {bossMaxHp}
+        </span>
+      </div>
+      <div className="gn-boss-track">
+        <i className="gn-boss-fill" style={{ width: `${bossPct}%` }} />
+      </div>
+    </div>
+  );
+}
+function RailLeft({ state }) {
+  if (!state) return <aside className="gn-rail gn-rail-left" hidden aria-hidden="true" />;
   const p = state.ship;
   return (
-    <>
-      <div className="gn-hud">
-        <div>
-          <strong>{String(state.score).padStart(6, '0')}</strong>
-          <span aria-label={'备用战机 ' + p.lives}>
-            <i className="gn-plane-icon" /> ×{p.lives}
-          </span>
-          <span>
-            {p.bomb} {p.stock} <small>Lv.{p.bombPower}</small>
-          </span>
-        </div>
-        <div className="gn-hud-right">
-          <button aria-label="暂停飞行" onClick={onPause}>
-            {isGamepad ? <PadKey name="menu" /> : <Pause />}
-          </button>
-          <small>
-            {state.area} 区　{p.gun} 号 Lv.{p.power}
-          </small>
-          <small>
-            机速 {p.speed}　¥ {p.cash}
-          </small>
-        </div>
-      </div>
-      <aside className="gn-flight-keys" aria-label="操控提示">
+    <aside className="gn-rail gn-rail-left" aria-label="飞行成绩">
+      <strong className="gn-rail-score">{String(state.score).padStart(6, '0')}</strong>
+      <span aria-label={'备用战机 ' + p.lives}>
+        <i className="gn-plane-icon" /> ×{p.lives}
+      </span>
+      <span className="gn-rail-bomb">
+        {p.bomb} {p.stock} <small>Lv.{p.bombPower}</small>
+      </span>
+    </aside>
+  );
+}
+function RailRight({ state, isGamepad, onPause }) {
+  if (!state) return <aside className="gn-rail gn-rail-right" hidden aria-hidden="true" />;
+  const p = state.ship;
+  return (
+    <aside className="gn-rail gn-rail-right" aria-label="飞行状态">
+      <button aria-label="暂停飞行" onClick={onPause}>
+        {isGamepad ? <PadKey name="menu" /> : <Pause />}
+      </button>
+      <span className="gn-hud-area">
+        第 {state.area} 区
+        <small>{AREA_NAMES[state.area]}</small>
+      </span>
+      <span className="gn-rail-loadout">
+        <span>
+          {p.gun} 号 {GUN_NAMES[p.gun - 1]}
+        </span>
+        <span>Lv.{p.power}</span>
+        <span>机速 {p.speed}</span>
+        <span>¥ {p.cash}</span>
+      </span>
+      <div className="gn-flight-keys">
         {isGamepad ? (
           <>
-            <PadHint keys={['X']}>射击</PadHint>
+            <span>自动射击</span>
             <PadHint keys={['A']}>投弹</PadHint>
             <PadHint keys={['Y']}>换速</PadHint>
           </>
@@ -93,9 +162,7 @@ function HUD({ state, isGamepad, onPause }) {
             <span>
               <kbd>WASD</kbd>移动
             </span>
-            <span>
-              <kbd>J</kbd>射击
-            </span>
+            <span>自动射击</span>
             <span>
               <kbd>K</kbd>投弹
             </span>
@@ -104,11 +171,76 @@ function HUD({ state, isGamepad, onPause }) {
             </span>
           </>
         )}
-      </aside>
-    </>
+      </div>
+    </aside>
   );
 }
-function MenuPadBar({ page, loadError }) {
+function KeyHint({ keys: labels, children }) {
+  return (
+    <span className="gn-key-hint">
+      {labels.map((label) => (
+        <kbd key={label} className="gn-kbd">
+          {label}
+        </kbd>
+      ))}
+      {children}
+    </span>
+  );
+}
+function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
+  if (!isGamepad) {
+    if (loadError) {
+      return (
+        <div className="gn-pad-bar" aria-label="键盘操作提示">
+          <KeyHint keys={['WASD']}>选择</KeyHint>
+          <KeyHint keys={['J', 'Enter']}>确定</KeyHint>
+          <KeyHint keys={['Esc']}>回花园</KeyHint>
+        </div>
+      );
+    }
+    return (
+      <div className="gn-pad-bar" aria-label="键盘操作提示">
+        {page === 'manual' ? (
+          <>
+            <KeyHint keys={['A', 'D']}>切页</KeyHint>
+            <KeyHint keys={['W', 'S']}>选条目</KeyHint>
+            <KeyHint keys={['Esc']}>{manualBackLabel}</KeyHint>
+          </>
+        ) : page === 'config' ? (
+          <>
+            <KeyHint keys={['W', 'S']}>选项目</KeyHint>
+            <KeyHint keys={['A', 'D']}>调值</KeyHint>
+            <KeyHint keys={['J', 'Enter']}>切换</KeyHint>
+            <KeyHint keys={['Esc']}>返回机库</KeyHint>
+          </>
+        ) : page === 'shop' ? (
+          <>
+            <KeyHint keys={['WASD']}>选择</KeyHint>
+            <KeyHint keys={['J', 'Enter']}>购买或出发</KeyHint>
+            <KeyHint keys={['Esc']}>保存并回花园</KeyHint>
+          </>
+        ) : page === 'armory' ? (
+          <>
+            <KeyHint keys={['WASD']}>挑选武器</KeyHint>
+            <KeyHint keys={['J', 'Enter']}>选定出击</KeyHint>
+            <KeyHint keys={['Esc']}>返回机库</KeyHint>
+          </>
+        ) : page === 'pause' ? (
+          <>
+            <KeyHint keys={['WASD']}>选择</KeyHint>
+            <KeyHint keys={['J', 'Enter']}>确定</KeyHint>
+            <KeyHint keys={['Esc']}>继续飞行</KeyHint>
+          </>
+        ) : (
+          <>
+            <KeyHint keys={['WASD']}>选择</KeyHint>
+            <KeyHint keys={['J', 'Enter']}>确定</KeyHint>
+            <KeyHint keys={['Esc']}>{page === 'replace' ? '保留进度' : '回花园'}</KeyHint>
+          </>
+        )}
+      </div>
+    );
+  }
   if (loadError) {
     return (
       <div className="gn-pad-bar" aria-label="Xbox 手柄操作提示">
@@ -120,7 +252,13 @@ function MenuPadBar({ page, loadError }) {
   }
   return (
     <div className="gn-pad-bar" aria-label="Xbox 手柄操作提示">
-      {page === 'config' ? (
+      {page === 'manual' ? (
+        <>
+          <PadHint keys={['LB', 'RB']}>切页</PadHint>
+          <PadHint keys={['stick']}>选条目</PadHint>
+          <PadHint keys={['B']}>{manualBackLabel}</PadHint>
+        </>
+      ) : page === 'config' ? (
         <>
           <PadHint keys={['stick']}>上下选 / 左右调值</PadHint>
           <PadHint keys={['A']}>切换</PadHint>
@@ -131,6 +269,12 @@ function MenuPadBar({ page, loadError }) {
           <PadHint keys={['stick']}>选项目 / 左右选区</PadHint>
           <PadHint keys={['A']}>购买或出发</PadHint>
           <PadHint keys={['B']}>保存并回花园</PadHint>
+        </>
+      ) : page === 'armory' ? (
+        <>
+          <PadHint keys={['stick']}>挑选武器</PadHint>
+          <PadHint keys={['A']}>选定出击</PadHint>
+          <PadHint keys={['B']}>返回机库</PadHint>
         </>
       ) : page === 'pause' ? (
         <>
@@ -150,16 +294,18 @@ function MenuPadBar({ page, loadError }) {
 }
 export default function GunNac({ onExit, isSound, onSound }) {
   const gamepadState = useGamepad();
-  const isPadUi = gamepadState.mode === 'gamepad' || gamepadState.connected;
+  const isPadUi = gamepadState.mode === 'gamepad';
   const [saved] = useState(readSaved),
     [record, setRecord] = useState(readRecord);
   const flight = useRef(saved),
     view = useRef(null),
+    viewWidth = useRef(256),
     host = useRef(null),
     shell = useRef(null),
     audio = useRef(null);
   const [page, setPage] = useState('title'),
-    pageRef = useRef('title');
+    pageRef = useRef('title'),
+    manualFrom = useRef('title');
   const [ready, setReady] = useState(false),
     [loadError, setLoadError] = useState(''),
     [attempt, setAttempt] = useState(0);
@@ -167,6 +313,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
     [, refresh] = useState(0);
   const [difficulty, setDifficulty] = useState(2),
     [area, setArea] = useState(1),
+    [chosenGun, setChosenGun] = useState(3),
     [soundTest, setSoundTest] = useState(1),
     [ricochet, setRicochet] = useState(false);
   const [parcel, setParcel] = useState(() => Math.min(8, (saved?.area ?? 0) + 1)),
@@ -220,17 +367,27 @@ export default function GunNac({ onExit, isSound, onSound }) {
   function resume() {
     audio.current?.wake();
     const g = flight.current;
-    if (g) show(g.phase);
+    if (g) {
+      setFlightWidth(g, viewWidth.current);
+      show(g.phase);
+    }
   }
-  function start() {
+  function start(gunId = chosenGun) {
+    setChosenGun(gunId);
     flight.current = newFlight({
       area: soundTest === 5 ? area : 1,
       difficulty,
+      gun: gunId,
       ricochet,
       seed: crypto.getRandomValues(new Uint32Array(1))[0],
+      width: viewWidth.current,
     });
     persist();
     resume();
+  }
+  function openManual(from) {
+    manualFrom.current = from;
+    show('manual');
   }
   function leave() {
     if (!persist()) return;
@@ -293,10 +450,14 @@ export default function GunNac({ onExit, isSound, onSound }) {
       raf = 0,
       last = 0,
       carry = 0,
-      lastStill = null;
+      lastStill = null,
+      lastBossKey = '';
     setReady(false);
     setLoadError('');
-    createFlightView(host.current)
+    createFlightView(host.current, (w) => {
+      viewWidth.current = w;
+      if (flight.current) setFlightWidth(flight.current, w);
+    })
       .then((v) => {
         if (dead) {
           v.dispose();
@@ -304,6 +465,8 @@ export default function GunNac({ onExit, isSound, onSound }) {
         }
         owned = v;
         view.current = v;
+        viewWidth.current = v.getWidth();
+        if (flight.current) setFlightWidth(flight.current, viewWidth.current);
         setReady(true);
         const loop = (now) => {
           raf = requestAnimationFrame(loop);
@@ -350,7 +513,13 @@ export default function GunNac({ onExit, isSound, onSound }) {
               break;
             }
             if (g.frame % 360 === 0) persist();
-            if (g.frame % 5 === 0) refresh((n) => n + 1);
+            const bossKey = g.boss
+              ? `${g.boss.kind}:${Math.ceil(g.boss.hp)}:${g.boss.open}:${g.boss.flash > 0}`
+              : '';
+            if (bossKey !== lastBossKey || g.frame % 5 === 0) {
+              lastBossKey = bossKey;
+              refresh((n) => n + 1);
+            }
           }
           v.frame(g);
         };
@@ -411,7 +580,15 @@ export default function GunNac({ onExit, isSound, onSound }) {
         }
         if (menuMoves[e.code]) {
           e.preventDefault();
-          navigate(shell.current, menuMoves[e.code]);
+          const dir = menuMoves[e.code];
+          navigate(shell.current, dir);
+          if (
+            where === 'manual' &&
+            (dir === 'left' || dir === 'right') &&
+            document.activeElement?.getAttribute('role') === 'tab'
+          ) {
+            document.activeElement.click();
+          }
           return;
         }
         if (e.code === 'KeyJ') {
@@ -461,23 +638,31 @@ export default function GunNac({ onExit, isSound, onSound }) {
       events.abort();
     };
   }, []);
-  const padBadge = (name) => (
-    <span className="gn-btn-pad" aria-hidden="true">
-      <PadKey name={name} />
-    </span>
-  );
+  const padBadge = (name) =>
+    isPadUi ? (
+      <span className="gn-btn-pad" aria-hidden="true">
+        <PadKey name={name} />
+      </span>
+    ) : null;
   const back = (fn, label = '返回') => (
     <button data-gamepad-back onClick={fn}>
-      {padBadge('B')}
+      {isPadUi ? (
+        padBadge('B')
+      ) : (
+        <kbd className="gn-kbd" aria-hidden="true">
+          Esc
+        </kbd>
+      )}
       {label}
     </button>
   );
   const isFreshStart = !s || s.phase === 'ending';
+  const isFlying = page === 'flight' && !!s;
   const launchButton = (
     <button
       data-gn-first={isFreshStart ? true : undefined}
       disabled={!ready}
-      onClick={() => (s && s.phase !== 'ending' ? show('replace') : start())}
+      onClick={() => (s && s.phase !== 'ending' ? show('replace') : show('armory'))}
     >
       {isFreshStart && padBadge('A')}
       开始游戏
@@ -486,64 +671,61 @@ export default function GunNac({ onExit, isSound, onSound }) {
   return (
     <main ref={shell} className="gn-page home-page" data-gamepad-page={'gun-nac-' + page} data-gn-page={page}>
       <div className="gn-screen">
-        <div ref={host} className="gn-field" aria-hidden={page !== 'flight'} />
-        {page === 'flight' && s && (
-          <>
-            <div
-              className="gn-touch-area"
-              onPointerDown={(e) => {
-                e.currentTarget.setPointerCapture(e.pointerId);
-                drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
-              }}
-              onPointerMove={(e) => {
-                const d = drag.current;
-                if (d?.id === e.pointerId) {
-                  touch.current.x = Math.sign(Math.abs(e.clientX - d.x) > 7 ? e.clientX - d.x : 0);
-                  touch.current.y = Math.sign(Math.abs(e.clientY - d.y) > 7 ? e.clientY - d.y : 0);
-                }
-              }}
-              onPointerUp={() => {
-                drag.current = null;
-                touch.current.x = touch.current.y = 0;
-              }}
-              onPointerCancel={() => {
-                drag.current = null;
-                touch.current = freshInput();
-              }}
-            />
-            <HUD state={s} isGamepad={isPadUi} onPause={pause} />
-            {s.banner > 0 && (
-              <div className="gn-banner">
-                {AREA_NAMES[s.area]}
-                <small>第 {s.area} 区</small>
-              </div>
+        <div className="gn-stage">
+          <RailLeft state={isFlying ? s : null} />
+          <div className="gn-arena">
+            <div ref={host} className="gn-field" aria-hidden={!isFlying} />
+            {isFlying && (
+              <>
+                <div
+                  className="gn-touch-area"
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+                  }}
+                  onPointerMove={(e) => {
+                    const d = drag.current;
+                    if (d?.id === e.pointerId) {
+                      touch.current.x = Math.sign(Math.abs(e.clientX - d.x) > 7 ? e.clientX - d.x : 0);
+                      touch.current.y = Math.sign(Math.abs(e.clientY - d.y) > 7 ? e.clientY - d.y : 0);
+                    }
+                  }}
+                  onPointerUp={() => {
+                    drag.current = null;
+                    touch.current.x = touch.current.y = 0;
+                  }}
+                  onPointerCancel={() => {
+                    drag.current = null;
+                    touch.current = freshInput();
+                  }}
+                />
+                <BossBar boss={s.boss} />
+                {s.banner > 0 && (
+                  <div className="gn-banner">
+                    {AREA_NAMES[s.area]}
+                    <small>第 {s.area} 区</small>
+                  </div>
+                )}
+                {s.banner === 0 && isSelectingOpeningWeapon(s) && (
+                  <div className="gn-opening-tip" aria-live="polite">
+                    补给机正逐架送来 1～5 号武器（吃同号直接升级）
+                  </div>
+                )}
+                <div className="gn-touch-buttons">
+                  <button onClick={() => nextSpeed(s)}>换速</button>
+                  <button
+                    onPointerDown={() => {
+                      bombPending.current = true;
+                    }}
+                  >
+                    投弹
+                  </button>
+                </div>
+              </>
             )}
-            <div className="gn-touch-buttons">
-              <button onClick={() => nextSpeed(s)}>换速</button>
-              <button
-                onPointerDown={() => {
-                  bombPending.current = true;
-                }}
-              >
-                投弹
-              </button>
-              <button
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  touch.current.fire = true;
-                }}
-                onPointerCancel={() => {
-                  touch.current.fire = false;
-                }}
-                onPointerUp={() => {
-                  touch.current.fire = false;
-                }}
-              >
-                射击
-              </button>
-            </div>
-          </>
-        )}
+          </div>
+          <RailRight state={isFlying ? s : null} isGamepad={isPadUi} onPause={pause} />
+        </div>
         {(page !== 'flight' || loadError) && (
           <section className={'gn-panel gn-' + page}>
             {loadError ? (
@@ -568,19 +750,35 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   )}
                   {launchButton}
                   <button onClick={() => show('config')}>飞行设置</button>
+                  <button onClick={() => openManual('title')}>游戏说明书</button>
                   {back(leave, '回花园')}
                 </nav>
-                <div className="gn-help" aria-label="手柄与键盘说明">
-                  <div className="gn-help-pad">
-                    <PadHint keys={['stick']}>移动</PadHint>
-                    <PadHint keys={['X']}>射击</PadHint>
-                    <PadHint keys={['A']}>投弹</PadHint>
-                    <PadHint keys={['Y']}>换速</PadHint>
-                    <PadHint keys={['menu']}>暂停</PadHint>
-                  </div>
-                  <small>键盘　WASD 移动　J 射击　K 投弹　L 换速　Esc 暂停</small>
+                <div className="gn-help" aria-label={isPadUi ? 'Xbox 手柄操控说明' : '键盘操控说明'}>
+                  {isPadUi ? (
+                    <div className="gn-help-pad">
+                      <PadHint keys={['stick']}>移动</PadHint>
+                      <span>自动射击</span>
+                      <PadHint keys={['A']}>投弹</PadHint>
+                      <PadHint keys={['Y']}>换速</PadHint>
+                      <PadHint keys={['menu']}>暂停</PadHint>
+                    </div>
+                  ) : (
+                    <div className="gn-help-pad">
+                      <KeyHint keys={['WASD']}>移动</KeyHint>
+                      <span>自动射击</span>
+                      <KeyHint keys={['K']}>投弹</KeyHint>
+                      <KeyHint keys={['L']}>换速</KeyHint>
+                      <KeyHint keys={['Esc']}>暂停</KeyHint>
+                    </div>
+                  )}
                 </div>
               </>
+            ) : page === 'manual' ? (
+              <FlightManual
+                isGamepad={isPadUi}
+                backLabel={manualFrom.current === 'pause' ? '返回暂停' : '返回机库'}
+                onBack={() => show(manualFrom.current)}
+              />
             ) : page === 'config' ? (
               <>
                 <h2>飞行设置</h2>
@@ -607,8 +805,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                       onChange={(e) => {
                         const n = +e.target.value;
                         setSoundTest(n);
-                        audio.current.wake();
-                        audio.current.effect('shot' + (1 + (n % 5)));
+                        audio.current?.previewTest(n);
                       }}
                     >
                       {Array.from({ length: 16 }, (_, i) => (
@@ -648,10 +845,34 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   {padBadge('B')}
                   保留进度
                 </button>
-                <button onClick={start}>
+                <button onClick={() => show('armory')}>
                   {padBadge('A')}
-                  重新出击
+                  去选武器
                 </button>
+              </>
+            ) : page === 'armory' ? (
+              <>
+                <h2>选择出击主武器</h2>
+                <p className="gn-armory-sub">不限时慢慢挑，选好直接挂载升空（途中也能随时换枪或同号升级）</p>
+                <div className="gn-armory-grid" role="group" aria-label="五种主武器">
+                  {GUN_ARMORY_CARDS.map((item) => (
+                    <button
+                      key={item.id}
+                      className={'gn-armory-card' + (item.isBest ? ' is-best' : '')}
+                      data-gn-first={item.id === chosenGun ? true : undefined}
+                      onClick={() => start(item.id)}
+                    >
+                      {item.isBest && <em className="gn-armory-crown">最强推荐</em>}
+                      <ArmoryGlyph id={item.id} />
+                      <strong>
+                        {item.id} 号 {GUN_NAMES[item.id - 1]}
+                      </strong>
+                      <span className="gn-armory-tag">{item.tag}</span>
+                      <small>{item.desc}</small>
+                    </button>
+                  ))}
+                </div>
+                {back(() => show('title'), '返回机库')}
               </>
             ) : page === 'pause' ? (
               <>
@@ -663,6 +884,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   {padBadge('menu')}
                   继续飞行
                 </button>
+                <button onClick={() => openManual('pause')}>游戏说明书</button>
                 <button onClick={swapSound}>{isSound ? <SpeakerHigh /> : <SpeakerSlash />} 游戏声音</button>
                 <button onClick={leave}>保存并回花园</button>
               </>
@@ -743,7 +965,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
               </>
             ) : (
               <>
-                <div className="gn-ending-plane" aria-hidden="true" />
+                <EndingWingedCraft />
                 <h2>星系恢复了和平</h2>
                 <p>八区通关　得分 {s.score}</p>
                 <button data-gn-first onClick={() => show('title')}>
@@ -753,7 +975,12 @@ export default function GunNac({ onExit, isSound, onSound }) {
                 {back(leave, '回花园')}
               </>
             )}
-            <MenuPadBar page={page} loadError={loadError} />
+            <MenuControlBar
+              page={page}
+              isGamepad={isPadUi}
+              loadError={loadError}
+              manualBackLabel={manualFrom.current === 'pause' ? '返回暂停' : '返回机库'}
+            />
           </section>
         )}
         {warning && (

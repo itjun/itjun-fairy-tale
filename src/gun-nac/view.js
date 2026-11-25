@@ -1,9 +1,18 @@
 import * as THREE from 'three';
-import { openingPoint } from './stages.js';
+import { openingPoint, playBounds } from './stages.js';
 import { bombGeometry } from './arsenal.js';
 import { branchTip, rabbitEye } from './bosses.js';
 import { visibleTerrain, ENTRY_FRAME, solarSide } from './terrain.js';
 import { flareWidth } from './flight.js';
+import { paintCrescentBlade, crescentSpin, crescentDrawSize } from './crescent.js';
+import {
+  SHIP_CANVAS_SIZE,
+  BASE_SHIP_SIZE,
+  WINGED_SHIP_WIDTH,
+  WINGED_SHIP_HEIGHT,
+  paintBaseShip,
+  paintWingedShip,
+} from './ship-art.js';
 
 const BASE = './gun-nac/';
 const CRAFT = {
@@ -44,9 +53,9 @@ const BLUE = '#70dcff',
   HOT = '#ff643c',
   GOLD = '#ffd442',
   INK = '#192047';
-function textureFrom(paint) {
+function textureFrom(paint, size = 96) {
   const c = document.createElement('canvas');
-  c.width = c.height = 96;
+  c.width = c.height = size;
   const ctx = c.getContext('2d');
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -57,17 +66,19 @@ function textureFrom(paint) {
 }
 function inkTexture(shape, color, text = '') {
   return textureFrom((g) => {
+    if (shape === 'blade') {
+      paintCrescentBlade(g, { enemy: false });
+      return;
+    }
+    if (shape === 'crescent') {
+      paintCrescentBlade(g, { enemy: true });
+      return;
+    }
     g.strokeStyle = '#fff6de';
     g.lineWidth = 9;
     g.fillStyle = color;
     g.beginPath();
     switch (shape) {
-      case 'crescent':
-        g.moveTo(72, 12);
-        g.quadraticCurveTo(12, 38, 45, 84);
-        g.quadraticCurveTo(6, 71, 14, 42);
-        g.quadraticCurveTo(28, 6, 72, 12);
-        break;
       case 'beam':
         g.roundRect(27, 5, 42, 86, 17);
         break;
@@ -111,7 +122,7 @@ function inkTexture(shape, color, text = '') {
   });
 }
 
-export async function createFlightView(host) {
+export async function createFlightView(host, onResize) {
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
     alpha: false,
@@ -122,6 +133,7 @@ export async function createFlightView(host) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute('aria-label', '加纳战机飞行战场');
   host.append(renderer.domElement);
+  let viewWidth = 256;
   const scene = new THREE.Scene(),
     camera = new THREE.OrthographicCamera(0, 256, 240, 0, 0.1, 20);
   camera.position.z = 5;
@@ -194,16 +206,44 @@ export async function createFlightView(host) {
     renderer.forceContextLoss();
   }
   try {
-    const [craft, boss, terrain, ...maps] = await Promise.all(
-      ['craft', 'bosses', 'landmarks', ...Array.from({ length: 9 }, (_, i) => 'field-' + i)].map((n) =>
-        loader.loadAsync(BASE + n + '.webp').then(own),
-      ),
-    );
+    const [craft, boss, terrain, moonblade, ...maps] = await Promise.all([
+      ...['craft', 'bosses', 'landmarks'].map((n) => loader.loadAsync(BASE + n + '.webp').then(own)),
+      loader.loadAsync('./assets/weapon-moonblade.png').then(own),
+      ...Array.from({ length: 9 }, (_, i) => loader.loadAsync(BASE + 'field-' + i + '.webp').then(own)),
+    ]);
     tileAtlas('c', craft, 5, 4);
     tileAtlas('b', boss, 4, 4);
     tileAtlas('t', terrain, 4, 4);
+    const bladeMat = material('moonblade', moonblade, true);
+    bladeMat.alphaTest = 0.06;
+    const ghostMat = new THREE.MeshBasicMaterial({
+      map: moonblade,
+      transparent: true,
+      opacity: 0.34,
+      depthWrite: false,
+      depthTest: false,
+    });
+    materials.set('moonbladeGhost', ghostMat);
+    material('shipBase', own(textureFrom(paintBaseShip, SHIP_CANVAS_SIZE)), true);
+    material('shipWinged', own(textureFrom(paintWingedShip, SHIP_CANVAS_SIZE)), true);
+    const haloTex = own(
+      textureFrom((g) => {
+        const c = SHIP_CANVAS_SIZE / 2;
+        const grad = g.createRadialGradient(c, c + 4, 32, c, c + 4, c - 4);
+        grad.addColorStop(0, 'rgba(112, 240, 255, 0.0)');
+        grad.addColorStop(0.68, 'rgba(112, 240, 255, 0.18)');
+        grad.addColorStop(0.88, 'rgba(255, 224, 102, 0.36)');
+        grad.addColorStop(1, 'rgba(112, 240, 255, 0.0)');
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(c, c + 4, c - 4, 0, Math.PI * 2);
+        g.fill();
+      }, SHIP_CANVAS_SIZE),
+    );
+    material('wingHalo', haloTex, true);
     maps.forEach((tex, i) => {
       tex.wrapT = THREE.RepeatWrapping;
+      if (i !== 7) tex.wrapS = THREE.MirroredRepeatWrapping;
       fields.push(tex);
       material('field' + i, tex, false);
     });
@@ -218,7 +258,17 @@ export async function createFlightView(host) {
   }
   const resize = () => {
     const { width, height } = host.getBoundingClientRect();
-    if (width && height) renderer.setSize(width, height, false);
+    if (width && height) {
+      renderer.setSize(width, height, false);
+      // 战场固定经典 4∶3（256×240），不再随窗口拉宽。
+      viewWidth = 256;
+      camera.left = 0;
+      camera.right = 256;
+      camera.top = 240;
+      camera.bottom = 0;
+      camera.updateProjectionMatrix();
+      onResize?.(viewWidth);
+    }
   };
   observer = new ResizeObserver(resize);
   observer.observe(host);
@@ -226,29 +276,45 @@ export async function createFlightView(host) {
   const dot = symbol('dot', HOT),
     ring = symbol('ring', BLUE),
     laser = symbol('beam', '#ff4e6b');
+  const crescentTrail = new Map();
   function frame(s) {
     used = 0;
+    const w = playBounds(s).width || viewWidth;
+    if (camera.right - camera.left !== w) {
+      camera.left = 128 - w / 2;
+      camera.right = 128 + w / 2;
+      camera.updateProjectionMatrix();
+    }
+    const tileField = (idx, offsetY) => {
+      const tex = fields[idx];
+      tex.offset.y = offsetY;
+      if (idx !== 7) {
+        const rep = w / 256;
+        tex.repeat.x = rep;
+        tex.offset.x = (1 - rep) / 2;
+      }
+    };
     const entry = ENTRY_FRAME[s.area];
     const edge = Math.min(240, Math.max(0, (s.areaTick - entry) * 8));
     const arriving = entry > 0 && edge < 240;
     const field = arriving ? 0 : s.area;
-    fields[field].offset.y = s.scroll / 240;
+    tileField(field, s.scroll / 240);
     if (field === 7) {
       const row = Math.floor(s.scroll / 240);
       fields[7].offset.y = 0;
       for (let i = row; i <= row + 1; i++)
-        draw(solarSide(i) === 1 ? 'field7' : 'solarRight', 128, s.scroll - i * 240 + 120, 256, 240);
-    } else draw('field' + field, 128, 120, 256, 240);
+        draw(solarSide(i) === 1 ? 'field7' : 'solarRight', 128, s.scroll - i * 240 + 120, w, 240);
+    } else draw('field' + field, 128, 120, w, 240);
     if (arriving && edge > 0) {
-      fields[s.area].offset.y = (s.scroll - edge) / 240;
-      draw('field' + s.area, 128, edge - 120, 256, 240);
+      tileField(s.area, (s.scroll - edge) / 240);
+      draw('field' + s.area, 128, edge - 120, w, 240);
     }
-    for (const m of visibleTerrain(s.area, s.scroll, s.areaTick))
+    for (const m of visibleTerrain(s.area, s.scroll, s.areaTick, w))
       draw('t' + m.tile, m.x, m.y, m.width, m.width, m.turn);
     for (const h of s.hazards) {
       if (h.kind === 'flare') {
         if (h.age < 42) draw(symbol('ring', GOLD), h.x + h.sign * 4, h.y, 8 + Math.sin(h.age * 0.3) * 2);
-        else line(symbol('flame', '#ff982d'), h.x, h.y, h.x + h.sign * flareWidth(h), h.y, 12);
+        else line(symbol('flame', '#ff982d'), h.x, h.y, h.x + h.sign * flareWidth(h, w), h.y, 12);
       } else if (h.kind === 'pillar') {
         line(laser, h.x, 0, h.x, 240, 4);
       } else draw(symbol('shard', '#d78e53'), h.x, h.y, 10 + h.age * 0.22);
@@ -260,11 +326,11 @@ export async function createFlightView(host) {
         continue;
       }
       if (e.path === 'opening') {
-        for (let delay = 60; delay >= 10; delay -= 10) {
-          if (e.age < delay) continue;
-          const echo = openingPoint(e, e.age - delay);
-          draw('c' + CRAFT.courier, echo.x, echo.y, 9 + (60 - delay) * 0.07);
-        }
+        draw('c' + CRAFT.courier, e.x, e.y, 16, 16, Math.sin(e.age * 0.05) * 0.06);
+        const tag = String(e.dropGun || 1);
+        if (e.dropGun === 3) draw('moonblade', e.x, e.y + 13, 14, 14, e.age * 0.08);
+        draw(symbol('badge', e.dropGun === 3 ? GOLD : '#aceaf1', tag), e.x, e.y + 13, e.dropGun === 3 ? 11 : 12);
+        continue;
       }
       const size = e.r * (e.kind === 'barge' ? 3.4 : 3);
       draw('c' + CRAFT[e.kind], e.x, e.y, size, size, Math.sin(e.age * 0.065) * 0.085);
@@ -300,7 +366,7 @@ export async function createFlightView(host) {
     for (const i of s.items) {
       if (i.age < 0) continue;
       const id = { life: 19, money: 17, wing: 18 }[i.kind];
-      if (id != null) draw('c' + id, i.x, i.y, 15);
+      if (id != null) draw('c' + id, i.x, i.y, i.kind === 'wing' ? 18 : 15);
       else {
         const tag = i.kind.startsWith('gun')
           ? i.kind.slice(3)
@@ -309,25 +375,70 @@ export async function createFlightView(host) {
             : i.kind === 'chip'
               ? 'P'
               : '★';
-        draw(symbol('badge', i.kind.startsWith('bomb') ? '#fac081' : '#aceaf1', tag), i.x, i.y, 13);
+        const badgeSize = i.isOpening ? 15 : 13.5;
+        if (i.kind === 'gun3') {
+          draw('moonblade', i.x, i.y, badgeSize + 8, badgeSize + 8, i.age * 0.09);
+        }
+        draw(
+          symbol('badge', i.kind.startsWith('bomb') ? '#fac081' : i.kind === 'gun3' ? GOLD : '#aceaf1', tag),
+          i.x,
+          i.y,
+          i.kind === 'gun3' ? badgeSize - 1.5 : badgeSize,
+        );
       }
     }
+    // 圆月弯刀直接复用跳台原画 weapon-moonblade.png 素材，残影留在渲染层。
+    const live = new Set();
     for (const shot of s.shots) {
+      if (shot.gun === 3) {
+        live.add(shot);
+        const spin = crescentSpin(shot.age, shot.spinDir || 1);
+        const size = crescentDrawSize(shot.r);
+        let trail = crescentTrail.get(shot);
+        if (!trail) {
+          trail = [];
+          crescentTrail.set(shot, trail);
+        }
+        trail.push({ x: shot.x, y: shot.y, spin });
+        if (trail.length > 3) trail.shift();
+        for (let i = 0; i < trail.length - 1; i++) {
+          const ghost = trail[i];
+          const fade = (i + 1) / trail.length;
+          const gSize = size * (0.62 + fade * 0.22);
+          draw('moonbladeGhost', ghost.x, ghost.y, gSize, gSize, ghost.spin);
+        }
+        draw('moonblade', shot.x, shot.y, size, size, spin);
+        continue;
+      }
       const a = Math.atan2(shot.vy, shot.vx) + Math.PI / 2;
-      const shape = ['', 'beam', 'dot', 'crescent', 'flame', 'beam'][shot.gun],
-        color = ['', BLUE, '#dc8cff', '#8078ff', '#ffad22', '#66ffd9'][shot.gun];
+      const shape = ['', 'beam', 'dot', 'blade', 'flame', 'beam'][shot.gun],
+        color = ['', BLUE, '#dc8cff', '#38c6ff', '#ffad22', '#66ffd9'][shot.gun];
       draw(
         symbol(shape, color),
         shot.x,
         shot.y,
-        shot.r * (shot.gun === 3 ? 3.8 : 2.5),
-        shot.gun === 5 ? 14 : shot.gun === 4 ? 24 : shot.gun === 1 ? 7 : shot.r * 3.5,
+        shot.r * 2.5,
+        shot.gun === 5 ? 16 : shot.gun === 4 ? 26 : shot.gun === 1 ? 8.5 : shot.r * 3.5,
         a,
       );
     }
+    for (const key of crescentTrail.keys()) if (!live.has(key)) crescentTrail.delete(key);
     const p = s.ship;
-    if (p.inv <= 0 || Math.floor(p.inv / 6) % 2 === 0)
-      draw('c' + (p.wing ? 1 : 0), p.x, p.y, p.wing ? 21 : 15, p.wing ? 21 : 15, p.dx * 0.04);
+    if (p.inv <= 0 || Math.floor(p.inv / 6) % 2 === 0) {
+      const tilt = p.dx * 0.045;
+      const pulse = 0.86 + Math.sin(s.frame * 0.48) * 0.2;
+      if (p.wing) {
+        const haloSize = 54 + Math.sin(s.frame * 0.12) * 3;
+        draw('wingHalo', p.x, p.y + 1, haloSize, haloSize * 0.84, 0);
+        draw(symbol('flame', '#ff9c24'), p.x, p.y + 19, 7.6, 14 * pulse, Math.PI + tilt);
+        draw(symbol('flame', '#5ceeff'), p.x - 12.2, p.y + 18, 5.4, 11 * pulse, Math.PI + tilt);
+        draw(symbol('flame', '#5ceeff'), p.x + 12.2, p.y + 18, 5.4, 11 * pulse, Math.PI + tilt);
+        draw('shipWinged', p.x, p.y, WINGED_SHIP_WIDTH, WINGED_SHIP_HEIGHT, tilt);
+      } else {
+        draw(symbol('flame', '#ff9c24'), p.x, p.y + 14.5, 6.2, 10.5 * pulse, Math.PI + tilt);
+        draw('shipBase', p.x, p.y, BASE_SHIP_SIZE, BASE_SHIP_SIZE, tilt);
+      }
+    }
     for (const h of s.hostile) {
       const a = Math.atan2(h.vy, h.vx) + Math.PI / 2;
       if (h.kind === 'elbow' || h.kind === 'laser') draw(laser, h.x, h.y, 3.6, 12, a);
@@ -338,7 +449,7 @@ export async function createFlightView(host) {
       else draw(h.kind === 'shard' ? symbol('shard', HOT) : dot, h.x, h.y, h.r * 2.6);
     }
     for (const b of s.bombs) {
-      const g = bombGeometry(b, p);
+      const g = bombGeometry(b, p, w);
       if (b.kind === 'F') draw(symbol('ring', '#ff9732'), g.x, g.y, g.ring * 2.2);
       if (b.kind === 'B') line(symbol('beam', '#92e3ff'), g.x, 0, g.x, 240, g.width * 2);
       if (b.kind === 'T')
@@ -360,5 +471,5 @@ export async function createFlightView(host) {
     for (let i = used; i < meshes.length; i++) meshes[i].visible = false;
     renderer.render(scene, camera);
   }
-  return { frame, dispose };
+  return { frame, dispose, getWidth: () => viewWidth };
 }
