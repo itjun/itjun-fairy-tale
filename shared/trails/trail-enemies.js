@@ -22,7 +22,7 @@ export function addTrailEnemies(world, stage, random) {
     let kindIndex = Math.floor(random() * kinds.length);
     for (const id of room.platformIds) {
       const p = world.platforms[id];
-      if (reserved.has(id) || p.isMoving || p.isEnabled === false || p.isCrumbling || p.isBridge || p.slope || p.width < 4) continue;
+      if (reserved.has(id) || p.isLoadingDock || p.isMoving || p.isEnabled === false || p.isCrumbling || p.isBridge || p.slope || p.width < 4) continue;
       if (Math.hypot(p.x - start.x, p.y - start.y) < 12) continue;
       if (world.forest && !p.isCave && p.y < 8 && p.x <= world.bossArenas[0].right + 5) continue;
       if (occupied.some(e => Math.abs(e.x - p.x) < 15 && Math.abs(e.baseY - p.y) < 7)) continue;

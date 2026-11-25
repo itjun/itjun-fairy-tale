@@ -26,11 +26,13 @@ export function addFieldViews(views) {
     }
     for(const s of r.stops) {
       const p=w.platforms[s.platformId], size=s.size||2.25;
+      const isDeliveryCart=r.moving.some(m=>m.delivery && m.platformId===p.id);
       const item=sprite(s.icon==='platform-gear'?'mill-wheel':s.icon,p.x,p.y+size*.56,size,size,.54);
       const react=addFieldReaction(views,r,s,item,sprite);
       const halo=views.glow(p.x,p.y+1);
       const sign=views.paper(p.x,p.y+size+1.22,6.2,1.02,480,78);
-      const delivered=(s.display||[]).map((art,i)=>sprite(art,p.x+.94,p.y+1+i*.56,1.36,1.18,.8+i*.015));
+      const displayOffset=isDeliveryCart ? 1.65 : .94;
+      const delivered=(s.display||[]).map((art,i)=>sprite(art,p.x+displayOffset,p.y+1+i*.56,1.36,1.18,.8+i*.015));
       watch((state,here)=>{
         const marks=state.field, player=g.players[0], done=hasMark(r,marks,s.key);
         const carrying=done && !!s.carryUntil && !hasMark(r,marks,s.carryUntil);
@@ -57,19 +59,21 @@ export function addFieldViews(views) {
         const serveAge=done?Math.max(0,g.elapsed-marks[r.id+'/'+s.key]):0;
         delivered.forEach((obj,i)=>{
           obj.visible=here&&done;
-          if(obj.visible) obj.position.y=p.y+1+i*.56+(g.isReducedMotion?0:Math.max(0,1-serveAge*2+i*.12));
+          if(obj.visible) {
+            obj.position.x=p.x+displayOffset;
+            obj.position.y=p.y+1+i*.56+(g.isReducedMotion?0:Math.max(0,1-serveAge*2+i*.12));
+          }
         });
         react(state,here,carrying);
+        if(isDeliveryCart) item.visible=false; // 车上的实物就是订单，不再叠一份触点图标。
       });
     }
     for(const m of r.moving.filter(m=>m.icon)) {
       const p=w.platforms[m.platformId],body=sprite(m.icon,p.x,p.y,m.width||p.width,m.height||2,.24);
       watch((_,here)=>{
         body.visible=here;body.position.set(p.x,p.y-(m.below??.5),.24);
-        if (m.rail) {
-          g.platformViews.get(p.id).visible=false;
-          body.scale.x=Math.abs(body.scale.x)*Math.sign(m.toX-m.x);
-        }
+        if (m.rail || m.delivery) g.platformViews.get(p.id).visible=false;
+        if (m.rail) body.scale.x=Math.abs(body.scale.x)*Math.sign(m.toX-m.x);
       });
     }
   }

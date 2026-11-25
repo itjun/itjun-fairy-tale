@@ -1,6 +1,6 @@
 import { airParticles } from './air-particles.js';
 import { pushInWind } from '../../shared/trails/wind.js';
-import { fieldHint, stepField, syncField } from '../../shared/trails/field-progress.js';
+import { fieldHint, recoverFieldCargo, stepField, syncField } from '../../shared/trails/field-progress.js';
 import { fieldImages } from './field-views.js';
 import { trailMaterial } from './trail-art.js';
 import { advanceStory, syncStory, storyHint } from '../../shared/story-mechanisms.js';
@@ -698,6 +698,12 @@ export class GardenEngine {
       sets: setCounts(this.adventure), rerolls: resources.rerolls || 0, tierUp: resources.tierUp || 0,
     };
   }
+  recoverAt(point) {
+    const platform = this.platforms[point.platformId];
+    const isCargoReturned = !!this.world.field && recoverFieldCargo(this.world, this.roomState, platform, this.elapsed);
+    rescue(this.players[0], platform, platform.x + point.offsetX);
+    return isCargoReturned;
+  }
   hurt(isFall = false, amount = 10, source) {
     const powers = upgradePower(this.adventure);
     const player = this.players[0];
@@ -705,8 +711,10 @@ export class GardenEngine {
     if (isFall && this.difficulty.isFallFree) {
       // 轻松档掉坑不扣血，只送回刚才站稳的地方；这间房的“没掉坑”那颗星照样没有。
       const point=revivalPoint(player,this.platforms,true);
-      rescue(player,this.platforms[point.platformId],this.platforms[point.platformId].x+point.offsetX);player.protection=1;
-      recordHurt(this.roomState,true,false);this.callbacks.onSound('player-hurt');this.publish('掉下去了，回到刚才站的地方。');
+      const isCargoReturned = this.recoverAt(point);player.protection=1;
+      recordHurt(this.roomState,true,false);this.callbacks.onSound('player-hurt');
+      this.publish(isCargoReturned ? '甜品还在，带着它再上车吧！' : '掉下去了，回到刚才站的地方。');
+      if (isCargoReturned) this.callbacks.onLifeChange?.(this.snapshot());
       return;
     }
     const isLanding = source === 'landing';
@@ -734,16 +742,16 @@ export class GardenEngine {
       this.publish(isLanding && !lostHp ? '落地受伤，补给帮你回了血。' : message);
     }
     if (result === 'death') { this.revival = revivalPoint(player, this.platforms, isFall); this.pause(true); this.publish(this.survival.lives ? `扣掉一条命，还剩 ${this.survival.lives} 条。` : '生命用完了，这次冒险结束。'); }
-    if(isFall && result !== 'death'){const point=revivalPoint(player,this.platforms,true);rescue(player,this.platforms[point.platformId],this.platforms[point.platformId].x+point.offsetX);player.protection=1;}
+    if(isFall && result !== 'death'){this.recoverAt(revivalPoint(player,this.platforms,true));player.protection=1;}
     this.callbacks.onSound(result==='death'?'life-lost':['shield','armor','courage'].includes(result)?'block':'player-hurt');
     this.callbacks.onLifeChange?.(this.snapshot());
   }
   revive() {
     if (!reviveSurvival(this.survival)) return false;
-    const point = this.revival || revivalPoint(this.players[0], this.platforms, true), platform = this.platforms[point.platformId];
-    rescue(this.players[0], platform, platform.x + point.offsetX); this.revival = undefined; this.players[0].protection=3;
+    const isCargoReturned = this.recoverAt(this.revival || revivalPoint(this.players[0], this.platforms, true));
+    this.revival = undefined; this.players[0].protection=3;
     if(this.adventure.revivalWaves){this.adventure.revivalWaves--;this.enemyShots=this.enemyShots.filter(shot=>shot.bossId||Math.hypot(shot.x-this.players[0].x,shot.y-this.players[0].y)>18);this.skillEffects.burst(this.players[0].x,this.players[0].y+1,this.elapsed,true);}
-    this.clearInput(); this.publish('就在这里接着走，继续加油！');
+    this.clearInput(); this.publish(isCargoReturned ? '甜品还在，带着它再上车吧！' : '就在这里接着走，继续加油！');
     // 帮一把：同一间房倒下两次，起来时送一层护盾。
     if (this.roomState.downs >= 2 && getPlaySettings().isHelpOn) { (this.adventure.magic ||= newMagic()).shield = 1; this.publish('送你一层护盾，再试一次！'); }
     this.callbacks.onLifeChange?.(this.snapshot()); return true;

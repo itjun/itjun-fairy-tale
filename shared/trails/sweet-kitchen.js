@@ -8,8 +8,8 @@ function order(p,recipe,sources,counter,options={}) {
   recipe.forEach((icon,i)=>{
     p.station('piece'+i,sources[i],icon,'取'+names[icon],{after:i?['piece'+(i-1)]:[],carryUntil:'serve',sound:'flower'});
   });
-  p.station('serve',counter,'icecream',options.label||'交给甜点柜',{after:['piece'+(recipe.length-1)],goal:true,
-    received:'甜点做好了！',display:recipe,displayAfter:'serve'});
+  p.station('serve',options.cart || counter,'icecream',options.label||'交给甜点柜',{after:['piece'+(recipe.length-1)],goal:true,
+    ...(options.cart ? {atDock:0} : {}), received:options.cart?'装好啦，坐稳去对岸！':'甜点做好了！',display:recipe,displayAfter:'serve'});
 }
 function pantry(p) {
   const road=p.mainTrail([[0,0,14],[19,0],[42,-1],[61,0],[78,0],[97,1]], [5, 0, -6, -3, 0, 4],[3]);
@@ -32,9 +32,10 @@ function berryCellar(p) {
 function delivery(p) {
   const kitchen=p.mainTrail([[0,0,13],[18,0],[38,1],[57,2]], [-5, 0, -5, 2]);
   const upper=p.path([[18,0],[30,3],[42,6],[52,8]]);
-  const car=p.move(64,2,7,98,5,{period:13,after:'serve',icon:'kitchen-cart',width:8.3,height:5,below:.18});
+  kitchen[3].isLoadingDock=true;
+  const car=p.move(64,2,7,98,5,{period:13,after:'serve',delivery:'ride',icon:'kitchen-cart',width:8.3,height:5,below:.18});
   const far=p.path([[105,5,12],[122,3],[139,2]]);
-  order(p,[cup,milk],[kitchen[1],upper[3]],kitchen[3],{label:'给甜品车装杯'});
+  order(p,[cup,milk],[kitchen[1],upper[3]],kitchen[3],{cart:car,label:'带着甜品跳上车'});
   p.station('ride',car,'mini-cup','随车到对岸',{after:['serve'],goal:true,atDock:1,wait:'搭上装好货的甜品车'});
   p.prop('castle-cutaway',far[2],8,7);p.prize(upper[2]);p.prize(far[1]);p.finish(kitchen[0],far[2]);
 }

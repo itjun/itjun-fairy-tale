@@ -46,12 +46,21 @@ export function fieldStopReady(room,marks,stop,time) {
   if(!isFieldStopActive(room,marks,stop)) return false;
   if(stop.atDock!==undefined) {
     const moving=room.moving.find(m=>m.platformId===stop.platformId);
-    if(Math.abs(fieldMotion(room,moving,marks,time)-stop.atDock)>(moving.rail ? .001 : .065)) return false;
+    if(Math.abs(fieldMotion(room,moving,marks,time)-stop.atDock)>(moving.rail || moving.delivery ? .001 : .065)) return false;
   }
   if(stop.tide) {
     const water=tideHeight(time,room.tide.period);
     return stop.tide==='low'?water<.32:water>.68;
   }
+  return true;
+}
+// 回到出发岸时，把未送达的货交还给孩子；到了对岸或仍站在车上就能继续接车。
+export function recoverFieldCargo(world,rooms,landing,time) {
+  const room=world.rooms[rooms.roomId], marks=rooms.field;
+  const cart=room.moving.find(m=>m.delivery && hasMark(room,marks,m.after) && !hasMark(room,marks,m.delivery));
+  if(!cart || landing.id===cart.platformId || Math.abs(landing.x-cart.x)>Math.abs(landing.x-cart.toX)) return false;
+  delete marks[idOf(room,cart.after)];
+  syncField(world,rooms,time);
   return true;
 }
 export function stepField(world,rooms,player,time) {
