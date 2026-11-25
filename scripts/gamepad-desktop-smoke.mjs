@@ -106,11 +106,16 @@ try {
   if (process.env.GARDEN_GAMEPAD_CASE === 'bindings') { await checkWeaponBindings(); console.log('手柄圆环换装通过'); app.exit(0); return; }
   await evaluate('choose(".home-play")');
   await until(() => evaluate('!!document.querySelector(".atlas-sheet")'), '选地图');
+  win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Left' });
+  win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Left' });
+  await until(() => evaluate('document.documentElement.dataset.inputMode === "keyboard"'), '选地图切到键盘');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".atlas-page button kbd")).filter(key => key.checkVisibility()).map(key => key.textContent)'), ['B', 'A'], '用键盘也能看见返回和确认的手柄键');
   const themes = await evaluate('Array.from(document.querySelectorAll("[data-world]"), button => button.dataset.world)');
   assert.equal(themes.length, 9);
   for (const theme of themes) {
     await evaluate(`reach("[data-world=${theme}]")`);
     assert.equal(await evaluate('document.activeElement.getAttribute("aria-pressed")'), 'true', theme);
+    assert.ok(await evaluate('document.activeElement.querySelector(".atlas-marker svg")?.checkVisibility()'), '方向图标跟随当前地标');
   }
   await evaluate('choose("[data-world=rainbow]")');
   await until(() => evaluate('!!document.querySelector(".family-grid")'), '选角');

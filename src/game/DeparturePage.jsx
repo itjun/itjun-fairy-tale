@@ -4,15 +4,15 @@ import { navigate } from '../input/gamepad.js';
 import { trapFocus } from './AdventurePanels.jsx';
 import './departure.css';
 
-export function ConfirmAction({ children, onClick, className = '' }) {
+export function ConfirmAction({ children, onClick, className = '', isPadKeyAlwaysVisible = false }) {
   const { mode } = useGamepad();
   return <button className={`departure-confirm ${className}`} onClick={onClick}>
-    {mode === 'gamepad' ? <kbd aria-hidden="true">A</kbd> : <ArrowRight weight="bold" />}
+    {isPadKeyAlwaysVisible || mode === 'gamepad' ? <kbd aria-hidden="true">A</kbd> : <ArrowRight weight="bold" />}
     {children}
   </button>;
 }
 
-export function DeparturePage({ title, backLabel, onBack, className, children, pageRef }) {
+export function DeparturePage({ title, backLabel, onBack, className, children, pageRef, isPadKeyAlwaysVisible = false }) {
   const { mode } = useGamepad();
   function handleKey(event) {
     if (event.defaultPrevented || event.target.closest('[role="dialog"]') !== event.currentTarget) return;
@@ -34,7 +34,7 @@ export function DeparturePage({ title, backLabel, onBack, className, children, p
     <header className="departure-heading">
       <h2>{title}</h2>
       <button className="departure-back" data-gamepad-back onClick={onBack}>
-        {mode === 'gamepad' ? <kbd aria-hidden="true">B</kbd> : <ArrowLeft weight="bold" />}{backLabel}
+        {isPadKeyAlwaysVisible || mode === 'gamepad' ? <kbd aria-hidden="true">B</kbd> : <ArrowLeft weight="bold" />}{backLabel}
       </button>
     </header>
     {children}

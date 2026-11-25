@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MapPin } from '@phosphor-icons/react';
+import { ArrowsOutCardinal, MapPin } from '@phosphor-icons/react';
 import { PLAYABLE_WORLDS, findStage } from '../../shared/levels.js';
 import { CHARACTERS } from './characters.js';
 import { difficultyOf } from './difficulty.js';
@@ -63,7 +63,7 @@ export function WorldPicker({ levelIndex, isSwitching, freshOnly, onChoose, onBa
       </button>)}</div>{error && <p role="alert">{error}</p>}
   </DeparturePage>;
 
-  return <DeparturePage pageRef={page} className="atlas-page" title="选地图"
+  return <DeparturePage pageRef={page} className="atlas-page" title="选地图" isPadKeyAlwaysVisible
     backLabel={isSwitching ? '回到暂停' : '返回'} onBack={onBack}>
     <div className="atlas-viewport"><div className="atlas-sheet" aria-label="九个世界">
       <picture>
@@ -78,13 +78,15 @@ export function WorldPicker({ levelIndex, isSwitching, freshOnly, onChoose, onBa
           onFocus={() => setMarked(world.themeId)}
           onPointerEnter={event => { if (event.pointerType === 'mouse') event.currentTarget.focus({ preventScroll: true }); }}
           onClick={() => choose(world)}>
-          <span className="atlas-marker" aria-hidden="true">{selected ? world.name : <MapPin weight="fill" />}</span>
+          <span className="atlas-marker" aria-hidden="true">
+            {selected ? <><ArrowsOutCardinal weight="bold" />{world.name}</> : <MapPin weight="fill" />}
+          </span>
         </button>;
       })}
     </div></div>
     <footer className="departure-footer"><div className="atlas-location" aria-live="polite">
       <strong>{region}</strong><span>{description}</span>
-    </div><ConfirmAction onClick={() => choose(level)}>{entries.length > 1 ? '选进度' : entries.length ? resumeLabel(entries[0]) : '选这关'}</ConfirmAction></footer>
+    </div><ConfirmAction isPadKeyAlwaysVisible onClick={() => choose(level)}>{entries.length > 1 ? '选进度' : entries.length ? resumeLabel(entries[0]) : '选这关'}</ConfirmAction></footer>
     {error && <p className="departure-error" role="alert">{error}</p>}
   </DeparturePage>;
 }
