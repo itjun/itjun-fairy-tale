@@ -5,6 +5,7 @@ import { fieldImages } from './field-views.js';
 import { trailMaterial } from './trail-art.js';
 import { advanceStory, syncStory, storyHint } from '../../shared/story-mechanisms.js';
 import { storyImages } from './story-views.js';
+import { addNetView } from './safety-net-view.js';
 import { VALLEY_IMAGES, WATER_NOTICES, valleyHint } from './flower-valley-view.js';
 import { syncWaterRoutes, waterUnderfoot } from '../../shared/flower-valley.js';
 import { forestHint, stepForestRescue } from './forest-rescue.js';
@@ -239,16 +240,20 @@ export class GardenEngine {
       const group = new THREE.Group(); group.position.set(platform.x, platform.y, 0);
       if (platform.skin === 'sunlight') {
         addSunlightDeck(this, group, platform);
-      } else if (platform.handLength || platform.skin==='safety-net' || (this.world.expedition && this.level.id==='snow' && platform.isIce)) {
-        const hand=!!platform.handLength, net=platform.skin==='safety-net';
-        const art=hand?'clock-orange-hand':net?'clock-safety-net':'snow-crayon-bank';
+      } else if (platform.skin === 'safety-net') {
+        this.storyDecks ||= {};
+        const mat = this.storyDecks['clock-safety-net'] ||= this.spriteMaterial('clock-safety-net');
+        (this.netViews ??= []).push(addNetView(this, group, platform, mat));
+      } else if (platform.handLength || (this.world.expedition && this.level.id==='snow' && platform.isIce)) {
+        const hand=!!platform.handLength;
+        const art=hand?'clock-orange-hand':'snow-crayon-bank';
         this.storyDecks ||= {};
         const mat=this.storyDecks[art] ||= this.spriteMaterial(art);
         const mesh=new THREE.Mesh(this.planeGeometry,mat);
         const width=hand?platform.handLength*1.11:platform.snowDepth?Math.hypot(platform.width,platform.width*platform.slope)+.32:platform.width;
-        const height=hand?width*.15:net?width*.25:platform.snowDepth || Math.min(2.2,width*.23);
+        const height=hand?width*.15:platform.snowDepth || Math.min(2.2,width*.23);
         mesh.scale.set(width,height,1);
-        mesh.position.set(hand?-platform.handLength*.045:0,net?height*.03:hand?-height*.26:-height*.44,.3);
+        mesh.position.set(hand?-platform.handLength*.045:0,hand?-height*.26:-height*.44,.3);
         group.add(mesh);
       } else if (this.waterMaterials?.[platform.skin]) {
         const deck = new THREE.Mesh(this.planeGeometry, this.waterMaterials[platform.skin]);
@@ -517,8 +522,6 @@ export class GardenEngine {
       const facing = this.world.valley.layout === 'aqueduct' && averageY > 10 ? -1 : 1;
       return { x: Math.max(min, Math.min(max, averageX + facing * lookAhead)), y: averageY + 1 };
     }
-    const frame = room.frames?.find(f => Math.abs(f.x-averageX)<f.width*.48 && Math.abs(f.y-averageY)<12);
-    if (frame) return {x:frame.x+(averageX-frame.x)*.25,y:frame.y+.35+(averageY-frame.y)*.15};
     if (this.world.expedition && this.level.id==='snow' && room.runs?.length) {
       return {x:Math.max(min,Math.min(max,averageX + Math.min(10,this.camera.right*.43))),y:averageY+2.4};
     }
@@ -747,7 +750,7 @@ export class GardenEngine {
     if (this.updateLifeLoot()) return;
     this.survival.shieldRemaining = Math.max(0, this.survival.shieldRemaining - STEP);
     moveCampaignPlatforms(this.world.lifts, this.elapsed);
-    stepMechanisms(this.world, this.players[0], this.elapsed, STEP);
+    stepMechanisms(this.world, this.players[0], this.elapsed, STEP, this.isReducedMotion);
     if (this.world.field) syncField(this.world,this.roomState,this.elapsed);
     if (this.world.expedition) syncStory(this.world,this.roomState,this.elapsed,this.players[0]);
     const nearby = item => this.players.some(p => Math.abs(item.x-p.x)<45 && Math.abs(item.y-p.y)<24);
@@ -1120,8 +1123,9 @@ export class GardenEngine {
         while (this.accumulator >= STEP && !this.isPaused) { this.elapsed += STEP; this.tick(); this.accumulator -= STEP; }
       }
       const { x: targetX, y: targetY } = this.cameraTarget();
-      const smoothing = Math.min(1, delta * 4);
-      this.cameraX += (targetX - this.cameraX) * smoothing; this.cameraY += (targetY - this.cameraY) * smoothing;
+      const verticalRate = this.world.expedition && this.world.themeId === 'family' ? 2.8 : 4;
+      this.cameraX = THREE.MathUtils.damp(this.cameraX, targetX, 4, delta);
+      this.cameraY = THREE.MathUtils.damp(this.cameraY, targetY, verticalRate, delta);
       this.camera.position.set(this.cameraX + 0.6, this.cameraY + 3.3, 30); this.camera.lookAt(this.cameraX, this.cameraY, 0);
       for(const drop of this.combatLoot.drops) {
         let view=this.lootViews.get(drop.enemyId);

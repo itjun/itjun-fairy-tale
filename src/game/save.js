@@ -126,6 +126,11 @@ function readSave(key, storage) {
     if (state.checkpointId !== undefined && (!world.platforms[state.checkpointId] || world.platforms[state.checkpointId].isMoving)) return null;
     if (!Array.isArray(state.supplies) || new Set(state.supplies).size !== state.supplies.length || state.supplies.some(id => !world.supplies.some(s => s.id === id))) return null;
     if (!Array.isArray(state.mechanisms) || new Set(state.mechanisms.map(p=>p.id)).size !== state.mechanisms.length || state.mechanisms.some(p => !world.platforms[p.id] || p.collapseAt !== undefined && (!world.platforms[p.id].isCrumbling || !Number.isFinite(p.collapseAt) || p.collapseAt < state.elapsed-4 || p.collapseAt > state.elapsed+2.3) || p.slope !== undefined && (!world.platforms[p.id].isSeesaw || !Number.isFinite(p.slope) || Math.abs(p.slope) > .23))) return null;
+    for (const { id, net } of state.mechanisms) {
+      if (net === undefined) continue;
+      if (world.platforms[id].skin !== 'safety-net' || !Number.isFinite(net?.bend) || Math.abs(net.bend) > 3 ||
+          !Number.isFinite(net.speed) || Math.abs(net.speed) > 30 || !Number.isFinite(net.focus) || Math.abs(net.focus) > 1) return null;
+    }
     if(state.enemies.some((e,i)=>world.enemies[i].isBoss&&!isValidBossState(e,world.enemies[i],state.elapsed)))return null;
     if(state.isCompleted && world.bossArenas.some(a=>!state.defeatedIds.includes(a.bossId)))return null;
     // 房间进度要和地图对得上，人也得站在当前这间房里。

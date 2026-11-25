@@ -1,12 +1,13 @@
+import { landOnNet, netOffset } from './safety-net.js';
 export { randomGenerator } from '../../shared/random.js';
 export const RULES = Object.freeze({ speed: 6, gravity: 23, jump: 12.6, radius: 0.28, coyote: 0.14, buffer: 0.16 });
 // 给四位角色的平地二段跳留足安全高度。
 export function landingDamage(height) { return Math.min(100, Math.ceil(Math.max(0, height - 8.5) * 4)); }
-export function platformY(platform, x) {
+export function platformY(platform, x, previous = false) {
   const offset = Math.max(-platform.width / 2, Math.min(platform.width / 2, x - platform.x));
   if (platform.skin === 'safety-net') {
     const distance = offset / (platform.width / 2);
-    return platform.y + platform.width * .12 * distance ** 2;
+    return platform.y + platform.width * .12 * distance ** 2 + netOffset(platform, x, previous);
   }
   return platform.y + (platform.slope || 0) * offset;
 }
@@ -88,11 +89,12 @@ export function stepPlayer(player, input, platforms, dt, bounds = {}) {
       const lifted = Math.max(0, Math.min(0.1, platform.deltaY || 0));
       // 从高台边缘往下走时，脚直接贴上相连的光桥。
       const entersLightBridge = previousGround && platform.lightTopId === previousGround.id;
-      if (previousY >= platformY(platform,previousX) - lifted - 0.01 && (entersLightBridge || player.y <= platformY(platform,player.x)) && Math.abs(player.x - platform.x) < platform.width / 2 + RULES.radius && (!landing || platformY(platform,player.x) > platformY(landing,player.x))) landing = platform;
+      if (previousY >= platformY(platform,previousX,true) - lifted - 0.01 && (entersLightBridge || player.y <= platformY(platform,player.x)) && Math.abs(player.x - platform.x) < platform.width / 2 + RULES.radius && (!landing || platformY(platform,player.x) > platformY(landing,player.x))) landing = platform;
     }
   }
   player.ground = landing;
   if (landing) {
+    if (landing.skin === 'safety-net' && landing !== previousGround) landOnNet(landing, player.vy);
     player.y = platformY(landing,player.x); player.vy = 0; player.isGrounded = true; player.isAirJumpUsed = false;
     // 记录最近站稳的平台及横向位置，掉坑后不退回平台中央或检查点。
     if (!landing.isMoving && !landing.isCrumbling && !landing.isSeesaw && Math.abs(player.x - landing.x) < landing.width / 2 - 0.35) { player.safe = landing; player.safeX = player.x; }

@@ -1,5 +1,6 @@
 import { heal, resourcesFor } from './expedition.js';
 import { addLife } from './characters.js';
+import { stepNet } from './safety-net.js';
 import { TIMED_ITEMS } from '../../shared/adventure-catalog.js';
 
 export const ICICLE_SIZE = { width: 2.4, height: 1.7 };
@@ -34,8 +35,9 @@ export function breakIcicle(wave, target) {
   wave.clash = { x: target.x, y: target.y, isIcicle: true };
 }
 
-export function stepMechanisms(world, player, elapsed, dt) {
+export function stepMechanisms(world, player, elapsed, dt, isReducedMotion = false) {
   for(const p of world.platforms){
+    if (p.skin === 'safety-net') stepNet(p, player, dt, isReducedMotion);
     if(p.isCrumbling){
       if(player.ground?.id===p.id&&p.collapseAt===undefined)p.collapseAt=elapsed+2.2;
       if(p.collapseAt!==undefined){p.isEnabled=elapsed<p.collapseAt||elapsed>=p.collapseAt+4;if(elapsed>=p.collapseAt+4)delete p.collapseAt;}
@@ -64,5 +66,27 @@ export function takeRoomSupply(world,claimed,player,survival,adventure,powers={}
   } else if(item.kind==='medkit'){if(!heal(survival,25)){if(!adventure||!powers.snack||resourcesFor(adventure).snack)return null;adventure.resources.snack=1;}}else if(!addLife(survival))return null;
   claimed.push(item.id);return item;
 }
-export function mechanismSave(world){return world.platforms.filter(p=>p.collapseAt!==undefined||p.isSeesaw).map(p=>({id:p.id,...(p.collapseAt!==undefined?{collapseAt:p.collapseAt}:{}),...(p.isSeesaw?{slope:p.slope}:{})}));}
-export function restoreMechanisms(world,states,elapsed){for(const saved of states||[]){const p=world.platforms[saved.id];if(saved.collapseAt!==undefined){p.collapseAt=saved.collapseAt;p.isEnabled=elapsed<p.collapseAt||elapsed>=p.collapseAt+4;}if(saved.slope!==undefined)p.slope=saved.slope;}}
+export function mechanismSave(world) {
+  return world.platforms.filter(p => p.collapseAt !== undefined || p.isSeesaw || p.netMotion).map(p => {
+    const saved = { id: p.id };
+    if (p.collapseAt !== undefined) saved.collapseAt = p.collapseAt;
+    if (p.isSeesaw) saved.slope = p.slope;
+    if (p.netMotion) {
+      const { bend, speed, focus } = p.netMotion;
+      saved.net = { bend, speed, focus };
+    }
+    return saved;
+  });
+}
+export function restoreMechanisms(world, states, elapsed) {
+  for (const p of world.platforms) if (p.netMotion) delete p.netMotion;
+  for (const saved of states || []) {
+    const p = world.platforms[saved.id];
+    if (saved.collapseAt !== undefined) {
+      p.collapseAt = saved.collapseAt;
+      p.isEnabled = elapsed < p.collapseAt || elapsed >= p.collapseAt + 4;
+    }
+    if (saved.slope !== undefined) p.slope = saved.slope;
+    if (saved.net) p.netMotion = { ...saved.net, previousBend: saved.net.bend, previousFocus: saved.net.focus };
+  }
+}
