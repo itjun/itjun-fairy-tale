@@ -1,7 +1,8 @@
+import { PaperEffects } from '../effects/PaperEffects.jsx';
 import { createContext, useContext, useRef, useState } from 'react';
 
 const Interaction = createContext(null);
-export function InteractionProvider({ children, onDrop, renderItem, resetKey }) {
+export function InteractionProvider({ children, onDrop, renderItem, resetKey, motion }) {
   const [choice, setChoice] = useState(null);
   const selected = choice?.key === resetKey ? choice.item : null;
   const [drag, setDrag] = useState(null);
@@ -23,9 +24,9 @@ export function InteractionProvider({ children, onDrop, renderItem, resetKey }) 
         },
         onPointerMove(event) {
           const current = gesture.current;
-          if (!current || current.item !== item) return;
+          if (!current || current.item !== item || current.key !== resetKey) return;
           if (Math.hypot(event.clientX - current.x, event.clientY - current.y) > 8) current.isMoving = true;
-          if (current.isMoving) { choose(item); setDrag({ item, x: event.clientX, y: event.clientY }); }
+          if (current.isMoving) { choose(item); setDrag({ item, key:resetKey, x: event.clientX, y: event.clientY }); }
         },
         onPointerUp(event) {
           const current = gesture.current;
@@ -43,7 +44,8 @@ export function InteractionProvider({ children, onDrop, renderItem, resetKey }) 
       };
     },
   };
-  return <Interaction.Provider value={value}>{children}{drag && <div className="mini-drag-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">{renderItem(drag.item)}</div>}</Interaction.Provider>;
+  const activeDrag=drag?.key===resetKey ? drag : null;
+  return <Interaction.Provider value={value}><PaperEffects cue={motion} dragging={activeDrag?.item}/>{children}{activeDrag && <div className="mini-drag-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">{renderItem(drag.item)}</div>}</Interaction.Provider>;
 }
 
 export function PickItem({ item, label, children, className = '' }) {

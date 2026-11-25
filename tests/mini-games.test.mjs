@@ -5,6 +5,7 @@ import { readGardenBackup, mergeGardenProgress } from '../src/garden-backup.js';
 import { earnedQuests } from '../src/garden-progress.js';
 import { readFile, stat } from 'node:fs/promises';
 import { narrationText, narrationFile, PHASE_NARRATION } from '../src/mini-games/narration.js';
+import { miniMotion } from '../src/mini-games/motion.js';
 
 const empty = { rainbow: 0, flowers: [0,0,0,0], served: [false,false,false,false], stamps: [] };
 function perform(session, action) {
@@ -37,6 +38,20 @@ function finish(session) {
   }
   return session;
 }
+
+test('天气动效只落到实际受益的花床，撤回和重复操作不重播', () => {
+  let session=createMiniSession('garden',42);
+  while(session.tasks[session.taskIndex].kind==='sow') session=perform(session,solveAction(session)).session;
+  session.tasks[session.taskIndex].weather[0]='rain';
+  const action={type:'weather'}, result=perform(session,action);
+  const advanced=result.session.board.steps.flatMap((step,i)=>step>session.board.steps[i]?[i]:[]);
+  assert.equal(advanced.length,2);
+  const motion=miniMotion(action,session,result,{});
+  assert.deepEqual(motion.targets.map(t=>[t.selector,t.particles]),advanced.map(i=>['[data-drop="'+i+'"] > img','water']));
+  assert.equal(miniMotion(action,result.session,perform(result.session,action),{}),null);
+  const undo={type:'undo'};
+  assert.equal(miniMotion(undo,result.session,perform(result.session,undo),{}),null);
+});
 
 test('三款各 80 种随机局正常可解，任务内容有变化，同种子可复现且不随恢复改变', () => {
   for (const id of ['rainbow','garden','treat']) {

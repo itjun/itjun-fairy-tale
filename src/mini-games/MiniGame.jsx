@@ -8,9 +8,12 @@ import { InteractionProvider } from './Interaction.jsx';
 import { Art, Gem, Bloom, Ingredient, Tool } from './Art.jsx';
 import { TOOLS } from './flowers.js';
 import { narrationFile, narrationText } from './narration.js';
+import { miniMotion } from './motion.js';
 import './mini-games.css';
 
 export function MiniGame({ session, onChange, onExit, onReplay, isSound, onSound, onChime, isSaved }) {
+  const stage = useRef(null);
+  const [motion,setMotion] = useState(null);
   const current = useRef(session);
   current.current = session;
   const [feedback, setFeedback] = useState({ message: '', isSuccess: false });
@@ -38,6 +41,7 @@ export function MiniGame({ session, onChange, onExit, onReplay, isSound, onSound
     if (action.type === 'hint') setNarrationRequest(value => value + 1);
     const result = actOnMiniSession(current.current, { ...action, taskId: task?.id, revision: session.revision });
     if (result.session !== current.current) {
+      setMotion(miniMotion(action,current.current,result,stage.current));
       current.current = result.session;
       onChange(result.session);
       if (result.isSuccess) onChime(result.isTaskComplete);
@@ -56,8 +60,8 @@ export function MiniGame({ session, onChange, onExit, onReplay, isSound, onSound
     <nav className="mini-phases" aria-label="冒险进度">{game.phases.map((name, i) => <span className={`${i === phase ? 'is-current' : ''} ${i < phase || isComplete ? 'is-finished' : ''}`} key={name} aria-current={i === phase ? 'step' : undefined}>{(i < phase || isComplete) && <Check size={22} />}<b>{name}</b>{i < 2 && <ArrowRight size={22} className="phase-arrow" />}</span>)}</nav>
     {isComplete ? <section className="mini-finale"><Art name={session.id === 'rainbow' ? 'collectible-rainbow' : session.id === 'garden' ? 'flower' : 'icecream'} /><h2>{game.title}，完成啦！</h2><p>你是「{game.reward}」！这一份快乐，留在花园里。</p><div className="mini-finale-actions"><button className="primary-button" onClick={() => { setFeedback({ message: '', isSuccess: false }); onReplay(); }}><ArrowCounterClockwise size={23} />再来一次</button><button className="quiet-button" data-gamepad-back onClick={onExit}><ArrowLeft size={22} />回花园</button></div></section> : <>
       <div className="mini-progress-copy"><span>{game.phases[phase]}的小心愿</span><span>{session.taskIndex + 1} / {session.tasks.length}</span></div>
-      <section className={`mini-stage ${session.hintLevel ? 'is-hinting' : ''}`} data-scene={task.kind === 'find' ? task.scene : undefined} aria-label={task.title}>
-        <InteractionProvider key={`${session.id}-${session.seed}-${task.id}`} resetKey={`${session.seed}-${task.id}`} onDrop={send} renderItem={renderItem}><Game session={session} send={send} /></InteractionProvider>
+      <section ref={stage} className={`mini-stage ${session.hintLevel ? 'is-hinting' : ''}`} data-scene={task.kind === 'find' ? task.scene : undefined} aria-label={task.title}>
+        <InteractionProvider motion={motion} key={`${session.id}-${session.seed}`} resetKey={`${session.seed}-${task.id}`} onDrop={send} renderItem={renderItem}><Game key={task.id} session={session} send={send} /></InteractionProvider>
       </section>
       <section className="mini-assistance"><div className={`mini-feedback ${feedback.isSuccess ? 'is-success' : ''}`} role="status">{miniHint(session) || feedback.message || '不着急，看看线索，试着搭配。'}</div><div className="mini-assistance-actions"><button className="quiet-button" disabled={!session.history.length} onClick={() => send({ type: 'undo' })}><ArrowCounterClockwise size={21} />撤回</button><button className="quiet-button" onClick={() => send({ type: 'hint' })}><Lightbulb size={24} />{session.hintLevel === 1 ? '提示下一步' : '看提示'}</button></div></section>
     </>}

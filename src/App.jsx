@@ -1,3 +1,4 @@
+import { PaperEffects } from './effects/PaperEffects.jsx';
 import { GamepadStampCanvas } from './input/GamepadStampCanvas.jsx';
 import { lazy, Suspense } from 'react';
 import { HomePage } from './HomePage.jsx';
@@ -68,6 +69,7 @@ export function App() {
   const [isSound, setIsSound] = useState(true);
   const [isDecorating, setIsDecorating] = useState(false);
   const [stamp, setStamp] = useState('flower');
+  const [stampMotion,setStampMotion] = useState(null);
   const [galleryIndex, setGalleryIndex] = useState(8);
   const [notice, setNotice] = useState('今天，邀请家人来花园开派对吧！');
   const [isSaved, setIsSaved] = useState(true);
@@ -136,6 +138,7 @@ export function App() {
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = Math.max(5, Math.min(95, (event.clientX - bounds.left) / bounds.width * 100));
     const y = Math.max(5, Math.min(95, (event.clientY - bounds.top) / bounds.height * 100));
+    setStampMotion({targets:[{selector:`[data-stamp-index="${progress.stamps.length}"]`,kind:'stamp',art:true}]});
     setProgress(p => ({ ...p, stamps: [...p.stamps, { type: stamp, x, y }] })); chime();
   }
   async function saveGarden() {
@@ -192,9 +195,10 @@ export function App() {
           <img className="world-art" src={asset('assets/garden.png')} alt="彩笔画的花园：蓝色尖顶、粉色和青绿的城堡，彩虹、大花朵和绿草地" draggable="false" />
           <div className="world-top"><span className="place-label"><Icon as={Flag} size={18} />我的花园</span><button className="world-help" onClick={() => setMode('help')} aria-label="怎么玩"><span>?</span></button></div>
           {!isDecorating && <div className="invitation"><span className="eyebrow">今天的小心愿</span><h2>{total === 3 ? '花园派对开始啦！' : '一起准备花园派对'}</h2><p>{total === 3 ? '花开了，彩虹也来了。\n和最爱的家人一起庆祝吧！' : '找找颜色，照顾小花，\n还有甜甜的冰淇淋等着你。'}</p><button className="primary-button" onClick={() => total === 3 ? setMode('party') : openQuest(next.id)}><Icon as={total === 3 ? Heart : Play} size={20} weight="fill" />{total === 3 ? '去开派对' : total ? '继续冒险' : '开始冒险'}<Icon as={ArrowRight} size={20} /></button><span className="gentle-note">不着急，按自己的节奏玩</span></div>}
-          <img className={`world-family ${total === 3 ? 'dancing' : ''}`} src={asset('assets/family.png')} alt="手牵手的爸爸、妈妈和两个小女孩" draggable="false" />
+          <PaperEffects cue={stampMotion} dance={total===3 ? '.world-family' : null} />
+          <img className="world-family" src={asset('assets/family.png')} alt="手牵手的爸爸、妈妈和两个小女孩" draggable="false" />
           {!isDecorating && <><button className="map-hotspot rainbow-hotspot" onClick={() => openQuest('rainbow')} aria-label="去找回彩虹"><Icon as={completed[0] ? Check : Sparkle} size={20} /><span>{completed[0] ? '彩虹回来啦' : '找找彩虹'}</span></button><button className="map-hotspot flower-hotspot" onClick={() => openQuest('garden')} aria-label="去照顾花朵"><Icon as={completed[1] ? Check : Drop} size={20} /><span>{completed[1] ? '小花开啦' : '小花口渴啦'}</span></button><button className="map-hotspot treat-hotspot" onClick={() => openQuest('treat')} aria-label="去甜蜜分享"><Icon as={completed[2] ? Check : IceCream} size={20} /><span>{completed[2] ? '甜甜的一家人' : '甜蜜小屋'}</span></button></>}
-          {progress.stamps.map((item, i) => <div className={`placed-stamp stamp-${item.type}`} key={i} style={{ left: `${item.x}%`, top: `${item.y}%` }} data-stamp-type={item.type}><Stamp type={item.type} /></div>)}
+          {progress.stamps.map((item, i) => <div className={`placed-stamp stamp-${item.type}`} key={i} style={{ left: `${item.x}%`, top: `${item.y}%` }} data-stamp-type={item.type} data-stamp-index={i}><Stamp type={item.type} /></div>)}
           {isDecorating && <div className="decorate-instruction"><span className="stamp-pick-hint">选一张贴纸，放到喜欢的位置</span><span className="stamp-key-hint">方向键移动，回车或空格贴上</span></div>}
         </GamepadStampCanvas>
         <div className="world-bottom"><div className="guide"><Icon as={Heart} size={23} /><span aria-live="polite">{notice}</span></div><button className={`decorate-toggle ${isDecorating ? 'active' : ''}`} onClick={() => setIsDecorating(!isDecorating)}><Icon as={isDecorating ? Check : PaintBrush} size={22} />{isDecorating ? '装饰好啦' : '装饰花园'}</button></div>
@@ -223,7 +227,7 @@ export function App() {
     {mode === 'photo' && <Modal title="我的花园照片" onClose={closeModal} className="gallery-modal"><p className="modal-subtitle">把今天的快乐留在照片里。</p><img className="garden-photo" src={photo} alt="包含家人和贴纸的花园照片" /><div className="photo-actions"><a className="primary-button" href={photo} download="我的花园王国.png"><Icon as={DownloadSimple} />下载图片</a><span>也可以长按或右键图片保存</span></div></Modal>}
     {mode === 'gallery' && <HomePage title="小小画家的画展" onBack={() => setMode('options')} backLabel="返回选项" className="home-gallery"><p className="modal-subtitle">每个奇妙的故事，都从一张画开始。</p><div className="artwork-view"><img src={asset(`artworks/${galleryIndex + 1}.jpg`)} className={turns[galleryIndex] ? 'rotated-art' : ''} style={{ transform: `translate(-50%, -50%) rotate(${turns[galleryIndex]}deg)` }} alt={artworkNames[galleryIndex]} /></div><div className="gallery-controls" data-gamepad-tabs="换一幅"><button className="icon-button" aria-label="上一幅画" onClick={() => setGalleryIndex((galleryIndex + 10) % 11)}><Icon as={ArrowLeft} /></button><div><strong>{artworkNames[galleryIndex]}</strong><span>{galleryIndex + 1} / 11</span></div><button className="icon-button" aria-label="下一幅画" onClick={() => setGalleryIndex((galleryIndex + 1) % 11)}><Icon as={ArrowRight} /></button></div></HomePage>}
     {mode === 'collection' && <HomePage title="我的小成就" onBack={() => setMode('options')} backLabel="返回选项" className="home-collection"><p className="modal-subtitle">每一次用心，都值得被记住。</p><div className="achievement-list">{quests.map((q, i) => <button key={q.id} onClick={() => openQuest(q.id)} className={completed[i] ? 'earned' : ''}><Icon as={q.icon} size={48} /><strong>{q.reward}</strong><span>{completed[i] ? '已经收集到啦' : '去玩一玩'}</span></button>)}</div><p className="game-counter">已经收集 {total} / 3 份小成就</p></HomePage>}
-    {mode === 'party' && <Modal title="一家人在一起，就是最好的魔法" onClose={closeModal} className="party-modal"><Icon as={Heart} className="party-heart" size={52} weight="fill" /><p className="modal-subtitle">谢谢你，让花园变得这么温暖！</p><img src={asset('assets/family.png')} alt="一家四口手牵手庆祝" className="party-family dancing" /><div className="party-badges">{quests.map(q => <span key={q.id}><Icon as={q.icon} />{q.reward}</span>)}</div><button className="primary-button" onClick={() => { closeModal(); setIsDecorating(true); tell('把花园装饰成你喜欢的样子吧！'); }}><Icon as={PaintBrush} />一起装饰花园</button><button className="text-button" onClick={closeModal}>再逛一会儿</button></Modal>}
+    {mode === 'party' && <Modal title="一家人在一起，就是最好的魔法" onClose={closeModal} className="party-modal"><PaperEffects dance=".party-family" /><Icon as={Heart} className="party-heart" size={52} weight="fill" /><p className="modal-subtitle">谢谢你，让花园变得这么温暖！</p><img src={asset('assets/family.png')} alt="一家四口手牵手庆祝" className="party-family" /><div className="party-badges">{quests.map(q => <span key={q.id}><Icon as={q.icon} />{q.reward}</span>)}</div><button className="primary-button" onClick={() => { closeModal(); setIsDecorating(true); tell('把花园装饰成你喜欢的样子吧！'); }}><Icon as={PaintBrush} />一起装饰花园</button><button className="text-button" onClick={closeModal}>再逛一会儿</button></Modal>}
     {mode === 'help' && <Modal title="小小冒险家，这样玩" onClose={closeModal}><div className="help-list"><p><Icon as={Play} />点“开始冒险”，或者选下面的小冒险。</p><p><Icon as={SpeakerHigh} />点小喇叭，就能听玩法。</p><p><Icon as={PaintBrush} />点“装饰花园”，把贴纸放到喜欢的位置。</p><p><Icon as={Heart} />没有倒计时，点错也没关系。</p></div><button className="primary-button" onClick={closeModal}>我知道啦<Icon as={Check} /></button></Modal>}
     {mode === 'reset' && <Modal title="再来一次小冒险？" onClose={closeModal}><p className="modal-subtitle">会清空这次的小成就和花园贴纸，原画会好好保留。</p><div className="reset-actions"><button className="quiet-button" onClick={closeModal}>继续现在的冒险</button><button className="primary-button" onClick={() => { setProgress({ ...emptyProgress, stamps: [] }); setIsDecorating(false); closeModal(); tell('新的一天开始啦！一起准备花园派对吧。'); }}>重新开始</button></div></Modal>}
   </div>;

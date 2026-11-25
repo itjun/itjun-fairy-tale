@@ -14,7 +14,7 @@ export function RainbowGame({ session, send }) {
     <div className="mini-clue find-clue"><MagnifyingGlass size={28} /><span>{task.title}，找一找</span><Gem id={task.target} /><strong>{GEMS[task.target].name}</strong></div>
     <div className={`rainbow-search search-scene-${task.scene}`} aria-label={`${task.title}寻找线索`}>
       <Art name="girl-player" className="scene-girl" />
-      {task.options.map((id, i) => <button className="hidden-gem" key={id} style={{ left: `${task.positions[i].x}%`, top: `${task.positions[i].y}%` }} aria-label={`找到${GEMS[id].name}`} onClick={() => send({ type: 'find', item: id })}><Gem id={id} /><span>{GEMS[id].name}</span></button>)}
+      {task.options.map((id, i) => <button className="hidden-gem" data-gem={id} key={id} style={{ left: `${task.positions[i].x}%`, top: `${task.positions[i].y}%` }} aria-label={`找到${GEMS[id].name}`} onClick={() => send({ type: 'find', item: id })}><Gem id={id} /><span>{GEMS[id].name}</span></button>)}
     </div>
     <p className="mini-instruction">看一看画里的角落，点中符合线索的宝物。</p>
   </>;
