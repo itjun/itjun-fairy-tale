@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 
+export const SKILL_ART = {
+  lightblade:'weapon-lightblade', blade:'light-wave', bubble:'magic-bubble', stars:'collectible-star',
+  flame:'flame-stream', dragon:'weapon-flame', snow:'collectible-snowflake', thunder:'light-wave',
+  fire:'flame-stream', rain:'magic-bubble', cloud:'platform-cloud', moonblade:'weapon-moonblade',
+  boomerang:'weapon-boomerang', seed:'weapon-seed', firefly:'weapon-firefly', pulse:'collectible-star', flower:'flower',
+};
+
 // 仅使用已有彩笔素材组合动效；所有几何和材质复用，不逐帧创建 GPU 资源。
 export class SkillEffects {
   constructor(scene, geometry, materials, isReducedMotion) {

@@ -40,7 +40,7 @@ import { DESERT_IMAGES, TRAVERSAL_IMAGES, TraversalViews } from './traversal-vie
 import { addSunlightDeck } from './oasis-light.js';
 import { campaignScore } from '../../shared/campaign.js';
 import { moveCampaignPlatforms } from './combat.js';
-import { SkillEffects } from './skill-effects.js';
+import { SkillEffects, SKILL_ART } from './skill-effects.js';
 import { touchEnemy, touchSpring, saveEnemy, restoreEnemy } from './enemies.js';
 import { ICICLE_SIZE, hazardState, icicleTargets, stepMechanisms, touchingHazard, takeRoomSupply, mechanismSave, restoreMechanisms } from './hazards.js';
 import { LEVELS, themeFor } from '../../shared/levels.js';
@@ -161,8 +161,12 @@ export class GardenEngine {
       this.collectibleMaterials = Object.fromEntries(LEVEL_COLLECTIBLES[this.level.id].map(id => [id, spriteMaterial(COLLECTIBLES[id].image)]));
       this.waveMaterial = spriteMaterial('light-wave'); this.burstMaterial = spriteMaterial('enemy-burst');
       this.starMaterial = spriteMaterial('collectible-star'); this.treeMaterial = spriteMaterial('treehouse-tall');
-      this.skillEffects = new SkillEffects(this.scene, this.planeGeometry,
-        { lightblade:spriteMaterial('weapon-lightblade'), blade: this.waveMaterial, bubble: spriteMaterial('magic-bubble'), stars: this.starMaterial, flame: spriteMaterial('flame-stream'), dragon:spriteMaterial('weapon-flame'), snow:spriteMaterial('collectible-snowflake'), thunder:this.waveMaterial, fire:spriteMaterial('flame-stream'), rain:spriteMaterial('magic-bubble'), cloud:spriteMaterial('platform-cloud'), moonblade: spriteMaterial('weapon-moonblade'), boomerang: spriteMaterial('weapon-boomerang'), seed: spriteMaterial('weapon-seed'), firefly: spriteMaterial('weapon-firefly'), pulse: this.starMaterial }, this.isReducedMotion);
+      const effectArt = new Map([['light-wave',this.waveMaterial],['collectible-star',this.starMaterial]]);
+      const effects = Object.fromEntries(Object.entries(SKILL_ART).map(([key, name]) => {
+        if (!effectArt.get(name)) effectArt.set(name,spriteMaterial(name));
+        return [key,effectArt.get(name)];
+      }));
+      this.skillEffects = new SkillEffects(this.scene,this.planeGeometry,effects,this.isReducedMotion);
       this.houseMaterial=spriteMaterial('street-house');this.houseMaterial.opacity=0.6;
       this.windmillMaterial=spriteMaterial('windmill-tall');this.windmillMaterial.opacity=0.65;
       this.awningMaterial=spriteMaterial('platform-awning');
@@ -172,7 +176,7 @@ export class GardenEngine {
       for (const [kind,bounds] of Object.entries(PLATFORM_CROPS)) {const texture=this.platformMaterials[kind].map;texture.offset.y=1-bounds[1];texture.repeat.y=bounds[1]-bounds[0];}
       this.characterMaterials = Object.fromEntries(Object.entries(CHARACTERS).map(([id,c]) => [id, { standing: spriteMaterial(c.image), attack: spriteMaterial(c.attack) }]));
       this.traversalMaterials = Object.fromEntries(poseNames.map(name => [name, spriteMaterial(name)]));
-      this.flowerMaterial = spriteMaterial('flower'); this.rainbowMaterial = spriteMaterial('collectible-rainbow');
+      this.flowerMaterial = effects.flower; this.rainbowMaterial = spriteMaterial('collectible-rainbow');
       this.liftMaterial = spriteMaterial('lift-leaf'); this.springMaterial = spriteMaterial('spring-flower');
       this.bridgeMaterial = spriteMaterial('bridge-rope'); this.flagMaterial = spriteMaterial('checkpoint-flag');
       this.enemyMaterials = Object.fromEntries(Object.entries(MONSTERS).map(([kind, monster]) => [kind, spriteMaterial(monster.image)]));

@@ -1,4 +1,5 @@
 import { useGamepad } from '../input/GamepadSupport.jsx';
+import { PracticeView } from './practice-view.js';
 import { CombatAudio } from './combat-audio.js';
 import { useEffect, useRef, useState } from 'react';
 import { Check, GearSix } from '@phosphor-icons/react';
@@ -16,12 +17,14 @@ function CharacterPractice({ character, build, isTrying, onError, mixer }) {
   const canvas = useRef(null);
   useEffect(() => {
     const pad = { actions: new Set(), direction: 0 };
-    const node = canvas.current, context = node.getContext('2d'), images = {}, keys = new Set();
+    const node = canvas.current, keys = new Set();
     const person = CHARACTERS[character], survival = newSurvival(character), adventure=starterAdventure(0,build);
     const floor = { id:0, x:14, y:0, width:28 }, player = createPlayer(floor), enemy = { id:1, combatVersion:2, x:14, y:0, width:1.5, height:2.5, hp:999, isDefeated:false };
     player.x = build.weapons.includes('lightblade') ? 11.5 : 8.5;
     let isDisposed = false, frame, previous = 0, elapsed = 0, waves = [], jump = false, effect, nextDemoJump = 0, nextContact = 2;
-    const names = [...new Set([person.image, person.attack, 'enemy-leaf', 'flame-stream', ...Object.values(WEAPONS).map(w=>w.image), 'flower', 'collectible-rainbow', 'enemy-burst'])];
+    let view;
+    try { view=new PracticeView(node,person); }
+    catch { onError('试用场景暂时打不开，可以返回选角。'); return; }
     onError('');
     function keydown(event) {
       if (document.activeElement !== node || !['ArrowLeft','ArrowRight','KeyA','KeyD','KeyJ','Space','ArrowUp','KeyW'].includes(event.code) || event.code === 'Space' && event.target.closest('button')) return;
@@ -36,7 +39,8 @@ function CharacterPractice({ character, build, isTrying, onError, mixer }) {
     };
     node.addEventListener('garden:practice-input', gamepadInput); node.addEventListener('blur', clear);
     window.addEventListener('keydown',keydown); window.addEventListener('keyup',keyup); window.addEventListener('blur',clear);
-    Promise.all(names.map(name => new Promise((resolve,reject) => { const image = new Image(); image.onload = () => { images[name] = image; resolve(); }; image.onerror = reject; image.src = `./assets/${name}.png`; }))).then(() => { if (!isDisposed) frame = requestAnimationFrame(draw); }).catch(() => { if (!isDisposed) onError('素材还没准备好，请返回后重试。'); });
+    view.load().then(() => { if (!isDisposed) frame=requestAnimationFrame(draw); })
+      .catch(() => { if (!isDisposed) onError('素材还没准备好，请返回后重试。'); });
     function draw(time) {
       const dt = previous ? Math.min((time-previous)/1000,0.035) : 0; previous = time; elapsed += dt;
       survival.shieldRemaining = Math.max(0,survival.shieldRemaining-dt);
@@ -64,30 +68,10 @@ function CharacterPractice({ character, build, isTrying, onError, mixer }) {
         }
       }
       waves=[...waves.filter(w=>w.isActive),...spawned].slice(-80); enemy.hp=999;enemy.isDefeated=false;
-      context.clearRect(0,0,node.width,node.height);
-      // 近战练习按正式关卡的相对比例放大，刀光才能对齐手部和练习靶。
-      const isMelee=build.weapons.includes('lightblade'), zoom=isMelee?2.8:1;
-      const scale=node.width/28*zoom, ground=node.height*0.86, origin=isMelee?player.x-8.5/zoom:0;
-      function picture(name,x,y,w,h){ const im=images[name]; if(im)context.drawImage(im,(x-origin-w/2)*scale,ground-(y+h)*scale,w*scale,h*scale); }
-      const size=person.height*(isMelee?1:2.8);
-      picture(elapsed < (player.attackUntil||0) ? person.attack : person.image,player.x,player.y,size,size);
-      picture('enemy-leaf',enemy.x,0,isMelee?enemy.height:4,isMelee?enemy.height:4);
-      for(const wave of waves) {
-        if(wave.kind==='lightblade') {
-          if(wave.age < wave.delay) continue;
-          context.save();context.translate((wave.x-origin)*scale,ground-wave.y*scale);context.scale(wave.direction,1);
-          context.drawImage(images['weapon-lightblade'],-(wave.reach-.25)/2*scale,-wave.halfHeight*scale,(wave.reach-.25)*scale,wave.halfHeight*2*scale);context.restore();
-        } else if(wave.kind==='moonblade') {
-          context.save();context.translate((wave.x-origin)*scale,ground-wave.y*scale);context.rotate(-wave.age*10);context.drawImage(images['weapon-moonblade'],-.8*scale,-.8*scale,1.6*scale,1.6*scale);context.restore();
-        } else picture(wave.kind==='flame'?'flame-stream':WEAPONS[wave.kind]?.image||'collectible-star',wave.x,wave.y,1.8,1.8);
-      }
-      if(effect && elapsed-effect.at<1.7) {
-        if(effect.isShield) picture('collectible-rainbow',player.x,player.y+2.3,5,3);
-        else for(let i=0;i<5;i++)picture(effect.spark || 'flower',effect.x+Math.cos(i*1.25)*1.5,effect.y+Math.sin(i*1.25)*1.5,1.8,1.8);
-      }
+      view.draw(player,enemy,waves,elapsed,effect,build.weapons[0],build.weapons.includes('lightblade'));
       frame=requestAnimationFrame(draw);
     }
-    return () => { node.removeEventListener('garden:practice-input', gamepadInput); node.removeEventListener('blur', clear); isDisposed=true; cancelAnimationFrame(frame); window.removeEventListener('keydown',keydown); window.removeEventListener('keyup',keyup); window.removeEventListener('blur',clear); };
+    return () => { node.removeEventListener('garden:practice-input', gamepadInput); node.removeEventListener('blur', clear); isDisposed=true; cancelAnimationFrame(frame); view.dispose(); window.removeEventListener('keydown',keydown); window.removeEventListener('keyup',keyup); window.removeEventListener('blur',clear); };
   },[character,build,isTrying,onError,mixer]);
   return <canvas ref={canvas} data-gamepad-canvas data-gamepad-practice tabIndex={0} onPointerDown={event => event.currentTarget.focus()} width="1060" height="530" aria-label={`${CHARACTERS[character].name}技能试用场景`}/>;
 }
