@@ -1,5 +1,6 @@
 import { ballPosition } from '../../shared/story-mechanisms.js';
 import { addChannelWater } from './channel-water.js';
+import { waterGutter } from './water-gutter.js';
 import { trailArt, trailMaterial } from './trail-art.js';
 
 const townArt=['clock-tower-frame','clock-orange-hand','clock-golden-bell','clock-safety-net','clock-town-sky'];
@@ -30,17 +31,24 @@ export function addStoryViews(views) {
       const key=s.key.split('/')[1], isBeacon=key==='beacon';
       const height=isFlower?4.9:isBell?2.8:isGutter?1.55:1.8;
       const art=key==='rail'?'rail-switch':isGear?'mill-wheel':s.icon;
-      const obj=sprite(art,p.x+s.offset,p.y+height*.53,isGutter?3.5:height*(isGear?1.43:isFlower?.65:.94),height,.55);
       if(isGutter) {
         const x=p.x+s.offset;
-        let wheel;
-        if(key==='wheel') {
-          wheel=sprite('mill-wheel',p.x+p.width/2+.35,p.y+.05,3.4,2.38,-.06);
-        }
-        outlets.push({x:x+1.62,y:p.y+1.09,lip:p.x+p.width/2,wheel,at:state=>state.story.marks[s.key]});
-        const inlet=sprite('water-pond',x,p.y+1.16,2,.24,.58);
-        watch((state,here)=>{inlet.visible=here;inlet.rotation.z=Object.hasOwn(state.story.marks,s.key)?-.16:0;});
+        const tilt=waterGutter(engine,x,p.y,3.5,height);
+        const source={x,y:p.y,vx:7,at:state=>{
+          const mark=state.story.marks[s.key];
+          return mark === undefined ? null : mark+.18;
+        }};
+        if(key==='wheel') source.wheel=sprite('mill-wheel',p.x+p.width/2+.35,p.y+.05,3.4,2.38,-.06);
+        outlets.push(source);
+        watch((state,here)=>{
+          const mark=state.story.marks[s.key];
+          const ready=s.requires.every(k=>Object.hasOwn(state.story.marks,k));
+          const lip=tilt(here,mark===undefined ? null : engine.elapsed-mark,1,ready);
+          if (lip) {source.x=lip.x; source.y=lip.y;}
+        });
+        continue;
       }
+      const obj=sprite(art,p.x+s.offset,p.y+height*.53,height*(isGear?1.43:isFlower?.65:.94),height,.55);
       const light=isBeacon ? views.glow(p.x,p.y+1.45) : null;
       if(light) watch((state,here)=>{light.visible=here && Object.hasOwn(state.story.marks,s.key);light.scale.set(4.3,4.3,1);});
       const destination={chick:'nest',pollen:'bloom',star:'beacon'}[key];
@@ -51,11 +59,11 @@ export function addStoryViews(views) {
         const following=destination && claimed && !Object.hasOwn(marks,room.id+'/'+destination);
         const age=claimed?Math.max(0,engine.elapsed-marks[s.key]):0;
         const isCollecting=claimed && age<.55 && !engine.isReducedMotion;
-        obj.visible=here && (!claimed || following || isBell || isFlower || isGear || isGutter || isBeacon || key==='nest' || isCollecting);
+        obj.visible=here && (!claimed || following || isBell || isFlower || isGear || isBeacon || key==='nest' || isCollecting);
         if(!obj.visible) return;
         const time=engine.isReducedMotion?0:engine.elapsed;
         obj.material.color.set(!ready?'#969397':claimed?'#fff1c1':'#ffffff');
-        obj.rotation.z=isBell && ready && !claimed ? Math.sin(time*2.3)*.13 : isGutter && claimed ? -.16 : 0;
+        obj.rotation.z=isBell && ready && !claimed ? Math.sin(time*2.3)*.13 : 0;
         if(following) {
           const player=engine.players[0];
           obj.position.set(player.x-player.facing*1.45,player.y+.82+Math.abs(Math.sin(time*6))*.22,.64);
@@ -78,7 +86,7 @@ export function addStoryViews(views) {
             const growth=claimed?(engine.isReducedMotion?1:Math.min(1,age/.65)):0;
             obj.scale.y=height*(.56+.44*growth);obj.scale.x=obj.scale.y*.65;
             obj.position.y=p.y+obj.scale.y*.51;
-          } else if(isCollecting && !isBell && !isGear && !isGutter && !isBeacon && key!=='nest') {
+          } else if(isCollecting && !isBell && !isGear && !isBeacon && key!=='nest') {
             obj.position.y+=age*2;obj.scale.y=height*(1-age/.6);
           }
         }

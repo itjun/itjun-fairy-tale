@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { guidedWater } from './water-effects.js';
+import { gutterLip, TIP_TIME, waterGutter } from './water-gutter.js';
 import { growthFraction } from '../../shared/flower-valley.js';
 
 export const VALLEY_IMAGES = ['water-gutter', 'water-sunflower', 'water-leaf', 'water-lily', 'water-pond', 'water-bank'];
@@ -29,8 +31,12 @@ export function addValleyViews(views) {
     return engine.sprite(materials.get(name), x, y, width, height, z);
   };
   const watch = (roomId, update) => views.items.push({ roomId, update });
-  // 细水槽在河岸前方。浅色底线一直显示，蓝色水线和高光沿实际引水方向前进。
-  function stream(points, roomId, enabled, width = .1, color = '#29a4da') {
+  function stream(points, enabled, width, isRain = false) {
+    const update = guidedWater(engine,points,width,isRain);
+    watch(0,(state,here)=>update(here,enabled(state.water)));
+  }
+  function vine(points, enabled) {
+    const width = .095, color = '#61923f';
     const curve = new THREE.CatmullRomCurve3(points.map(([x,y]) => new THREE.Vector3(x,y,.4)));
     const steps = 44;
     const vertices = [], indices = [];
@@ -45,17 +51,11 @@ export function addValleyViews(views) {
     geometry.setIndex(indices); engine.resources.push(geometry);
     const mesh = new THREE.Mesh(geometry, engine.material(new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, depthWrite: false })));
     engine.scene.add(mesh);
-    const beads = Array.from({length:color === '#61923f' ? 0 : 4}, () => sprite('magic-bubble',0,0,.22,.29,.43));
-    watch(roomId, (state, current) => {
+    watch(0, (state, current) => {
       const start = enabled(state.water);
       mesh.visible = current && start !== null;
       const amount = mesh.visible ? Math.min(1, Math.max(0,(engine.elapsed - start) / .4)) : 0;
       geometry.setDrawRange(0, Math.floor(steps * amount) * 6);
-      beads.forEach((bead,i) => {
-        const t = ((engine.isReducedMotion ? .3 : engine.elapsed * .72) + i / beads.length) % 1;
-        bead.visible = mesh.visible && t < amount;
-        if (bead.visible) { const p = curve.getPoint(t); bead.position.set(p.x,p.y,.44); }
-      });
     });
   }
   const {left,right,y} = valley.pool;
@@ -82,25 +82,30 @@ export function addValleyViews(views) {
   const vineParts = world.platforms.filter(p => p.roomId === 0 && p.channel === 'flower');
   vineParts.forEach((p,i) => {
     const source = vineParts[i-1] || {x:22.9,y:0};
-    stream([[source.x,source.y-.75],[(source.x+p.x)/2,(source.y+p.y)/2-1],[p.x,p.y-.65]],0,
-      water => water.flower === null ? null : water.flower + p.delay,.095,'#61923f');
+    vine([[source.x,source.y-.75],[(source.x+p.x)/2,(source.y+p.y)/2-1],[p.x,p.y-.65]],
+      water => water.flower === null ? null : water.flower + p.delay);
   });
 
   const first = valley.controls[0];
+  const outlet = (x,y,width,direction=1) => {
+    const lip = gutterLip(x,y,width,width/2.6,direction);
+    return [lip.x,lip.y];
+  };
+  const opened = mark => mark == null ? null : mark+TIP_TIME;
   const cloud = sprite('platform-cloud',first.x-1,first.y+6.7,4.3,1.6,-.3);
   watch(0, (_,current) => { cloud.visible = current; });
-  stream([[first.x-.5,first.y+6.25],[first.x-.3,first.y+4.5],[first.x,first.y+1.1]],0,() => 0,.13);
-  stream([[first.x+1.15,first.y+1.05],[4.1,first.y+.85],[4.9,first.y*.5+.45],[5.45,.08]],0,water => water.demo,.23);
+  stream([[first.x-.5,first.y+6.25],[first.x-.3,first.y+4.5],[first.x,first.y+.94]],() => 0,.27,true);
+  stream([outlet(first.x,first.y,3.5),[4.35,first.y+.52],[4.9,first.y*.5+.45],[5.45,.08]],water => opened(water.demo),.16);
   const forkX = valley.forkX;
   const forkCloud = sprite('platform-cloud',forkX-1,6.1,4.3,1.6,-.3);
   watch(0, (_,current) => { forkCloud.visible = current; });
-  stream([[forkX-.5,5.55],[forkX-.15,4.1],[forkX,2.25]],0,() => 0,.07);
-  stream([[forkX+2.3,2],[21.5,1.7],[22.1,.7],[22.9,.08]],0,
-    water => water.flow === 'flower' ? water.flower : null,.15);
-  stream([[forkX-2,2],[15.5,1],[16,-.8],[22,-1.6],[26,-3.5]],0,
-    water => water.flow === 'pond' ? water.pond : null,.15);
+  stream([[forkX-.5,5.55],[forkX-.15,4.1],[forkX,1.83]],() => 0,.25,true);
+  stream([outlet(forkX,0,6.8),[21.9,1.04],[22.5,.62],[22.9,.08]],
+    water => water.flow === 'flower' ? opened(water.flower) : null,.15);
+  stream([outlet(forkX,0,6.8,-1),[14.5,.52],[16,-.8],[22,-1.6],[26,-3.5]],
+    water => water.flow === 'pond' ? opened(water.pond) : null,.15);
   if (valley.layout === 'aqueduct') {
-    stream([[22.2,15.35],[20.1,14.6],[16.8,13.9],[12.3,13.5]],0,water => water.bridge,.14);
+    stream([outlet(23.4,14.4,3.5,-1),[20.1,14.6],[16.8,13.9],[12.3,13.5]],water => opened(water.bridge),.14);
   }
 
   const gutters = [{x:first.x,y:first.y,key:'demo'}, {x:forkX,y:0,key:'fork'}];
@@ -108,11 +113,11 @@ export function addValleyViews(views) {
   if (upper) gutters.push({x:upper.x,y:upper.y,key:'bridge'});
   for (const item of gutters) {
     const fork = item.key === 'fork', width = fork ? 6.8 : 3.5, height = width / 2.6;
-    const gutter = sprite('water-gutter',item.x,item.y+height*.46,width,height,.34);
+    const tilt = waterGutter(engine,item.x,item.y,width,height);
     watch(0,(state,current) => {
-      gutter.visible = current;
-      const active = fork ? state.water.flow : state.water[item.key] !== null;
-      gutter.rotation.z = active ? (active === 'pond' || item.key === 'bridge' ? .14 : -.14) : 0;
+      const channel = fork ? state.water.flow : item.key;
+      const mark = state.water[channel];
+      tilt(current,mark == null ? null : engine.elapsed-mark,channel === 'pond' || channel === 'bridge' ? -1 : 1);
     });
   }
   for (const p of world.platforms.filter(platform => platform.channel)) {

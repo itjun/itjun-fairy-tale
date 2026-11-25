@@ -1,3 +1,4 @@
+import { airParticles } from './air-particles.js';
 import { pushInWind } from '../../shared/trails/wind.js';
 import { fieldHint, stepField, syncField } from '../../shared/trails/field-progress.js';
 import { fieldImages } from './field-views.js';
@@ -309,7 +310,9 @@ export class GardenEngine {
       const width=h.kind==='pendulum'?height/2:h.kind==='block'?1.9:h.kind==='icicle'?ICICLE_SIZE.width:2.4;
       const mesh=new THREE.Mesh(this.planeGeometry,this.material((h.kind==='block'?this.blockMaterials[h.skin]:this.trapMaterials[h.kind]).clone()));
       mesh.scale.set(width,height,1);mesh.position.y=h.kind==='pendulum'?-height*.45:height/2;
-      group.add(mesh);this.scene.add(group);this.hazardViews.set(h.id,{group,mesh});
+      group.add(mesh);this.scene.add(group);
+      const exhaust=['steam','geyser'].includes(h.kind) ? airParticles(this,h.kind==='steam'?'vapor':'spray',h.x,h.y+.22,.56) : null;
+      this.hazardViews.set(h.id,{group,mesh,exhaust});
     }
     for (const supply of this.world.supplies || []) {
       const isBalloon = supply.kind === 'hotAirBalloon';
@@ -1138,11 +1141,18 @@ export class GardenEngine {
       for (const mesh of this.backdrops) mesh.visible = !isInCave;
       for (const p of this.platforms) {const view=this.platformViews.get(p.id);view.position.set(p.x,p.y,0);view.rotation.z=Math.atan(p.slope || 0);if(p.collapseAt!==undefined&&this.elapsed<p.collapseAt)view.position.y+=Math.sin(this.elapsed*40)*.04;view.visible=!!p.isCave===isInCave && p.caveId===caveId && p.isEnabled!==false && Math.abs(p.x-this.cameraX)<this.camera.right+p.width/2+12 && Math.abs(p.y-this.cameraY)<this.camera.top+12;}
       this.traversalViews?.update(this.roomState.roomId, this.players[0], this.cameraX, this.cameraY, this.camera);
+      if (this.netViews) for (const update of this.netViews) update();
       for (const hazard of this.world.hazards) {
-        const { group, mesh } = this.hazardViews.get(hazard.id);
-        group.visible = !hazard.isBroken && Math.abs(hazard.x - this.cameraX) < this.camera.right + 6;
+        const { group, mesh, exhaust } = this.hazardViews.get(hazard.id);
+        const floor=this.platforms[hazard.platformId];
+        group.visible = !hazard.isBroken && floor.roomId===this.roomState.roomId && floor.caveId===caveId && Math.abs(hazard.x-this.cameraX)<this.camera.right+6;
+        if (exhaust) exhaust.visible=false;
         if (!group.visible || hazard.kind === 'block') continue;
         const state = hazardState(hazard, this.elapsed);
+        if (exhaust && state.isActive) {
+          exhaust.visible=true;
+          exhaust.material.uniforms.clock.value = this.isReducedMotion ? .8 : this.elapsed;
+        }
         if (hazard.kind === 'pendulum') group.rotation.z = state.angle;
         else if (hazard.kind === 'icicle') {
           group.visible = state.isWarning || state.isActive;

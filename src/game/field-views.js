@@ -7,7 +7,7 @@ import { isFieldStopActive, hasMark, fieldStopReady } from '../../shared/trails/
 
 export function fieldImages(world) {
   if(!world.field)return [];
-  return [...new Set([...(world.field==='desert'?['water-pond']:[]),...world.rooms.flatMap(r=>[...r.stops.flatMap(s=>[s.icon,...(s.display||[])]),...r.props.map(p=>p.icon),...r.moving.map(m=>m.icon)].filter(name=>name && !trailArt(name)))])];
+  return [...new Set([...(world.field==='desert' || world.field==='beach'?['water-pond']:[]),...world.rooms.flatMap(r=>[...r.stops.flatMap(s=>[s.icon,...(s.display||[])]),...r.props.map(p=>p.icon),...r.moving.map(m=>m.icon)].filter(name=>name && !trailArt(name)))])];
 }
 export function addFieldViews(views) {
   const g=views.engine,w=g.world,materials=new Map();

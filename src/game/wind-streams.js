@@ -1,35 +1,33 @@
 import * as THREE from 'three';
+import { airParticles } from './air-particles.js';
 import { hasMark } from '../../shared/trails/field-progress.js';
 
-// Arrows are drawn in the flow itself. In reduced motion their positions stay
-// fixed, so the same direction information remains available without animation.
 export function paintWind(views,r) {
-  const g=views.engine,canvas=document.createElement('canvas');
-  canvas.width=112;canvas.height=52;
-  const c=canvas.getContext('2d');
-  for(let i=0;i<3;i++){
-    c.strokeStyle=['#4d9990','#85bbab','#d9efe0'][i];c.lineWidth=3.5-i*.65;c.lineCap='round';
-    c.beginPath();c.moveTo(5,24+i*4);c.bezierCurveTo(28,13,44,36,86,24+i*4);c.stroke();
-  }
-  c.strokeStyle='#4f988b';c.lineWidth=4;c.beginPath();c.moveTo(71,14);c.lineTo(89,24);c.lineTo(74,35);c.stroke();
-  const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;g.textures.push(tex);
-  const mat=g.material(new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
+  const g=views.engine;
+  const arrow=new THREE.Shape();
+  arrow.moveTo(-.85,-.05);arrow.quadraticCurveTo(-.4,.16,.31,.06);
+  arrow.lineTo(.23,.26);arrow.lineTo(.78,.02);arrow.lineTo(.23,-.24);
+  arrow.lineTo(.32,-.055);arrow.quadraticCurveTo(-.39,.07,-.85,-.05);
+  const geometry=new THREE.ShapeGeometry(arrow);
+  g.resources.push(geometry);
+  const ink=g.material(new THREE.MeshBasicMaterial({color:0x619a8d,transparent:true,opacity:.82,depthWrite:false}));
   for(const jet of r.wind) {
-    const arrows=Array.from({length:Math.max(5,Math.ceil(jet.width/2.5))},()=>g.sprite(mat,jet.x,jet.y,3.2,1.65,-.74));
+    const leaves=airParticles(g,'wind',jet.x,jet.y+jet.height/2,-.6,
+      {...jet,count:Math.ceil(jet.width+jet.height)});
+    const direction=new THREE.Mesh(geometry,ink);
+    direction.position.set(jet.x,jet.y+jet.height*.45,-.57);
+    direction.rotation.z=Math.atan2(jet.dy,jet.dx);
+    g.scene.add(direction);
     const sign=views.paper(jet.x,jet.y+1.1,4.2,.8,320,66);
     const destination=r.stops.find(stop=>stop.after.includes(jet.after));
     views.items.push({roomId:r.id,update:(state,here)=>{
       const on=!jet.after||hasMark(r,state.field,jet.after);
-      const horizontal=Math.abs(jet.dx)>jet.dy;
+      const horizontal=Math.abs(jet.dx)>Math.abs(jet.dy);
+      const hint=horizontal ? (jet.dx<0?'跳入横风 ←':'跳入横风 →') : '起跳乘上升风 ↑';
       sign.mesh.visible=here && on && (!destination || !hasMark(r,state.field,destination.key)) && Math.abs(g.players[0].x-jet.x)<14;
-      if(sign.mesh.visible) sign.draw('wind',(ctx,w)=>views.text(ctx,horizontal?'跳入横风 →':'起跳乘上升风 ↑',w/2,44,29,'#3b7166'));
-      for(const [i,arrow] of arrows.entries()){
-        arrow.visible=here && on;if(!arrow.visible)continue;
-        const u=(i/arrows.length+(g.isReducedMotion?0:g.elapsed*.22))%1;
-        const stripe=(i%3-1)*.23;
-        arrow.position.set(jet.x+(horizontal?(u-.5)*jet.width:stripe*jet.width),jet.y+(horizontal?.5+stripe:u)*jet.height,-.74);
-        arrow.rotation.z=Math.atan2(jet.dy,jet.dx||.01);
-      }
+      if(sign.mesh.visible) sign.draw('wind',(ctx,w)=>views.text(ctx,hint,w/2,44,29,'#3b7166'));
+      direction.visible=leaves.visible=here && on;
+      if (leaves.visible) leaves.material.uniforms.clock.value=g.isReducedMotion ? .8 : g.elapsed;
     }});
   }
 }

@@ -1,83 +1,50 @@
-import * as THREE from 'three';
-
-// 水面和出水口都取自同一张彩笔池塘。宽水面往返取中段，保留两端的岸线。
-function waterRibbon(g, material, curve, width, depth, sections) {
-  const vertices = [], uv = [], indices = [];
-  for (let i = 0; i <= sections; i++) {
-    const t = i / sections, point = curve.getPointAt(t), tangent = curve.getTangentAt(t);
-    const radius = width / 2;
-    const u = i === 0 ? 0 : i === sections ? 1 : i % 2 ? .78 : .22;
-    for (const side of [1, -1]) {
-      vertices.push(point.x - tangent.y * radius * side, point.y + tangent.x * radius * side, 0);
-      uv.push(u, side === 1 ? 1 : 0);
-    }
-    if (i) { const j = i * 2; indices.push(j-2,j-1,j,j-1,j+1,j); }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geometry.setIndex(indices);
-  g.resources.push(geometry);
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.z = depth;
-  g.scene.add(mesh);
-  return mesh;
-}
+import { waterCourse } from './water-course.js';
+import { channelPool, waterEffects } from './water-effects.js';
 
 export function addChannelWater(views, room, sources, {left, right, surface, depth = 3.2}) {
-  const g = views.engine, water = g.spriteMaterial('water-pond');
-  const middle = surface - depth / 2;
-  const river = waterRibbon(g, water, new THREE.LineCurve(new THREE.Vector2(left,middle), new THREE.Vector2(right,middle)),
-    depth, -.32, Math.max(4, Math.ceil((right-left)/11)));
-  const foam = g.material(new THREE.MeshBasicMaterial({color:0xc0f5ff}));
-  const outlets = sources.map(({x, y, lip, at, wheel}) => {
-    // 出水口绕过台边，在下方水面收住。水和地形前后分层，荷叶上仍能看清落脚点。
-    const landing = Math.max(x+2.3, lip+.65);
-    const curve = new THREE.CatmullRomCurve3([
-      [x,y], [x+.55,y+.08], [landing-.5,y-.4], [landing,y-1],
-      [landing+.35, Math.min(y-1.1,(surface+y)/2)], [landing+.52,surface-.28]
-    ].map(([a,b])=>new THREE.Vector3(a,b,0)));
-    const jet = waterRibbon(g,water,curve,.52,.10,32);
-    const streaks = Array.from({length:Math.max(2,Math.ceil(curve.getLength()/2.2))},()=>g.sprite(foam,0,0,.32,.045,.115));
-    const drops = Array.from({length:4},()=>g.sprite(foam,0,0,.10,.22,.12));
-    return {jet,curve,streaks,drops,at,wheel,landing};
-  });
-  const point = new THREE.Vector3(), tangent = new THREE.Vector3();
-  views.items.push({roomId:room.id,update(state,here) {
-    const player = g.players[0];
-    const visible = here && player.safe?.caveId === sources[0].caveId;
+  const g = views.engine, river = channelPool(g, left, right, surface, depth);
+  const createPart = waterEffects(g);
+  const platforms = room.platformIds.map(id => g.world.platforms[id]);
+  const outlets = sources.map(source => ({ source, parts: [] }));
+  views.items.push({roomId:room.id, update(state, here) {
+    const visible = here && g.players[0].safe?.caveId === sources[0].caveId;
     river.visible = visible;
     let rise = 0;
-    for (const {jet,curve,streaks,drops,at,wheel,landing} of outlets) {
-      const start = at(state);
-      const open = start != null;
-      const age = open ? Math.max(0,g.elapsed-start) : 0;
-      const amount = open && g.isReducedMotion ? 1 : Math.min(1,age/.46);
-      jet.visible = visible && open;
-      if (jet.visible) jet.geometry.setDrawRange(0, Math.max(1,Math.ceil(32*amount))*6);
-      for (const [i, streak] of streaks.entries()) {
-        const t=((g.isReducedMotion ? .13 : age*.7)+i/streaks.length)%1;
-        streak.visible=jet.visible && t<amount;
-        if (!streak.visible) continue;
-        curve.getPointAt(t,point);curve.getTangentAt(t,tangent);
-        streak.position.set(point.x,point.y,.115);
-        streak.rotation.z=Math.atan2(tangent.y,tangent.x);
+    for (const outlet of outlets) {
+      const {source, parts} = outlet;
+      const start = source.at(state);
+      if (source.wheel) source.wheel.visible = visible;
+      if (!visible || start == null) {
+        for (const part of parts) part.ribbon.visible = part.splash.visible = false;
+        if (source.wheel) source.wheel.rotation.z = 0;
+        outlet.course = null;
+        continue;
       }
-      if (wheel) {
-        wheel.visible = visible;
-        wheel.rotation.z = open ? (g.isReducedMotion ? -.4 : -age*2.6) : 0;
+      // 沙漠的泉眼在石槽里，水直接落入槽内。花园的露天水路逐层接水。
+      const course = waterCourse(source, source.isBasin ? [] : platforms, surface);
+      const last = course.at(-1);
+      const arrival = last ? last.start + last.duration : 0;
+      const age = g.isReducedMotion ? arrival+2 : Math.max(0,g.elapsed-start);
+      rise = Math.max(rise, Math.min(1, Math.max(0,(age-arrival)/1.15))*.45);
+      outlet.course = course;
+      outlet.age = age;
+      if (source.wheel) {
+        const wheelAge = Math.max(0,age-(source.wheel.position.x-source.x)/source.vx);
+        source.wheel.rotation.z = g.isReducedMotion ? -.4 : -2.6*(wheelAge-(1-Math.exp(-3*wheelAge))/3);
       }
-      const fill = Math.min(1, Math.max(0,(age-.3)/1.15));
-      rise = Math.max(rise, open && g.isReducedMotion ? 1 : fill);
-      drops.forEach((drop,i)=>{
-        drop.visible = jet.visible && amount >= 1;
-        if (!drop.visible) return;
-        const phase = ((g.isReducedMotion ? .34 : age*1.65)+i/drops.length)%1;
-        drop.rotation.z = (i%2 ? -1 : 1)*.6;
-        drop.position.set(landing+.52+(i%2 ? 1 : -1)*phase*(.55+i*.16),
-          surface + fill*.45 + 2.7*phase*(1-phase), .12);
-      });
     }
-    river.position.y = rise*.45;
+    if (!visible) return;
+    river.material.uniforms.clock.value = g.isReducedMotion ? 0 : g.elapsed;
+    river.position.y = surface - depth/2 + rise;
+    for (const {source, parts, course, age} of outlets) {
+      if (!course) continue;
+      // 多个槽口共用此刻的水位，最后一段的水花跟随水面。
+      const path = rise ? waterCourse(source, source.isBasin ? [] : platforms, surface+rise) : course;
+      for (let i=0; i<path.length; i++) {
+        const part = parts[i] ||= createPart();
+        part.update(path[i], age, i===path.length-1, i ? .77 : 1);
+      }
+      for (let i=path.length; i<parts.length; i++) parts[i].ribbon.visible = parts[i].splash.visible = false;
+    }
   }});
 }

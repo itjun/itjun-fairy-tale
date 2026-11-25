@@ -1,3 +1,4 @@
+import { airParticles } from './air-particles.js';
 import { addChannelWater } from './channel-water.js';
 
 // 大多数触点能从器材或任务本身认出来。复用同一张图但做不同动作的触点在地图上指定 reaction。
@@ -22,7 +23,7 @@ export function addFieldReaction(views,room,stop,item,sprite) {
   if (kind==='pour' || kind==='fill') {
     const isPour=kind==='pour';
     const spout=x+(isPour?.72:-1.1);
-    addChannelWater(views,room,[{x:spout,y:p.y+1.15,lip:spout+.7,caveId:p.caveId,at}],
+    addChannelWater(views,room,[{x:spout,y:p.y+1.15,vx:3.5,isBasin:true,caveId:p.caveId,at}],
       {left:x-3,right:x+(isPour?10:5),surface:p.y-.65,depth:isPour?1.45:1});
   }
   const tower=kind==='beam' && room.props.find(prop=>prop.icon==='island-lighthouse' && Math.abs(prop.x-x)<2);
@@ -31,7 +32,8 @@ export function addFieldReaction(views,room,stop,item,sprite) {
   const flame=kind==='heat' && sprite('oven-flame',oven?.x??x,p.y+1.45,2.9,2.5,-.65);
   const flag=kind==='flag' && stop.icon!=='meadow-ribbon' && sprite('meadow-ribbon',x,p.y,2.5,2.5,.48);
   const light=kind==='signal' && views.glow(x,p.y);
-  const vapor=kind==='heat' && sprite('tidal-cloud',(oven?.x??x)+1,p.y+4.2,1.5,.85,-.68);
+  const vapor=kind==='heat' && airParticles(g,'vapor',(oven?.x??x)+1,p.y+3.7,-.68);
+  const embers=kind==='heat' && airParticles(g,'ember',oven?.x??x,p.y+1,-.59);
   const onVehicle=stop.atDock!==undefined;
   return (state,here,carrying)=>{
     const start=at(state), done=start!==undefined;
@@ -50,10 +52,9 @@ export function addFieldReaction(views,room,stop,item,sprite) {
       }
     }
     if(flame) {
-      flame.visible=vapor.visible=show;
+      flame.visible=vapor.visible=embers.visible=show;
       flame.scale.y=2.5+Math.sin(time*10)*.19;
-      const drift=g.isReducedMotion?.5:(time*.62)%1;
-      vapor.position.y=p.y+4.1+drift*1.3;vapor.scale.x=1.35+drift;
+      vapor.material.uniforms.clock.value=embers.material.uniforms.clock.value=time;
     }
     if(light) {
       light.visible=show && (!onVehicle || age<1.5);

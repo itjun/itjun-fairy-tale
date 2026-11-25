@@ -8,6 +8,7 @@ import { newRoomState } from '../src/game/rooms.js';
 import { createPlayer } from '../src/game/physics.js';
 import { addStoryViews } from '../src/game/story-views.js';
 import { fieldReaction } from '../src/game/field-reactions.js';
+import { paintWind } from '../src/game/wind-streams.js';
 import { GardenEngine } from '../src/game/engine.js';
 
 test('新旧双渠都能看见水面，踩哪一渠哪一渠出水，续关时仍通水', t => {
@@ -22,35 +23,39 @@ test('新旧双渠都能看见水面，踩哪一渠哪一渠出水，续关时�
     const engine=Object.assign(Object.create(GardenEngine.prototype),{
       world, scene:new THREE.Scene(), resources:[], textures:[], planeGeometry:new THREE.PlaneGeometry(),
       platformViews:new Map(world.platforms.map(p=>[p.id,new THREE.Group()])),
-      players:[createPlayer(world.platforms[room.startId])], elapsed:0,
+      players:[createPlayer(world.platforms[room.startId])], elapsed:0, textureFor:()=>null,
       spriteMaterial(name) { return this.material(new THREE.MeshBasicMaterial({name})); },
     });
     const views={engine,items:[]};
     addStoryViews(views);
     const draw=(rooms=state)=>views.items.forEach(v=>v.update(rooms,v.roomId===rooms.roomId));
-    const bodies=engine.scene.children.filter(obj=>obj.material?.name==='water-pond' && obj.geometry!==engine.planeGeometry);
-    const visibleWater=()=>bodies.filter(obj=>obj.visible);
+    const visible = name => engine.scene.children.filter(obj=>obj.visible && obj.name===name);
     draw();
-    assert.equal(visibleWater().length,1,stage.id+' 关闸时已有河水');
-    const river=visibleWater()[0];
-    const riverBox=new THREE.Box3().setFromObject(river);
+    const rivers=engine.scene.children.filter(obj=>obj.visible && obj.material?.name==='water-pond');
+    assert.equal(rivers.length,1,stage.id+' 关闸时已有河水');
+    assert.equal(visible('water-stream').length,0);
+    const river=rivers[0], riverBox=new THREE.Box3().setFromObject(river);
     assert.ok(riverBox.max.x-riverBox.min.x > room.right-room.left-1);
-    for(const [i,stop] of room.stations.entries()) {
+    const open=[];
+    for(const stop of room.stations) {
       const p=world.platforms[stop.platformId];
       assert.equal(advanceStory(world,state,createPlayer(p),engine.elapsed),stop.label);
-      engine.elapsed+=.15;draw();
-      const jet=visibleWater().at(-1);
-      assert.equal(visibleWater().length,2+i);
-      const box=new THREE.Box3().setFromObject(jet);
-      assert.ok(box.min.x>p.x && box.min.x<p.x+2,'水流从木槽右端流出');
-      assert.ok(box.max.y>p.y && box.min.y<=riverBox.max.y,'水能落进河里');
-      const partial=jet.geometry.drawRange.count;
-      assert.ok(partial>0 && partial<jet.geometry.index.count);
-      engine.elapsed+=2;draw(structuredClone(state));
-      assert.equal(jet.geometry.drawRange.count,jet.geometry.index.count,'续关保留已经放出的水');
+      engine.elapsed+=.3;draw();
+      const jet=visible('water-stream').find(o=>o.position.x>p.x && o.position.x<p.x+2 && o.position.y>p.y);
+      assert.ok(jet,'水流从刚打开的木槽右端流出');
+      open.push(jet);
+      assert.ok(open.every(o=>o.visible),'先打开的水槽持续出水');
+      const u=jet.material.uniforms;
+      assert.ok(u.front.value>0 && u.front.value<u.duration.value,'刚开闸时水还在空中');
+      engine.elapsed+=15;draw(structuredClone(state));
+      assert.ok(u.front.value>=u.duration.value,'续关时水已经到达落点');
+      const inPool=visible('water-impact').filter(o=>o.material.uniforms.pool.value===1);
+      assert.equal(inPool.length,open.length,'每一股水最终流进河里');
+      for(const splash of inPool) assert.ok(Math.abs(splash.position.y-.78-(river.position.y+1.6))<.001);
     }
     draw({...state,roomId:3});
-    assert.equal(visibleWater().length,0,'离开水磨时水面和出水口一起隐藏');
+    assert.equal(river.visible,false);
+    assert.equal(visible('water-stream').length+visible('water-impact').length,0,'离开水磨后水流与水花都隐藏');
   }
 });
 
@@ -78,7 +83,8 @@ test('点炉、点灯、扳道岔的反馈在各自的触点出现，换房后�
     const state=newRoomState(world);
     state.roomId=room.id;
     for(const dep of stop.after) state.field[room.id+'/'+dep]=1;
-    const player=createPlayer(platform), engine={world,players:[player],elapsed:5};
+    const player=createPlayer(platform), engine={world,players:[player],elapsed:5,resources:[],
+      scene:new THREE.Scene(),planeGeometry:new THREE.PlaneGeometry(),material:m=>m};
     const views={engine,items:[]}, scene=new THREE.Scene();
     const sprite=(name,x,y,width,height,z)=>{
       const mesh=new THREE.Object3D();mesh.name=name;mesh.scale.set(width,height,1);mesh.position.set(x,y,z);
@@ -99,8 +105,45 @@ test('点炉、点灯、扳道岔的反馈在各自的触点出现，换房后�
     if(art) {
       update(state,false,false);
       assert.equal(effect.visible,false);
+      if(key==='heat') for(const plume of engine.scene.children) assert.equal(plume.visible,false);
       update(structuredClone(state),true,false);
       assert.equal(effect.visible,true,'再进房间时保持点亮');
+      if(key==='heat') {
+        assert.deepEqual(engine.scene.children.map(m=>m.name),['particles-vapor','particles-ember']);
+        for(const plume of engine.scene.children) {
+          assert.equal(plume.visible,true);
+          assert.equal(plume.material.uniforms.clock.value,1);
+        }
+        engine.isReducedMotion=true;
+        engine.elapsed+=2;
+        update(state,true,false);
+        for(const plume of engine.scene.children) assert.equal(plume.material.uniforms.clock.value,0);
+      }
     }
   }
+});
+
+test('风场解锁后按实际风向绘制，减少动态时保持方向，离开房间时收起', () => {
+  const engine={scene:new THREE.Scene(),resources:[],planeGeometry:new THREE.PlaneGeometry(),
+    material:m=>m,players:[{x:0}],elapsed:2};
+  const views={engine,items:[],paper:()=>({mesh:new THREE.Object3D(),draw(){}})};
+  const room={id:3,stops:[],wind:[{x:0,y:0,width:5,height:6,dx:-6,dy:2,after:'flag'}]};
+  paintWind(views,room);
+  const [particles,arrow]=engine.scene.children;
+  const update=(field,here)=>views.items[0].update({field},here);
+  update({},true);
+  assert.equal(particles.visible,false);
+  const field={'3/flag':1};
+  update(field,true);
+  assert.ok(particles.visible && arrow.visible && particles.geometry.isInstancedBufferGeometry);
+  assert.deepEqual(particles.material.uniforms.flow.value.toArray(),[-6,2]);
+  assert.equal(arrow.rotation.z,Math.atan2(2,-6));
+  assert.equal(particles.material.uniforms.clock.value,2);
+  engine.isReducedMotion=true;
+  update(field,true);
+  const still=particles.material.uniforms.clock.value;
+  engine.elapsed=7;update(field,true);
+  assert.equal(particles.material.uniforms.clock.value,still);
+  update(field,false);
+  assert.equal(particles.visible || arrow.visible,false);
 });
