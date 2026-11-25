@@ -14,6 +14,7 @@ const MiniGame = lazy(() => import('./mini-games/MiniGame.jsx').then(module => (
 import { readAdventure, clearAdventure } from './game/save.js';
 import { queueRun, flushScores } from './scores/client.js';
 const ScoreHistory = lazy(() => import('./scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
+const GunNac = lazy(() => import('./gun-nac/GunNac.jsx'));
 const PlatformGame = lazy(() => import('./game/PlatformGame.jsx').then(module => ({ default: module.PlatformGame })));
 import { useEffect, useRef, useState } from 'react';
 import { Flower, Rainbow, IceCream, Heart, Star, Sparkle, ArrowRight, ArrowLeft, SpeakerHigh, X, Check, PaintBrush, ArrowCounterClockwise, DownloadSimple, Play, Drop, Flag, Butterfly, Trophy } from '@phosphor-icons/react';
@@ -177,6 +178,7 @@ export function App() {
   const activeQuest = quests.find(q => q.id === mode);
   if (activeQuest) return <Suspense fallback={<div className="loading-adventure">正在打开小冒险…</div>}><MiniGame session={progress.miniGames[activeQuest.id]} onChange={saveMiniSession} onExit={() => { setMode(questReturnMode.current); window.speechSynthesis?.cancel(); }} onReplay={() => openQuest(activeQuest.id)} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} onChime={chime} isSaved={isSaved} /></Suspense>;
   if (isScores) return <Suspense fallback={<div className="loading-adventure">正在翻开成绩本…</div>}><ScoreHistory onClose={() => setIsScores(false)} /></Suspense>;
+  if (mode === 'gun-nac') return <Suspense fallback={<div className="loading-adventure">正在进入机库…</div>}><GunNac isSound={isSound} onSound={() => setIsSound(value => !value)} onExit={() => setMode(null)} /></Suspense>;
   if (adventureEntry) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame entry={adventureEntry} initialSound={isSound} onExit={() => { setAdventureEntry(null); setSavedAdventure(readAdventure()); }} /></Suspense>;
   return <div className={isGarden ? 'app-shell' : 'app-shell home-shell'}>
     <DesktopRestState />
@@ -185,6 +187,7 @@ export function App() {
       onAdventure={() => { window.speechSynthesis?.cancel(); setAdventureEntry('continue'); }}
       onChooseWorld={() => { window.speechSynthesis?.cancel(); setAdventureEntry('worlds'); }}
       onNewAdventure={() => { isStartingAdventureRef.current = false; setMode('new-adventure'); }}
+      onGunNac={() => setMode('gun-nac')}
       onAlbum={() => setMode('album')}
       onMiniGames={() => setMode('mini-games')}
       onOptions={() => setMode('options')} /> : <>
