@@ -305,7 +305,7 @@ function relay(p) {
   const lower=trail([[124,10,10],[136,8,10],[148,6,10],[160,4,10],[172,2,10],[184,1,10]],'ice');
   const high=trail([[121,14.6],[129,17.2],[137,19.8],[146,20],[155,18.5],[164,17]],'rock');
   station('rail',high[1],gear,'切换了最后一道岔轨',{goal:false});
-  run('blue',shelf,[[111,13],[124,11],[136,9],[148,7],[160,5],[172,3],[184,2]],'山顶哨站的通路打开了',
+  run('blue',shelf,[[111,13],[124,11],[136,9],[148,7],[160,5],[172,3],[184,2]],'雪球撞开了山顶哨站前的冰墙',
     {fork:3,spur:[[148,7],[159,9],[173,8]],switchKey:'rail'});
   const secret=gated([[169,6.2],[178,5.6]],'blue-spur','ice');
   treasure(shaft[3]);treasure(lower[2]);treasure(secret[0]);finish(top[0],tile(197,1,13,'ice'));

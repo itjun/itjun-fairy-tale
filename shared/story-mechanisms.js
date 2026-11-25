@@ -9,7 +9,7 @@ export function metGoals(room,state) { return (room.goals || []).every(key=>reac
 export function storyHint(room,state) {
   if (!room.goals?.length) return '';
   const count = room.goals.filter(key=>reached(room,state,key)).length;
-  if (count===room.goals.length) return '路通了，去发光的门';
+  if (count===room.goals.length) return '跳到门前，门亮了就进去';
   const active = room.stations.find(s=>s.goal && !done(state,s.key) && s.requires.every(k=>done(state,k)));
   const clue = active?.icon === 'clock-golden-bell' ? '找一找还在晃的金钟'
     : active?.kind === 'ride' ? '站上橙色指针，等它靠窗'

@@ -80,7 +80,7 @@ export function stepField(world,rooms,player,time) {
 export function fieldHint(world,rooms,player,time) {
   const room=world.rooms[rooms.roomId],marks=rooms.field;
   if(!room.stops.length) return '';
-  if(fieldComplete(room,marks)) return '通路打开了　去发光的门';
+  if(fieldComplete(room,marks)) return '跳到门前，门亮了就进去';
   const next=nextRequiredStop(room,marks);
   if(!next)return room.clue || '看看附近的机关';
   const p=world.platforms[next.platformId],dx=p.x-player.x,dy=p.y-player.y;
