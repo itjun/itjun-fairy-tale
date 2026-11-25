@@ -138,7 +138,14 @@ export function startGamepad() {
     if (isBindings && !input.faceX) input.actions.delete('attack');
     const step = gate.step(input, time);
     if (!step.isReady) return;
-    if (step.navigation || step.pressed.size || input.scroll || isBindings && Math.hypot(input.stick.x, input.stick.y) >= .52) publish({ mode: 'gamepad', notice: '' });
+    if (
+      step.navigation ||
+      step.pressed.size ||
+      input.scroll ||
+      (isPlaying && (Math.abs(input.direction) > 0 || Math.abs(input.vertical) > 0 || input.actions.size > 0)) ||
+      (isBindings && Math.hypot(input.stick.x, input.stick.y) >= 0.52)
+    )
+      publish({ mode: 'gamepad', notice: '' });
     if (isPlaying) {
       // 游玩中 B 不暂停，孩子乱按也不会被打断。
       if (step.pressed.has('pause')) { release(); gameplay.pause(); return; }
