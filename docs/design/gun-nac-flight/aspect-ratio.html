@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>加纳战机 · 战场比例</title>
+<style>
+@font-face {
+  font-family: GardenHand;
+  src: url('/fonts/LXGWWenKai-Regular.woff2') format('woff2');
+  font-display: swap;
+}
+:root {
+  --ink: #e8f0ff;
+  --muted: #8fa4c8;
+  --gold: #ffdf7b;
+  --cyan: #9be8fa;
+  --navy: #0b1430;
+  --panel: #15224a;
+  --rail: #101d42;
+  --line: #3d5278;
+  --pick: #ffe39a;
+  --pick-ink: #172448;
+  --now: #ff7a5c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font: 17px/1.55 GardenHand, "Kaiti SC", KaiTi, "Songti SC", serif;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, #1a2f68 0%, transparent 55%),
+    linear-gradient(180deg, #0a1228 0%, var(--navy) 40%, #0e1a38 100%);
+}
+button { font: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+a { color: var(--cyan); }
+header, main, footer {
+  width: min(1180px, calc(100% - 36px));
+  margin-inline: auto;
+}
+header { padding: 28px 0 8px; }
+header .eyebrow {
+  color: var(--muted);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+}
+h1 {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 4.5vw, 42px);
+  font-weight: normal;
+  color: var(--gold);
+  text-shadow: 2px 2px #1a2240;
+  line-height: 1.2;
+}
+.lead {
+  margin: 0;
+  max-width: 46em;
+  color: #d5e2f7;
+  font-size: 16px;
+}
+.lead strong { color: var(--gold); font-weight: normal; }
+.problem {
+  margin: 22px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.problem figure,
+.option .stage {
+  margin: 0;
+  border: 2px solid var(--line);
+  border-radius: 10px 14px 9px 12px;
+  overflow: hidden;
+  background: #0c1634;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.problem figcaption,
+.option .cap {
+  padding: 10px 14px 12px;
+  font-size: 14px;
+  color: var(--muted);
+  background: rgba(10, 18, 40, 0.92);
+  border-top: 1px solid var(--line);
+}
+.problem figcaption b,
+.option .cap b { color: var(--now); font-weight: normal; }
+.wide-shot {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #101d42 center / cover no-repeat;
+  background-image: url('screens/area-5-route.webp');
+}
+.wide-shot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 122, 92, 0.22), transparent 18%, transparent 82%, rgba(255, 122, 92, 0.22));
+  pointer-events: none;
+}
+.scan {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 58%;
+  height: 0;
+  border-top: 2px dashed rgba(255, 122, 92, 0.85);
+  pointer-events: none;
+}
+.scan span {
+  position: absolute;
+  top: -1.6em;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 13px;
+  color: #ffc4b4;
+  background: rgba(20, 16, 30, 0.75);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.note-card {
+  padding: 16px 18px;
+  border: 2px solid var(--line);
+  border-radius: 12px 16px 11px 14px;
+  background: rgba(21, 34, 74, 0.88);
+}
+.note-card h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: normal;
+  color: var(--gold);
+}
+.note-card p { margin: 0 0 10px; color: #d5e2f7; font-size: 15px; }
+.note-card p:last-child { margin-bottom: 0; }
+.note-card ul {
+  margin: 8px 0 0;
+  padding-left: 1.15em;
+  color: var(--muted);
+  font-size: 14px;
+}
+.note-card li + li { margin-top: 4px; }
+.note-card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  color: var(--cyan);
+}
+
+h2.section {
+  margin: 34px 0 12px;
+  font-size: 24px;
+  font-weight: normal;
+  color: var(--cyan);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.option {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--line);
+  border-radius: 14px 18px 12px 16px;
+  background: rgba(16, 29, 66, 0.92);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.option[aria-pressed="true"] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(255, 223, 123, 0.35), 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+.option .head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 4px;
+}
+.option .head h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: normal;
+  color: var(--gold);
+}
+.option .tag {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.option .tag.rec {
+  color: #102040;
+  background: var(--gold);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.option .why {
+  margin: 0;
+  padding: 0 14px 10px;
+  font-size: 14px;
+  color: #c8d6ef;
+  min-height: 3.2em;
+}
+
+/* Window mock */
+.stage {
+  margin: 0 10px;
+  position: relative;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  background: #070d1c;
+}
+.stage .chrome {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 7% 5%;
+}
+.frame {
+  position: relative;
+  height: 100%;
+  max-height: 100%;
+  background: #101d42 center / cover no-repeat;
+  background-image: url('screens/area-5-route.webp');
+  border: 1.5px solid #6f86a8;
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 218, 0.08);
+  overflow: hidden;
+}
+.frame .hud-tl,
+.frame .hud-tr {
+  position: absolute;
+  top: 5%;
+  font-size: 9px;
+  line-height: 1.25;
+  color: #fff4da;
+  text-shadow: 0 1px 2px #000;
+  white-space: nowrap;
+}
+.frame .hud-tl { left: 4%; }
+.frame .hud-tr { right: 4%; text-align: right; }
+.rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--rail-w, 14%);
+  background:
+    repeating-linear-gradient(
+      -18deg,
+      transparent 0 10px,
+      rgba(112, 220, 255, 0.04) 10px 11px
+    ),
+    linear-gradient(180deg, #15285a, #0e1a3c);
+  border: 1.5px solid #3a5078;
+  color: #dcebff;
+  font-size: 8px;
+  line-height: 1.3;
+  padding: 6% 4%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.rail.left { left: 0; border-right: none; border-radius: 4px 0 0 4px; }
+.rail.right { right: 0; border-left: none; border-radius: 0 4px 4px 0; text-align: right; }
+.rail .gold { color: var(--gold); }
+.eye {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translate(-50%, -50%);
+  height: 2px;
+  background: rgba(155, 232, 250, 0.85);
+  pointer-events: none;
+}
+.eye::before,
+.eye::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cyan);
+}
+.eye::before { left: -2px; }
+.eye::after { right: -2px; }
+
+/* A: 4:3 + rails */
+#opt-a .chrome { display: grid; grid-template-columns: 14% 1fr 14%; gap: 0; padding: 6% 3%; place-items: stretch; }
+#opt-a .frame { width: 100%; height: auto; aspect-ratio: 4 / 3; align-self: center; }
+#opt-a .rail { position: relative; width: auto; }
+#opt-a .eye { width: 58%; }
+
+/* B: 3:2 + thin rails */
+#opt-b .chrome { display: grid; grid-template-columns: 9% 1fr 9%; gap: 0; padding: 7% 2.5%; place-items: stretch; }
+#opt-b .frame { width: 100%; height: auto; aspect-ratio: 3 / 2; align-self: center; }
+#opt-b .rail { position: relative; width: auto; font-size: 7px; }
+#opt-b .eye { width: 68%; }
+
+/* C: 4:3 centered, HUD overlay, plain bars */
+#opt-c .chrome { padding: 6% 18%; }
+#opt-c .frame { width: 100%; aspect-ratio: 4 / 3; height: auto; }
+#opt-c .eye { width: 58%; }
+#opt-c .plain-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16%;
+  background: #070d1c;
+}
+#opt-c .plain-bar.l { left: 0; }
+#opt-c .plain-bar.r { right: 0; }
+
+.meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  padding: 10px 14px 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.meta span { color: var(--cyan); }
+.pick {
+  margin: 8px 12px 14px;
+  border: 2px solid #829bab;
+  border-radius: 8px 12px 7px 10px;
+  background: #222f56;
+  color: #fff3d9;
+  padding: 0.45em 0.9em;
+  min-height: 2.2em;
+}
+.option[aria-pressed="true"] .pick {
+  background: var(--pick);
+  color: var(--pick-ink);
+  border-color: #fff0c4;
+}
+
+.compare {
+  margin: 28px 0 8px;
+  overflow-x: auto;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: rgba(12, 20, 44, 0.9);
+}
+.compare table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.compare th,
+.compare td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.compare th { color: var(--gold); font-weight: normal; background: rgba(255, 223, 123, 0.06); }
+.compare td:first-child { color: var(--muted); white-space: nowrap; }
+.compare tr:last-child td { border-bottom: 0; }
+.compare .yes { color: #8dffb0; }
+.compare .mid { color: var(--gold); }
+.compare .no { color: #ff9a86; }
+
+.choice {
+  margin: 22px 0 10px;
+  padding: 16px 18px;
+  border: 2px dashed #5a73a0;
+  border-radius: 12px;
+  background: rgba(21, 34, 74, 0.55);
+}
+.choice h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: normal;
+  color: var(--gold);
+}
+.choice p { margin: 0; color: #d5e2f7; font-size: 15px; }
+.choice[data-empty="true"] p { color: var(--muted); }
+
+footer {
+  padding: 18px 0 40px;
+  color: var(--muted);
+  font-size: 13px;
+}
+footer p { margin: 0; }
+
+@media (max-width: 900px) {
+  .problem, .grid { grid-template-columns: 1fr; }
+  .option .why { min-height: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .option { transition: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">加纳战机 · 设计确认 · 尚未开发</p>
+  <h1>战场比例太宽，先收一收扫视距离</h1>
+  <p class="lead">
+    现在全屏时逻辑战场会从经典的 <strong>256 × 240</strong> 拉宽到最高约 <strong>540</strong>。
+    16∶9 显示器上飞机左右飞满整屏，弹幕与金币要横跨很长一条线，眼睛很容易累。
+    下面三套方案都<strong>保持竖向卷轴</strong>和现有彩笔画风，只改「看得见多宽」和 HUD 放哪。
+  </p>
+</header>
+
+<main>
+  <section class="problem" aria-label="当前问题">
+    <figure>
+      <div class="wide-shot" role="img" aria-label="当前偏宽的金钱世界战场示意">
+        <div class="scan"><span>眼睛要来回扫这么宽</span></div>
+      </div>
+      <figcaption>
+        <b>现状</b>：视口铺满 + 逻辑宽度随比例变宽（约 16∶9 ≈ 427 宽）。验收里的 4∶3 截图其实更舒服，宽屏被拉宽后才累。
+      </figcaption>
+    </figure>
+    <aside class="note-card">
+      <h2>为什么会变宽</h2>
+      <p>战斗坐标仍是红白机那套高度 240；宽屏时用 <code>240 × (屏宽÷屏高)</code> 把可飞宽度撑开，战机真的能飞到左右边缘。</p>
+      <ul>
+        <li>原版 / 验收截图：约 <strong>4∶3</strong>（256×240）</li>
+        <li>常见家庭显示器：约 <strong>16∶9</strong></li>
+        <li>改比例不必重做关卡美术，主要改「窗口怎么裁」和 HUD</li>
+      </ul>
+    </aside>
+  </section>
+
+  <h2 class="section">三套比例 · 点一下选定</h2>
+  <div class="grid" role="listbox" aria-label="战场比例方案" id="options">
+    <article class="option" id="opt-a" role="option" aria-pressed="false" tabindex="0" data-id="a" data-name="经典 4∶3 + 侧栏">
+      <div class="head">
+        <h3>A. 经典 4∶3 + 侧栏</h3>
+        <span class="tag rec">推荐</span>
+      </div>
+      <p class="why">中间固定红白机比例；分数、命数、区名、操作提示搬到左右深蓝侧栏。扫视最短，最接近原版手感。</p>
+      <div class="stage" aria-hidden="true">
+        <div class="chrome">
+          <div class="rail left"><span class="gold">183929</span><span>✈ ×19</span><span>T 2 Lv.2</span></div>
+          <div class="frame">
+            <div class="eye"></div>
+          </div>
+          <div class="rail right"><span class="gold">第 5 区</span><span>金钱世界</span><span>机速 2</span><span>¥0</span></div>
+        </div>
+      </div>
+      <div class="meta">
+        <div>逻辑宽 <span>256</span></div>
+        <div>画面 <span>4∶3</span></div>
+        <div>侧栏 <span>有 · 彩笔信息条</span></div>
+        <div>相对现状 <span>约窄 40%</span></div>
+      </div>
+      <button type="button" class="pick">选这套</button>
+    </article>
+
+    <article class="option" id="opt-b" role="option" aria-pressed="false" tabindex="0" data-id="b" data-name="稍宽 3∶2 + 薄侧栏">
+      <div class="head">
+        <h3>B. 稍宽 3∶2 + 薄侧栏</h3>
+        <span class="tag">折中</span>
+      </div>
+      <p class="why">比 4∶3 略宽一点，左右闪避还留一点余量；侧栏变薄。比现在的宽屏走廊窄一截，又不会收得太紧。</p>
+      <div class="stage" aria-hidden="true">
+        <div class="chrome">
+          <div class="rail left"><span class="gold">分数</span><span>命数</span></div>
+          <div class="frame">
+            <div class="eye"></div>
+          </div>
+          <div class="rail right"><span class="gold">区名</span><span>机速</span></div>
+        </div>
+      </div>
+      <div class="meta">
+        <div>逻辑宽 <span>约 360</span></div>
+        <div>画面 <span>3∶2</span></div>
+        <div>侧栏 <span>有 · 更薄</span></div>
+        <div>相对现状 <span>约窄 15～20%</span></div>
+      </div>
+      <button type="button" class="pick">选这套</button>
+    </article>
+
+    <article class="option" id="opt-c" role="option" aria-pressed="false" tabindex="0" data-id="c" data-name="4∶3 居中 · HUD 叠画面">
+      <div class="head">
+        <h3>C. 4∶3 居中叠 HUD</h3>
+        <span class="tag">素净</span>
+      </div>
+      <p class="why">战场同样锁 4∶3，左右只留素净深蓝边，不挪 HUD。分数区名仍叠在画面四角，改动最小，和验收截图最像。</p>
+      <div class="stage" aria-hidden="true">
+        <div class="chrome">
+          <div class="plain-bar l"></div>
+          <div class="plain-bar r"></div>
+          <div class="frame">
+            <div class="hud-tl">183929<br>✈ ×19<br>T 2 Lv.2</div>
+            <div class="hud-tr">第 5 区<br>金钱世界<br>机速 2 ¥0</div>
+            <div class="eye"></div>
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        <div>逻辑宽 <span>256</span></div>
+        <div>画面 <span>4∶3</span></div>
+        <div>侧栏 <span>无 · 只留空边</span></div>
+        <div>相对现状 <span>约窄 40%</span></div>
+      </div>
+      <button type="button" class="pick">选这套</button>
+    </article>
+  </div>
+
+  <div class="compare" role="region" aria-label="对照表">
+    <table>
+      <thead>
+        <tr>
+          <th>对比</th>
+          <th>A · 4∶3 + 侧栏</th>
+          <th>B · 3∶2 + 薄侧栏</th>
+          <th>C · 4∶3 叠 HUD</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>眼睛左右扫视</td>
+          <td class="yes">最短</td>
+          <td class="mid">中等</td>
+          <td class="yes">最短</td>
+        </tr>
+        <tr>
+          <td>和红白机手感</td>
+          <td class="yes">最接近</td>
+          <td class="mid">略宽一点</td>
+          <td class="yes">最接近</td>
+        </tr>
+        <tr>
+          <td>信息会不会压住弹幕</td>
+          <td class="yes">侧栏躲开战斗区</td>
+          <td class="yes">侧栏躲开战斗区</td>
+          <td class="mid">仍叠在画面角上</td>
+        </tr>
+        <tr>
+          <td>宽屏留白观感</td>
+          <td class="yes">侧栏有内容，不空</td>
+          <td class="yes">侧栏较薄</td>
+          <td class="mid">左右素边，更素净</td>
+        </tr>
+        <tr>
+          <td>实现量（确认后再做）</td>
+          <td class="mid">改布局 + 挪 HUD</td>
+          <td class="mid">改宽度上限 + 薄侧栏</td>
+          <td class="yes">主要锁比例，HUD 少动</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <section class="choice" id="choice" data-empty="true" aria-live="polite">
+    <h2>你的选择</h2>
+    <p>点上面任一「选这套」。确认后我再按该比例改飞行战场；现在还没有任何代码改动。</p>
+  </section>
+</main>
+
+<footer>
+  <p>参考画面来自金钱世界航线截图。本页只做比例确认，不改存档、关卡或武器规则。</p>
+</footer>
+
+<script>
+(() => {
+  const choice = document.getElementById('choice');
+  const options = [...document.querySelectorAll('.option')];
+  const labels = {
+    a: '已选 <strong>A. 经典 4∶3 + 侧栏</strong>。战场锁 256×240，分数与区名进左右彩笔侧栏。回复「确认 A」或再说微调即可开发。',
+    b: '已选 <strong>B. 稍宽 3∶2 + 薄侧栏</strong>。逻辑宽约 360，侧栏更薄。回复「确认 B」或再说微调即可开发。',
+    c: '已选 <strong>C. 4∶3 居中叠 HUD</strong>。战场锁 4∶3，HUD 仍叠画面角，左右素边。回复「确认 C」或再说微调即可开发。',
+  };
+
+  function select(id) {
+    options.forEach((el) => {
+      const on = el.dataset.id === id;
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
+      el.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    choice.dataset.empty = 'false';
+    choice.innerHTML = `<h2>你的选择</h2><p>${labels[id]}</p>`;
+  }
+
+  options.forEach((el) => {
+    const go = () => select(el.dataset.id);
+    el.querySelector('.pick').addEventListener('click', (e) => {
+      e.stopPropagation();
+      go();
+    });
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        go();
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
