@@ -40,7 +40,7 @@
   justify-content: center;
   gap: clamp(5px, 1.3cqw, 16px);
   overflow: auto;
-  padding: 3cqw 5cqw;
+  padding: 3cqw 5cqw clamp(44px, 7.6cqw, 72px);
   background: rgba(13, 22, 56, 0.91);
   box-sizing: border-box;
   text-align: center;
@@ -110,7 +110,8 @@
   gap: 1em;
 }
 .gn-config label {
-  width: min(64%, 380px);
+  width: min(76%, 440px);
+  white-space: nowrap;
 }
 .gn-title {
   align-items: flex-start;
@@ -137,9 +138,86 @@
   letter-spacing: 0.09em;
 }
 .gn-title .gn-help {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(5px, 0.85cqw, 11px);
+  max-width: 56%;
   color: #f8e9d1;
-  line-height: 1.5;
-  font-size: clamp(10px, 1.65cqw, 21px);
+  line-height: 1.45;
+  font-size: clamp(11px, 1.7cqw, 22px);
+}
+.gn-help-pad {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45em 0.85em;
+}
+.gn-title .gn-help small {
+  color: #bfd7e8;
+  font-size: 0.84em;
+}
+.gn-btn-pad {
+  display: inline-flex;
+  align-items: center;
+}
+.gn-page .pad-key {
+  min-width: 1.48em;
+  height: 1.48em;
+  padding: 0 0.28em;
+  border-width: 2px;
+  font-size: 0.82em;
+  font-weight: bold;
+}
+.gn-btn-pad .pad-key {
+  min-width: 1.35em;
+  height: 1.35em;
+  font-size: 0.76em;
+}
+.gn-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+.gn-select-wrap::before,
+.gn-select-wrap::after {
+  font-size: 0.72em;
+  color: #ffdf7b;
+  opacity: 0.85;
+}
+.gn-select-wrap::before {
+  content: '◀';
+}
+.gn-select-wrap::after {
+  content: '▶';
+}
+.gn-select-wrap[data-disabled='true']::before,
+.gn-select-wrap[data-disabled='true']::after {
+  opacity: 0.3;
+}
+.gn-pad-bar {
+  position: absolute;
+  right: 3.4%;
+  bottom: 2.5%;
+  max-width: 93%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35em 1.05em;
+  padding: 0.32em 0.72em;
+  border: 1.5px solid #829babaa;
+  border-radius: 9px 11px 8px 10px;
+  background: rgba(15, 26, 61, 0.86);
+  color: #fff4da;
+  font-size: clamp(11px, 1.58cqw, 20px);
+  line-height: 1.25;
+  pointer-events: none;
+}
+.gn-pad-bar .pad-key + .pad-key {
+  margin-left: -0.14em;
+}
+body:has(.gn-page) .gamepad-guide {
+  display: none;
 }
 .gn-row,
 .gn-parcel {
@@ -217,6 +295,49 @@
   width: 1em;
   height: 1em;
 }
+.gn-hud button .pad-key {
+  min-width: 1.4em;
+  height: 1.4em;
+  font-size: 0.65em;
+}
+.gn-flight-keys {
+  position: absolute;
+  right: 3.2%;
+  bottom: 2.2%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3em 0.78em;
+  padding: 0.25em 0.6em;
+  border-radius: 9px 11px 8px 10px;
+  background: rgba(12, 21, 50, 0.66);
+  color: #fff4da;
+  font-size: clamp(10px, 1.48cqw, 19px);
+  line-height: 1.2;
+  pointer-events: none;
+  text-shadow: 1px 1px 2px #0b132b;
+}
+.gn-flight-keys > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  white-space: nowrap;
+}
+.gn-flight-keys > span > kbd:not(.pad-key) {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5em;
+  height: 1.48em;
+  padding: 0 0.32em;
+  border: 1.5px solid #c9d8e8;
+  border-radius: 5px 7px 6px 6px;
+  background: rgba(25, 39, 76, 0.92);
+  color: #ffe39a;
+  font: inherit;
+  font-size: 0.86em;
+  box-sizing: border-box;
+}
 .gn-banner {
   position: absolute;
   inset: 39% 0 auto;
@@ -241,6 +362,9 @@
   padding: 6px;
 }
 @media (pointer: coarse) {
+  html:not([data-input-mode='gamepad']) .gn-flight-keys {
+    display: none;
+  }
   .gn-touch-buttons {
     position: absolute;
     bottom: 1%;
@@ -257,10 +381,14 @@
     padding: 6px 12px;
   }
 }
+html[data-input-mode='gamepad'] .gn-touch-buttons {
+  display: none;
+}
 @media (max-height: 520px) {
   .gn-panel {
     gap: 0.7cqw;
-    padding-block: 2cqw;
+    padding-top: 2cqw;
+    padding-bottom: clamp(38px, 7.6cqw, 62px);
   }
 }
 
@@ -269,7 +397,7 @@
     linear-gradient(180deg, #101c420d, #101935ec 76%),
     url('/gun-nac/hangar.webp') center / cover;
   justify-content: flex-end;
-  padding-bottom: 7cqw;
+  padding-bottom: clamp(54px, 9.5cqw, 96px);
 }
 .gn-ending-plane {
   width: 11cqw;

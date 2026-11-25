@@ -132,8 +132,8 @@ export function depart(s) {
   startArea(s, s.area + 1);
   return true;
 }
-export function nextSpeed(s) {
-  if (s.phase === 'flight') s.ship.speed = (s.ship.speed % 4) + 1;
+export function nextSpeed(s, delta = 1) {
+  if (s.phase === 'flight') s.ship.speed = ((((s.ship.speed - 1 + delta) % 4) + 4) % 4) + 1;
 }
 function advance(s) {
   if (s.boss || --s.wait > 0) return;

@@ -46,6 +46,11 @@ test('五种武器、机翼与四档机速通过实际拾取与开火生效', ()
     speeds.push(s.ship.speed);
   }
   assert.equal(new Set(speeds).size, 4);
+  const beforeBack = s.ship.speed;
+  nextSpeed(s, -1);
+  assert.equal(s.ship.speed, ((beforeBack - 2 + 4) % 4) + 1);
+  nextSpeed(s, 1);
+  assert.equal(s.ship.speed, beforeBack);
   for (const t of 'FBTW') {
     s.bombs = [];
     s.ship.stock = 10;
