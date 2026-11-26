@@ -20,7 +20,7 @@ import {
 import { createFlightView } from './view.js';
 import { FlightSound } from './sound.js';
 import { FlightManual } from './Manual.jsx';
-import { SHIP_CANVAS_SIZE, paintWingedShip } from './ship-art.js';
+import { SHIP_CANVAS_SIZE, paintBaseShip, paintWingedShip } from './ship-art.js';
 import './flight.css';
 
 const keys = {
@@ -115,6 +115,17 @@ function BossBar({ boss }) {
     </div>
   );
 }
+function ShipLifeIcon() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, SHIP_CANVAS_SIZE, SHIP_CANVAS_SIZE);
+    paintBaseShip(ctx);
+  }, []);
+  return <canvas ref={ref} width={SHIP_CANVAS_SIZE} height={SHIP_CANVAS_SIZE} className="gn-plane-icon" aria-hidden="true" />;
+}
 function RailLeft({ state }) {
   if (!state) return <aside className="gn-rail gn-rail-left" hidden aria-hidden="true" />;
   const p = state.ship;
@@ -122,7 +133,7 @@ function RailLeft({ state }) {
     <aside className="gn-rail gn-rail-left" aria-label="飞行成绩">
       <strong className="gn-rail-score">{String(state.score).padStart(6, '0')}</strong>
       <span aria-label={'备用战机 ' + p.lives}>
-        <i className="gn-plane-icon" /> ×{p.lives}
+        <ShipLifeIcon /> ×{p.lives}
       </span>
       <span className="gn-rail-bomb">
         {p.bomb} {p.stock} <small>Lv.{p.bombPower}</small>

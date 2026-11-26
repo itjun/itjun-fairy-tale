@@ -392,10 +392,9 @@ body:has(.gn-page) .gamepad-guide {
 }
 .gn-plane-icon {
   display: inline-block;
-  width: 1.12em;
-  height: 1.12em;
-  background: url('/gun-nac/craft.webp') 0 0 / 500% 400%;
-  vertical-align: -0.15em;
+  width: 1.32em;
+  height: 1.38em;
+  vertical-align: -0.22em;
 }
 .gn-rail span {
   display: flex;

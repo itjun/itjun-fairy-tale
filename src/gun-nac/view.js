@@ -7,7 +7,8 @@ import { flareWidth } from './flight.js';
 import { paintCrescentBlade, crescentSpin, crescentDrawSize } from './crescent.js';
 import {
   SHIP_CANVAS_SIZE,
-  BASE_SHIP_SIZE,
+  BASE_SHIP_WIDTH,
+  BASE_SHIP_HEIGHT,
   WINGED_SHIP_WIDTH,
   WINGED_SHIP_HEIGHT,
   paintBaseShip,
@@ -428,15 +429,17 @@ export async function createFlightView(host, onResize) {
       const tilt = p.dx * 0.045;
       const pulse = 0.86 + Math.sin(s.frame * 0.48) * 0.2;
       if (p.wing) {
-        const haloSize = 54 + Math.sin(s.frame * 0.12) * 3;
-        draw('wingHalo', p.x, p.y + 1, haloSize, haloSize * 0.84, 0);
-        draw(symbol('flame', '#ff9c24'), p.x, p.y + 19, 7.6, 14 * pulse, Math.PI + tilt);
-        draw(symbol('flame', '#5ceeff'), p.x - 12.2, p.y + 18, 5.4, 11 * pulse, Math.PI + tilt);
-        draw(symbol('flame', '#5ceeff'), p.x + 12.2, p.y + 18, 5.4, 11 * pulse, Math.PI + tilt);
+        const haloSize = 62 + Math.sin(s.frame * 0.12) * 3;
+        draw('wingHalo', p.x, p.y + 2, haloSize, haloSize * 0.86, 0);
+        draw(symbol('flame', '#ff9c24'), p.x - 3.8, p.y + 24.5, 5.6, 15.5 * pulse, Math.PI + tilt);
+        draw(symbol('flame', '#ff9c24'), p.x + 3.8, p.y + 24.5, 5.6, 15.5 * pulse, Math.PI + tilt);
+        draw(symbol('flame', '#5ceeff'), p.x - 18, p.y + 21.5, 5, 11.5 * pulse, Math.PI + tilt);
+        draw(symbol('flame', '#5ceeff'), p.x + 18, p.y + 21.5, 5, 11.5 * pulse, Math.PI + tilt);
         draw('shipWinged', p.x, p.y, WINGED_SHIP_WIDTH, WINGED_SHIP_HEIGHT, tilt);
       } else {
-        draw(symbol('flame', '#ff9c24'), p.x, p.y + 14.5, 6.2, 10.5 * pulse, Math.PI + tilt);
-        draw('shipBase', p.x, p.y, BASE_SHIP_SIZE, BASE_SHIP_SIZE, tilt);
+        draw(symbol('flame', '#ff9c24'), p.x - 2.8, p.y + 20.5, 4.8, 13 * pulse, Math.PI + tilt);
+        draw(symbol('flame', '#ff9c24'), p.x + 2.8, p.y + 20.5, 4.8, 13 * pulse, Math.PI + tilt);
+        draw('shipBase', p.x, p.y, BASE_SHIP_WIDTH, BASE_SHIP_HEIGHT, tilt);
       }
     }
     for (const h of s.hostile) {

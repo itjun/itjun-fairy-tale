@@ -60,16 +60,19 @@ function drawCraft(g, _img, x, y, isWinged, t = 0) {
   if (!cachedWingedShip) cachedWingedShip = makeShipCanvas(true);
   const pulse = 0.86 + Math.sin(t * 0.42) * 0.18;
   if (isWinged) {
-    paintShape(g, 'flame', FLAME, x, y + 22, 8.5, 16 * pulse, Math.PI);
-    paintShape(g, 'flame', BLUE, x - 14.5, y + 20, 6, 12.5 * pulse, Math.PI);
-    paintShape(g, 'flame', BLUE, x + 14.5, y + 20, 6, 12.5 * pulse, Math.PI);
-    const w = 62;
-    const h = 50;
+    paintShape(g, 'flame', FLAME, x - 4.5, y + 28, 6.2, 16.5 * pulse, Math.PI);
+    paintShape(g, 'flame', FLAME, x + 4.5, y + 28, 6.2, 16.5 * pulse, Math.PI);
+    paintShape(g, 'flame', BLUE, x - 20.5, y + 24.5, 5.4, 12.5 * pulse, Math.PI);
+    paintShape(g, 'flame', BLUE, x + 20.5, y + 24.5, 5.4, 12.5 * pulse, Math.PI);
+    const w = 72;
+    const h = 60;
     g.drawImage(cachedWingedShip, x - w / 2, y - h / 2, w, h);
   } else {
-    paintShape(g, 'flame', FLAME, x, y + 17, 7, 12 * pulse, Math.PI);
-    const s = 36;
-    g.drawImage(cachedBaseShip, x - s / 2, y - s / 2, s, s);
+    paintShape(g, 'flame', FLAME, x - 3.4, y + 23.5, 5.4, 14 * pulse, Math.PI);
+    paintShape(g, 'flame', FLAME, x + 3.4, y + 23.5, 5.4, 14 * pulse, Math.PI);
+    const w = 50;
+    const h = 52;
+    g.drawImage(cachedBaseShip, x - w / 2, y - h / 2, w, h);
   }
 }
 
