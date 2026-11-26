@@ -10,6 +10,8 @@
   .home-slide img { width:auto; height:100%; }
 }
 .home-title { position:absolute; top:clamp(28px,7vh,80px); left:clamp(28px,6vw,100px); }
+.home-retro { position:absolute; top:clamp(28px,7vh,80px); right:clamp(28px,6vw,100px); z-index:1; }
+#root .home-menu-button.home-retro { min-width:0; text-align:center; background:#fffaf1e8; border-radius:6px; }
 .home-title h1 { font-size:clamp(40px,5.3vw,76px); font-weight:400; color:#a83e66; letter-spacing:.12em; margin:0; }
 .home-title p { margin:12px 0 0; font-size:clamp(14px,1.4vw,20px); color:#685d50; letter-spacing:.1em; }
 .home-navigation { position:absolute; left:clamp(28px,6vw,100px); bottom:clamp(38px,9vh,100px); display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
@@ -28,6 +30,8 @@
 .home-page-content { padding-top:28px; }
 #root .home-page :is(.quest-card,.quiet-button,.achievement-list button) { border:0; border-image:none; border-radius:0; background:none; box-shadow:none; }
 #root .home-page :is(.quest-card,.quiet-button,.achievement-list button):hover { background:#eeeadd; transform:none; }
+#root .home-retro-page .quest-card:disabled { color:#8a8174; }
+#root .home-retro-page .quest-card:disabled:hover { background:none; }
 .home-options .home-page-header,.home-options .home-page-content { max-width:none; }
 .home-options .home-page-header { display:flex; align-items:center; justify-content:space-between; flex-direction:row-reverse; padding-bottom:24px; }
 .home-options .home-page-header h1 { margin:0; font-size:36px; }
@@ -80,6 +84,8 @@ body.is-desktop :is(.home-title,.garden-return,.home-page-header) { -webkit-app-
 @media(max-width:600px) {
   .home-slide img { width:140%; height:auto; left:35%; top:40%; }
   .home-title { top:32px; }
+  .home-retro { top:24px; right:16px; }
+  #root .home-menu-button.home-retro { font-size:20px; min-height:44px; padding:8px 14px; }
   .home-navigation { bottom:108px; gap:6px; }
   .home-slideshow { right:16px; bottom:18px; }
   .home-art-caption { font-size:13px; gap:8px; }
@@ -97,6 +103,7 @@ body.is-desktop :is(.home-title,.garden-return,.home-page-header) { -webkit-app-
 }
 @media(max-height:550px) and (min-width:601px) {
   .home-title { top:22px; }
+  .home-retro { top:16px; }
   .home-title h1 { font-size:40px; }
   .home-navigation { bottom:24px; gap:2px; }
   #root .home-menu-button { font-size:23px; min-height:44px; padding:6px 18px; }
