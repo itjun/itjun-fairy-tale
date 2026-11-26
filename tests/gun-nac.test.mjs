@@ -9,9 +9,8 @@ import {
   continueFlight,
   nextSpeed,
   setFlightWidth,
-  isSelectingOpeningWeapon,
 } from '../src/gun-nac/flight.js';
-import { BOSS, ROUTES, OPENING_LANES, launchWave, playBounds, spawnFoe } from '../src/gun-nac/stages.js';
+import { BOSS, ROUTES, playBounds, spawnFoe } from '../src/gun-nac/stages.js';
 import { bomb, collect, shoot, supply } from '../src/gun-nac/arsenal.js';
 import { enterBoss, bossTargets, hitBoss, updateBoss } from '../src/gun-nac/bosses.js';
 import { STAGE_THEMES, BOSS_THEME } from '../src/gun-nac/sound.js';
@@ -57,29 +56,43 @@ test('五种武器、机翼与四档机速通过实际拾取与开火生效', ()
   const flameY = s.shots.find((b) => b.gun === 4).y;
   for (let i = 0; i < 18; i++) tick(s, { autoFire: false });
   assert.ok(s.shots.some((b) => b.gun === 4 && b.y < flameY - 40));
-  // 3 号圆月弯刀：与跳台同款大尺寸，为最强主武器，可连斩穿透、等级几就齐射几道
+  // 3 号是小月牙：低伤、打中就没，不穿透也不劈弹。换枪留下等级。
   collect(s, { kind: 'gun3' });
   s.ship.power = 1;
+  s.ship.wing = false;
   s.shots = [];
   shoot(s);
   assert.equal(s.shots.length, 1);
   assert.equal(s.shots[0].gun, 3);
-  assert.ok(s.shots[0].spinDir === 1 || s.shots[0].spinDir === -1);
-  assert.equal(s.shots[0].flare, 5);
-  assert.ok(s.shots[0].r >= 6.5);
-  assert.ok(crescentDrawSize(s.shots[0].r) >= 26);
-  assert.ok(s.shots[0].damage >= 4);
-  assert.ok(s.shots[0].pierce >= 2);
-  const rLow = s.shots[0].r;
-  s.ship.power = 3;
+  assert.ok(s.shots[0].damage < 2);
+  assert.ok(s.shots[0].damage > 1.05);
+  const crescentDamage = s.shots[0].damage;
+  s.shots = [];
+  s.ship.gun = 2;
+  shoot(s);
+  assert.ok(s.shots[0].damage > crescentDamage * 3);
+  s.ship.gun = 3;
+  assert.equal(s.shots[0].pierce, undefined);
+  assert.equal(s.shots[0].hit, undefined);
+  const drawSize = crescentDrawSize(s.shots[0].r);
+  assert.ok(drawSize >= 8 && drawSize <= 10);
+  s.ship.power = 2;
+  s.shots = [];
+  shoot(s);
+  assert.equal(s.shots.length, 2);
+  s.ship.power = 8;
+  s.ship.wing = true;
   s.shots = [];
   shoot(s);
   assert.equal(s.shots.length, 3);
-  s.ship.power = 8;
-  s.shots = [];
-  shoot(s);
-  assert.ok(s.shots[0].r > rLow);
-  assert.equal(s.shots.length, 6);
+  s.ship.gun = 3;
+  s.ship.power = 4;
+  collect(s, { kind: 'gun5' });
+  assert.equal(s.ship.gun, 5);
+  assert.equal(s.ship.power, 4);
+  s.ship.gun = 5;
+  s.ship.power = 1;
+  s.ship.wing = false;
   for (let i = 0; i < 12; i++) collect(s, { kind: 'gun5' });
   assert.equal(s.ship.power, 3);
   collect(s, { kind: 'wing' });
@@ -107,7 +120,9 @@ test('五种武器、机翼与四档机速通过实际拾取与开火生效', ()
 });
 test('击落、续关、商店和预送炸弹各结算一次', () => {
   const s = newFlight();
-  assert.equal(s.ship.lives, 30);
+  assert.equal(s.ship.lives, 3);
+  assert.equal(s.ship.gun, 1);
+  assert.equal(s.ship.power, 1);
   s.ship.cash = 50;
   s.phase = 'shop';
   assert.equal(shopBuy(s, 'parcel', 3), true);
@@ -128,13 +143,17 @@ test('击落、续关、商店和预送炸弹各结算一次', () => {
   tick(s);
   assert.equal(s.phase, 'over');
   assert.equal(s.ship.cash, 20);
+  assert.equal(s.ship.gun, 1);
+  assert.equal(s.ship.power, 1);
   assert.equal(continueFlight(s), true);
   assert.equal(continueFlight(s), false);
-  assert.equal(s.ship.lives, 30);
+  assert.equal(s.ship.lives, 3);
   assert.equal(s.area, 3);
   assert.equal(s.ship.turbo, 1);
+  assert.equal(s.ship.gun, 1);
+  assert.equal(s.ship.power, 1);
 });
-test('掉机翼、坠机扣命和续关都继承此前的武器系统', () => {
+test('卸翼回到 1 级，坠机回到 1 号并钱减半', () => {
   const s = newFlight();
   s.wait = 10000;
   collect(s, { kind: 'gun3' });
@@ -148,38 +167,36 @@ test('掉机翼、坠机扣命和续关都继承此前的武器系统', () => {
   assert.equal(s.ship.power, 6);
   assert.equal(s.ship.bomb, 'B');
   assert.equal(s.ship.bombPower, 3);
-  // 第一次受击：机翼挡伤，武器类型和火力等级保持不变，再拾同号不会倒退
+  s.ship.cash = 40;
   s.ship.inv = 0;
   s.hostile.push({ x: s.ship.x, y: s.ship.y, vx: 0, vy: 0, r: 3, age: 0, life: 10 });
   tick(s);
   assert.equal(s.ship.wing, false);
-  assert.equal(s.ship.lives, 30);
+  assert.equal(s.ship.lives, 3);
   assert.equal(s.ship.gun, 3);
-  assert.equal(s.ship.power, 6);
-  collect(s, { kind: 'gun3' });
-  assert.equal(s.ship.power, 6);
-  // 第二次受击：扣一命，仍完整继承 3 号武器、火力、芯片和炸弹等级
+  assert.equal(s.ship.power, 1);
+  assert.equal(s.ship.cash, 40);
   s.ship.inv = 0;
   s.hostile.push({ x: s.ship.x, y: s.ship.y, vx: 0, vy: 0, r: 3, age: 0, life: 10 });
   tick(s);
-  assert.equal(s.ship.lives, 29);
-  assert.equal(s.ship.gun, 3);
-  assert.equal(s.ship.power, 6);
-  assert.equal(s.ship.chips, 1);
+  assert.equal(s.ship.lives, 2);
+  assert.equal(s.ship.gun, 1);
+  assert.equal(s.ship.power, 1);
+  assert.equal(s.ship.bombPower, 1);
   assert.equal(s.ship.bomb, 'B');
-  assert.equal(s.ship.bombPower, 3);
-  // 零命结束后续关：补满 30 命，依然继承原武器系统
+  assert.equal(s.ship.cash, 20);
+  assert.equal(s.ship.chips, 1);
   s.ship.lives = 0;
   s.ship.inv = 0;
+  s.ship.gun = 4;
+  s.ship.power = 3;
   s.hostile.push({ x: s.ship.x, y: s.ship.y, vx: 0, vy: 0, r: 3, age: 0, life: 10 });
   tick(s);
   assert.equal(s.phase, 'over');
   assert.equal(continueFlight(s), true);
-  assert.equal(s.ship.lives, 30);
-  assert.equal(s.ship.gun, 3);
-  assert.equal(s.ship.power, 6);
-  assert.equal(s.ship.bomb, 'B');
-  assert.equal(s.ship.bombPower, 3);
+  assert.equal(s.ship.lives, 3);
+  assert.equal(s.ship.gun, 1);
+  assert.equal(s.ship.power, 1);
 });
 test('兔眼独立，海底、沙下与陶偶行走期间不受枪击', () => {
   for (const kind of ['rabbit', 'octopus', 'tower', 'clay']) {
@@ -265,18 +282,25 @@ test('汉化版首段固定输入保留四档位移、子弹与补给时序', ()
     assert.equal(Math.trunc(s.ship.x - 128), speeds[i]);
   }
   const s = newFlight();
-  let firstEnemy, firstItem;
-  for (let f = 1; f <= 300; f++) {
+  let firstEnemy, firstItem, firstKind;
+  for (let f = 1; f <= 800; f++) {
     tick(s, { x: f <= 34 ? -1 : 0, fire: true });
     if (f === 8) {
-      assert.equal(s.shots.length, 4);
-      assert.ok(s.shots.every((b) => b.vy < -9));
+      // 1 级散射每 7 帧一发，两发都还在场上，速度是 9。
+      assert.equal(s.shots.length, 2);
+      assert.ok(s.shots.every((b) => b.vy === -9));
     }
     if (s.enemies.length) firstEnemy ??= f;
-    if (s.items.some((item) => item.age >= 0)) firstItem ??= f;
+    const item = s.items.find((entry) => entry.age >= 0);
+    if (item) {
+      firstItem ??= f;
+      firstKind ??= item.kind;
+    }
   }
   assert.equal(firstEnemy, 108);
-  assert.ok(firstItem >= 120 && firstItem <= 180);
+  // 开局不再白送武器。第一件补给是钱袋，来自中段运输机。
+  assert.equal(firstItem, 768);
+  assert.equal(firstKind, 'money');
   enterBoss(s, 'rabbit');
   for (let f = 0; f < 72; f++) updateBoss(s);
   let open = 0;
@@ -331,15 +355,13 @@ test('商店可寄下一关，终关换弹和封顶余额可跨保存恢复', ()
   assert.ok(!depart(restored));
   assert.equal(decodeFlight(JSON.stringify({ ...restored, ship: { ...restored.ship, gun: 7 } })), null);
 });
-test('每关开局出现 1～5 五种武器且战场固定 4∶3', () => {
+test('战场固定 4∶3，开局不再白送五种武器', () => {
   for (let area = 0; area <= 8; area++) {
-    assert.equal(ROUTES[area][0].wave, 'I', `第 ${area} 区应以开局五武器编队起手`);
+    assert.notEqual(ROUTES[area][0].wave, 'I', `第 ${area} 区不应再以五武器编队起手`);
     const s = newFlight({ area, width: 426 });
     assert.equal(s.width, 256);
-    launchWave(s, 'I');
-    const guns = s.enemies.map((e) => e.dropGun).sort((a, b) => a - b);
-    assert.deepEqual(guns, [1, 2, 3, 4, 5], `第 ${area} 区开局应提供 1~5 全部五种武器`);
-    assert.equal(s.supplyCount, 0);
+    assert.equal(s.ship.gun, 1);
+    assert.equal(s.ship.lives, 3);
   }
   const flight = newFlight({ area: 1, width: 426 });
   flight.wait = 10000;
@@ -357,86 +379,52 @@ test('每关开局出现 1～5 五种武器且战场固定 4∶3', () => {
   assert.equal(flight.ship.x, 250);
 });
 
-test('开局五武器分五条独立航道逐架慢出，选枪期间不提前刷怪且不串道误触', () => {
-  assert.equal(OPENING_LANES.length, 5);
-  for (let i = 1; i < OPENING_LANES.length; i++) {
-    assert.ok(OPENING_LANES[i] - OPENING_LANES[i - 1] >= 44, '相邻武器航道留足安全间距');
-  }
-  const direct = newFlight({ area: 1, gun: 3 });
-  assert.equal(direct.ship.gun, 3, '出击武器选择界面可直接挂载所选主武器升空');
-
-  const s = newFlight({ area: 1 });
-  // 站在正中 x=128 自动射击：只会打落正中第 3 航道的圆月弯刀补给并稳稳接住，不会误吃到其他航道武器
-  let pickedThree = false;
-  for (let f = 0; f < 1600; f++) {
-    tick(s, { x: 0, y: 0, fire: true });
-    if (isSelectingOpeningWeapon(s)) {
-      assert.equal(
-        s.enemies.some((e) => e.path !== 'opening'),
-        false,
-        '开局选武器未结束前不刷普通敌机',
-      );
-      for (const item of s.items) {
-        if (item.isOpening && item.age >= 0) assert.equal(item.x, item.ox, '开局武器牌垂直缓落不左右乱晃');
-      }
-    }
-    if (s.ship.gun === 3) pickedThree = true;
-    if (pickedThree && !isSelectingOpeningWeapon(s)) break;
-  }
-  assert.equal(pickedThree, true);
-  assert.equal(s.ship.gun, 3, '后续航道的 4、5 号武器从侧旁滑走，不会覆盖已选中的 3 号圆月弯刀');
-});
-
-test('圆月弯刀可连续斩穿多只敌机并劈碎可破坏敌弹，战机与补给高频掉机翼和武器', () => {
-  assert.ok(BASE_SHIP_SIZE >= 20);
-  assert.ok(WINGED_SHIP_WIDTH > BASE_SHIP_SIZE + 12 && WINGED_SHIP_HEIGHT > BASE_SHIP_SIZE + 6);
+test('小飞机、小月牙不劈弹，掉落以钱和芯片为主', () => {
+  assert.equal(BASE_SHIP_SIZE, 16);
+  assert.equal(WINGED_SHIP_WIDTH, 26);
+  assert.equal(WINGED_SHIP_HEIGHT, 16);
 
   const s = newFlight({ area: 1 });
   s.wait = 9999;
   collect(s, { kind: 'gun3' });
+  s.ship.power = 1;
   s.ship.x = 128;
   s.ship.y = 180;
-  // 正前方纵向摆两只小怪 + 一颗可破坏敌弹，一把 Lv.1 圆月弯刀应一路劈碎敌弹并连斩两只小怪
   s.hostile.push({ x: 128, y: 155, vx: 0, vy: 0, r: 4, age: 0, life: 99, kind: 'pearl', breakable: 1 });
-  const e1 = spawnFoe(s, 'scout', 128, 135, 'ground', 1, 0);
-  const e2 = spawnFoe(s, 'scout', 128, 108, 'ground', 1, 0);
+  const e1 = spawnFoe(s, 'scout', 128, 120, 'ground', 1, 0);
+  const e2 = spawnFoe(s, 'scout', 128, 90, 'ground', 1, 0);
   e1.shotAt = e2.shotAt = 9999;
   shoot(s);
-  assert.equal(s.shots.length, 1);
   for (let i = 0; i < 40; i++) {
     s.cooldown = 99;
     tick(s, { autoFire: false });
   }
-  assert.equal(s.hostile.length, 0, '圆月弯刀直接劈碎可破坏敌弹');
-  assert.equal(s.enemies.length, 0, '单把圆月弯刀连斩两只敌机');
+  assert.equal(s.hostile.length, 1, '主炮不再劈掉敌弹');
+  assert.ok(s.enemies.some((e) => e.id === e2.id), '打中第一只后月牙就消失，打不到后面那只');
 
-  // 连续击落 60 只敌机：验证多掉机翼铠甲与武器类别，极少掉钱包
   const lootGame = newFlight({ area: 1, seed: 42 });
   lootGame.wait = 9999;
-  lootGame.ship.wing = true;
   for (let i = 0; i < 60; i++) {
     const foe = spawnFoe(lootGame, 'scout', 80, 80, 'ground', 1, 0);
     foe.hp = 1;
-    lootGame.shots.push({ x: 80, y: 80, vx: 0, vy: -4, gun: 3, age: 0, r: 7, damage: 5, life: 20, hit: [], pierce: 2 });
+    lootGame.shots.push({ x: 80, y: 80, vx: 0, vy: -4, gun: 1, age: 0, r: 2, damage: 5, life: 20 });
     tick(lootGame, { autoFire: false });
     lootGame.shots = [];
   }
   const combatKinds = lootGame.items.map((it) => it.kind);
   const wingCount = combatKinds.filter((k) => k === 'wing').length;
-  const gunOrChipCount = combatKinds.filter((k) => k.startsWith('gun') || k === 'chip').length;
   const moneyCount = combatKinds.filter((k) => k === 'money').length;
-  assert.ok(wingCount >= 4, '击落战机高频产出机翼铠甲');
-  assert.ok(gunOrChipCount >= 4, '击落战机高频产出武器类别与升级芯片');
-  assert.ok(moneyCount <= 1, '击落战机不再满屏掉钱包');
+  const chipCount = combatKinds.filter((k) => k === 'chip').length;
+  assert.ok(moneyCount >= 4, '击落主要掉钱袋');
+  assert.ok(chipCount >= 2, '升级芯片比机翼常见');
+  assert.ok(wingCount <= 1, '机翼不再高频掉落');
 
-  // 中段补给循环：首架必掉铠甲，整轮多铠甲与武器且无钱包
   const supGame = newFlight({ area: 1, seed: 7 });
-  for (let i = 0; i < 12; i++) supply(supGame, 128, 60);
+  for (let i = 0; i < 16; i++) supply(supGame, 128, 60);
   const supKinds = supGame.items.map((it) => it.kind);
-  assert.equal(supKinds[0], 'wing');
-  assert.ok(supKinds.filter((k) => k === 'wing').length >= 4);
-  assert.ok(supKinds.filter((k) => k.startsWith('gun')).length >= 4);
-  assert.equal(supKinds.filter((k) => k === 'money').length, 0);
+  assert.equal(supKinds[0], 'money');
+  assert.equal(supKinds.filter((k) => k === 'wing').length, 1);
+  assert.ok(supKinds.filter((k) => k === 'money').length > supKinds.filter((k) => k === 'wing').length);
 });
 
 test('第 0～8 区与首领战各自拥有独立的背景音乐编曲，八关旋律与配器互不重复', () => {

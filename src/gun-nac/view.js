@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { openingPoint, playBounds } from './stages.js';
+import { playBounds } from './stages.js';
 import { bombGeometry } from './arsenal.js';
 import { branchTip, rabbitEye } from './bosses.js';
 import { visibleTerrain, ENTRY_FRAME, solarSide } from './terrain.js';
@@ -207,24 +207,13 @@ export async function createFlightView(host, onResize) {
     renderer.forceContextLoss();
   }
   try {
-    const [craft, boss, terrain, moonblade, ...maps] = await Promise.all([
+    const [craft, boss, terrain, ...maps] = await Promise.all([
       ...['craft', 'bosses', 'landmarks'].map((n) => loader.loadAsync(BASE + n + '.webp').then(own)),
-      loader.loadAsync('./assets/weapon-moonblade.png').then(own),
       ...Array.from({ length: 9 }, (_, i) => loader.loadAsync(BASE + 'field-' + i + '.webp').then(own)),
     ]);
     tileAtlas('c', craft, 5, 4);
     tileAtlas('b', boss, 4, 4);
     tileAtlas('t', terrain, 4, 4);
-    const bladeMat = material('moonblade', moonblade, true);
-    bladeMat.alphaTest = 0.06;
-    const ghostMat = new THREE.MeshBasicMaterial({
-      map: moonblade,
-      transparent: true,
-      opacity: 0.34,
-      depthWrite: false,
-      depthTest: false,
-    });
-    materials.set('moonbladeGhost', ghostMat);
     material('shipBase', own(textureFrom(paintBaseShip, SHIP_CANVAS_SIZE)), true);
     material('shipWinged', own(textureFrom(paintWingedShip, SHIP_CANVAS_SIZE)), true);
     const haloTex = own(
@@ -277,7 +266,6 @@ export async function createFlightView(host, onResize) {
   const dot = symbol('dot', HOT),
     ring = symbol('ring', BLUE),
     laser = symbol('beam', '#ff4e6b');
-  const crescentTrail = new Map();
   function frame(s) {
     used = 0;
     const w = playBounds(s).width || viewWidth;
@@ -326,13 +314,6 @@ export async function createFlightView(host, onResize) {
         draw(ring, e.x, e.y, 9 + e.age * 0.28, 4 + e.age * 0.13);
         continue;
       }
-      if (e.path === 'opening') {
-        draw('c' + CRAFT.courier, e.x, e.y, 16, 16, Math.sin(e.age * 0.05) * 0.06);
-        const tag = String(e.dropGun || 1);
-        if (e.dropGun === 3) draw('moonblade', e.x, e.y + 13, 14, 14, e.age * 0.08);
-        draw(symbol('badge', e.dropGun === 3 ? GOLD : '#aceaf1', tag), e.x, e.y + 13, e.dropGun === 3 ? 11 : 12);
-        continue;
-      }
       const size = e.r * (e.kind === 'barge' ? 3.4 : 3);
       draw('c' + CRAFT[e.kind], e.x, e.y, size, size, Math.sin(e.age * 0.065) * 0.085);
       if (e.kind === 'shell' && e.age % 135 < 53) draw(symbol('ring', GOLD), e.x, e.y, size * 0.84);
@@ -376,71 +357,35 @@ export async function createFlightView(host, onResize) {
             : i.kind === 'chip'
               ? 'P'
               : '★';
-        const badgeSize = i.isOpening ? 15 : 13.5;
-        if (i.kind === 'gun3') {
-          draw('moonblade', i.x, i.y, badgeSize + 8, badgeSize + 8, i.age * 0.09);
-        }
+        const badgeSize = 12;
         draw(
-          symbol('badge', i.kind.startsWith('bomb') ? '#fac081' : i.kind === 'gun3' ? GOLD : '#aceaf1', tag),
+          symbol('badge', i.kind.startsWith('bomb') ? '#fac081' : '#aceaf1', tag),
           i.x,
           i.y,
-          i.kind === 'gun3' ? badgeSize - 1.5 : badgeSize,
+          badgeSize,
         );
       }
     }
-    // 圆月弯刀直接复用跳台原画 weapon-moonblade.png 素材，残影留在渲染层。
-    const live = new Set();
     for (const shot of s.shots) {
       if (shot.gun === 3) {
-        live.add(shot);
         const spin = crescentSpin(shot.age, shot.spinDir || 1);
         const size = crescentDrawSize(shot.r);
-        let trail = crescentTrail.get(shot);
-        if (!trail) {
-          trail = [];
-          crescentTrail.set(shot, trail);
-        }
-        trail.push({ x: shot.x, y: shot.y, spin });
-        if (trail.length > 3) trail.shift();
-        for (let i = 0; i < trail.length - 1; i++) {
-          const ghost = trail[i];
-          const fade = (i + 1) / trail.length;
-          const gSize = size * (0.62 + fade * 0.22);
-          draw('moonbladeGhost', ghost.x, ghost.y, gSize, gSize, ghost.spin);
-        }
-        draw('moonblade', shot.x, shot.y, size, size, spin);
+        draw(symbol('blade', '#7ad8ff'), shot.x, shot.y, size, size, spin);
         continue;
       }
       const a = Math.atan2(shot.vy, shot.vx) + Math.PI / 2;
       const shape = ['', 'beam', 'dot', 'blade', 'flame', 'beam'][shot.gun],
         color = ['', BLUE, '#dc8cff', '#38c6ff', '#ffad22', '#66ffd9'][shot.gun];
-      draw(
-        symbol(shape, color),
-        shot.x,
-        shot.y,
-        shot.r * 2.5,
-        shot.gun === 5 ? 16 : shot.gun === 4 ? 26 : shot.gun === 1 ? 8.5 : shot.r * 3.5,
-        a,
-      );
+      const height = shot.gun === 4 ? shot.span || 12 : shot.gun === 5 ? 9 : shot.gun === 1 ? 6 : shot.r * 2.4;
+      draw(symbol(shape, color), shot.x, shot.y, shot.gun === 5 ? 2.2 : shot.r * 2, height, a);
     }
-    for (const key of crescentTrail.keys()) if (!live.has(key)) crescentTrail.delete(key);
     const p = s.ship;
     if (p.inv <= 0 || Math.floor(p.inv / 6) % 2 === 0) {
       const tilt = p.dx * 0.045;
       const pulse = 0.86 + Math.sin(s.frame * 0.48) * 0.2;
-      if (p.wing) {
-        const haloSize = 62 + Math.sin(s.frame * 0.12) * 3;
-        draw('wingHalo', p.x, p.y + 2, haloSize, haloSize * 0.86, 0);
-        draw(symbol('flame', '#ff9c24'), p.x - 3.8, p.y + 24.5, 5.6, 15.5 * pulse, Math.PI + tilt);
-        draw(symbol('flame', '#ff9c24'), p.x + 3.8, p.y + 24.5, 5.6, 15.5 * pulse, Math.PI + tilt);
-        draw(symbol('flame', '#5ceeff'), p.x - 18, p.y + 21.5, 5, 11.5 * pulse, Math.PI + tilt);
-        draw(symbol('flame', '#5ceeff'), p.x + 18, p.y + 21.5, 5, 11.5 * pulse, Math.PI + tilt);
-        draw('shipWinged', p.x, p.y, WINGED_SHIP_WIDTH, WINGED_SHIP_HEIGHT, tilt);
-      } else {
-        draw(symbol('flame', '#ff9c24'), p.x - 2.8, p.y + 20.5, 4.8, 13 * pulse, Math.PI + tilt);
-        draw(symbol('flame', '#ff9c24'), p.x + 2.8, p.y + 20.5, 4.8, 13 * pulse, Math.PI + tilt);
-        draw('shipBase', p.x, p.y, BASE_SHIP_WIDTH, BASE_SHIP_HEIGHT, tilt);
-      }
+      draw(symbol('flame', '#ff9c24'), p.x, p.y + 8, 2.2, 4.2 * pulse, Math.PI + tilt);
+      if (p.wing) draw('shipWinged', p.x, p.y, WINGED_SHIP_WIDTH, WINGED_SHIP_HEIGHT, tilt);
+      else draw('shipBase', p.x, p.y, BASE_SHIP_WIDTH, BASE_SHIP_HEIGHT, tilt);
     }
     for (const h of s.hostile) {
       const a = Math.atan2(h.vy, h.vx) + Math.PI / 2;

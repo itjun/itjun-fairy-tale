@@ -114,12 +114,14 @@ export function crescentSpin(age, spinDir = 1) {
 }
 
 export function crescentRadius(level = 1) {
-  const lv = Math.max(1, Math.min(8, level | 0));
-  return 6.5 + ((lv - 1) / 7) * 2.1;
+  void level;
+  return 2.2;
 }
 
+/** 战场上的月牙大约 8～10 像素，不再铺满屏幕。 */
 export function crescentDrawSize(r) {
-  return r * 4.15;
+  void r;
+  return 9;
 }
 
 export { SIZE as CRESCENT_SIZE };

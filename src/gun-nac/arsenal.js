@@ -46,58 +46,49 @@ export function shoot(s) {
     });
   const up = -Math.PI / 2;
   if (gun === 1) {
-    const angles = [-0.07, 0.07];
-    if (level >= 2) angles.push(-0.38, 0.38);
-    if (level >= 4) angles.push(0, -0.74, 0.74);
-    if (level >= 7) angles.push(-2.25, 2.25);
-    const dmg = 1.3 + Math.floor(level / 3) * 0.55;
-    angles.forEach((a) => fire(up + a, 9.4, dmg, 2.7));
+    // 1 级单发，2～3 级只往前散开，4 级起才有后向。单发伤害低。
+    const angles =
+      level === 1 ? [0] : level === 2 ? [-0.22, 0, 0.22] : [-0.42, -0.18, 0, 0.18, 0.42];
+    if (level >= 4) angles.push(2.45, -2.45);
+    angles.forEach((a) => fire(up + a, 9, 1.05, 1.5));
   } else if (gun === 2) {
-    fire(up, 3.3, 3.2 + tier * 1.3, 4 + tier * 0.9, { blast: 17 + tier * 4.5 });
-    if (level >= 2) {
-      fire(up - 0.52, 3.6, 1.5 + tier * 0.4, 2.2);
-      fire(up + 0.52, 3.6, 1.5 + tier * 0.4, 2.2);
-    }
-    if (level >= 5) {
-      fire(up - 2.15, 3.2, 1.5, 2.1);
-      fire(up + 2.15, 3.2, 1.5, 2.1);
-    }
+    // 慢射、单发最重，命中后爆开一块圆形冲击。不追踪、不劈弹。
+    fire(up, 3.1, 6.8 + tier * 1.5, 3.2, { blast: 16 + tier * 3 });
   } else if (gun === 3) {
-    // 3 号圆月弯刀为最强主武器：大尺寸原画月牙、高伤、可连斩穿透、最多 6 把齐飞追敌。
-    const count = Math.min(6, Math.max(1, level));
+    // 小月牙会拐弯追敌，伤害只比 1 号略高，打中就消失。等级最多再加两枚。
+    const count = level >= 5 ? 3 : level >= 2 ? 2 : 1;
     const r = crescentRadius(level);
-    const dmg = 3.4 + level * 0.6;
-    const pierce = 2 + Math.floor(level / 2);
     s.crescentFlip = -(s.crescentFlip || 1);
     for (let i = 0; i < count; i++) {
       const side = i - (count - 1) / 2;
-      fire(up + side * 0.54, 3.1 + tier * 0.18, dmg, r, {
-        life: 175,
-        hit: [],
-        pierce,
+      fire(up + side * 0.42, 3.2, 1.25, r, {
+        life: 150,
         spinDir: side === 0 ? s.crescentFlip : Math.sign(side) || s.crescentFlip,
         flare: 5,
       });
     }
   } else if (gun === 4) {
-    // 火龙向前持续喷涌，多级扩展并行火柱且不随长按缩水。
-    const count = level >= 7 ? 4 : level >= 4 ? 3 : level >= 2 ? 2 : 1;
-    const reach = 82 + tier * 8;
+    // 火焰跟随机体左右弯，飞远后变短、伤害下降。
+    const count = level >= 4 ? 3 : level >= 2 ? 2 : 1;
+    const baseDamage = 2.2 + tier * 0.35;
     for (let i = 0; i < count; i++)
-      fire(up + (i - (count - 1) / 2) * 0.14, 4.2, 1.55 + tier * 0.5, 4.4 + tier * 0.55, {
-        life: reach,
+      fire(up + (i - (count - 1) / 2) * 0.16, 4.2, baseDamage, 2.4, {
+        life: 64,
         hit: [],
+        baseDamage,
         bend: p.dx * 0.36,
       });
   } else {
-    const count = Math.min(6, 2 + Math.floor(level / 2));
+    // 细光束穿透敌机。等级越高，束与束的空隙越大。
+    const count = Math.min(5, 2 + Math.floor((level - 1) / 2));
+    const gap = 5 + level * 2.2;
     for (let i = 0; i < count; i++)
-      fire(up + (i - (count - 1) / 2) * 0.068, 5.8, 1.45 + tier * 0.55, 2.8, {
-        x: p.x + (i - (count - 1) / 2) * 4.2,
+      fire(up, 6.2, 2.2 + tier * 0.35, 1.4, {
+        x: p.x + (i - (count - 1) / 2) * gap,
         hit: [],
       });
   }
-  s.cooldown = Math.max(3, [0, 7, 15, 13, 7, 11][gun] - p.turbo);
+  s.cooldown = Math.max(3, [0, 7, 18, 14, 8, 11][gun] - p.turbo);
   s.sounds.push('shot' + gun);
 }
 
@@ -168,44 +159,47 @@ export function bombTouches(b, g, x, y, r) {
 export function drop(s, x, y, kind, delay = 0, extra = {}) {
   s.items.push({ x, y, ox: x, age: -delay, kind, r: 6, ...extra });
 }
-export function supply(s, x, y) {
-  const sequence = [
-    'wing',
-    'gun',
-    'wing',
-    'gun',
-    'bomb',
-    'wing',
-    'chip',
-    'gun',
-    'wing',
-    'eraser',
-    'gun',
-    'life',
-  ];
-  let kind = sequence[s.supplyCount++ % sequence.length];
+// 钱和芯片为主。每 16 件才一只机翼；每四只机翼里有一只换成 1UP。
+const LOOT_CYCLE = [
+  'money',
+  'chip',
+  'money',
+  'gun',
+  'money',
+  'chip',
+  'money',
+  'bomb',
+  'money',
+  'chip',
+  'money',
+  'gun',
+  'money',
+  'chip',
+  'money',
+  'wing',
+];
+function nextLoot(s) {
+  const step = s.supplyCount++;
+  const round = Math.floor(step / LOOT_CYCLE.length);
+  let kind = LOOT_CYCLE[step % LOOT_CYCLE.length];
+  if (kind === 'wing' && round % 4 === 1) kind = 'eraser';
+  if (kind === 'wing' && round % 4 === 3) kind = 'life';
   if (kind === 'gun') kind = 'gun' + (1 + Math.floor(random(s) * 5));
   if (kind === 'bomb') kind = 'bomb' + 'FBTW'[Math.floor(random(s) * 4)];
-  drop(s, x, y, kind);
+  return kind;
 }
-const COMBAT_DROPS = ['wing', 'gun', 'wing', 'chip', 'gun', 'wing', 'bomb', 'gun', 'wing', 'money'];
+export function supply(s, x, y) {
+  drop(s, x, y, nextLoot(s));
+}
 export function combatDrop(s, x, y) {
-  const step = Math.max(0, Math.floor(s.kills / 6) - 1);
-  let kind = COMBAT_DROPS[step % COMBAT_DROPS.length];
-  if (!s.ship.wing && (kind === 'money' || kind === 'chip')) kind = 'wing';
-  if (kind === 'gun') kind = 'gun' + (1 + Math.floor(random(s) * 5));
-  if (kind === 'bomb') kind = 'bomb' + 'FBTW'[Math.floor(random(s) * 4)];
-  drop(s, x, y, kind);
+  drop(s, x, y, nextLoot(s));
 }
 export function powerUp(p) {
   p.power = Math.max(p.power, Math.min(p.wing ? 8 : 3, p.power + 1));
 }
 export function equip(p, gun) {
   if (p.gun === gun) powerUp(p);
-  else {
-    p.gun = gun;
-    p.power = 1;
-  }
+  else p.gun = gun;
 }
 export function collect(s, item) {
   const p = s.ship,

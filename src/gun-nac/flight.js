@@ -7,7 +7,6 @@ import {
   clamp,
   playBounds,
   random,
-  openingPoint,
   launchWave,
 } from './stages.js';
 import {
@@ -21,7 +20,6 @@ import {
   bombTouches,
   collect,
   combatDrop,
-  drop,
   equip,
   supply,
   segmentDistance,
@@ -30,7 +28,7 @@ import { branchTip, bossTargets, enterBoss, hitBoss, updateBoss } from './bosses
 
 export const SAVE_KEY = 'garden-gun-nac-flight-v1';
 export const RECORD_KEY = 'garden-gun-nac-record-v1';
-const INITIAL_LIVES = 30;
+const INITIAL_LIVES = 3;
 const DOWN = Math.PI / 2;
 export function newFlight({
   area = 1,
@@ -104,7 +102,14 @@ function startArea(s, area) {
 }
 export function continueFlight(s) {
   if (s.phase !== 'over') return false;
-  Object.assign(s.ship, { lives: INITIAL_LIVES, stock: Math.max(4, s.ship.stock) });
+  Object.assign(s.ship, {
+    lives: INITIAL_LIVES,
+    stock: Math.max(4, s.ship.stock),
+    gun: 1,
+    power: 1,
+    wing: false,
+    bombPower: 1,
+  });
   s.orders = s.orders.map((n) => Math.floor(n / 2));
   startArea(s, s.area);
   return true;
@@ -154,19 +159,8 @@ export function setFlightWidth(s, width = 256) {
   const { left, right } = playBounds(s);
   s.ship.x = clamp(s.ship.x, left + 6, right - 6);
 }
-export function isSelectingOpeningWeapon(s) {
-  if (!s || s.phase !== 'flight' || s.index !== 1 || s.boss) return false;
-  return (
-    s.enemies.some((e) => !e.dead && e.path === 'opening') ||
-    s.items.some((i) => !i.dead && i.isOpening)
-  );
-}
 function advance(s) {
   if (s.boss) return;
-  if (isSelectingOpeningWeapon(s)) {
-    s.wait = Math.max(s.wait, 42);
-    return;
-  }
   if (--s.wait > 0) return;
   const entry = ROUTES[s.area][s.index++];
   if (!entry) {
@@ -196,10 +190,14 @@ function damageShip(s) {
   s.sounds.push('hurt');
   if (p.wing) {
     p.wing = false;
+    p.power = 1;
     return;
   }
   p.cash = Math.floor(p.cash / 2);
   p.stock = Math.max(4, p.stock);
+  p.bombPower = 1;
+  p.gun = 1;
+  p.power = 1;
   if (p.lives <= 0) {
     s.phase = 'over';
     return;
@@ -263,9 +261,6 @@ function moveEnemy(s, e) {
     sign = e.sign,
     speed = 1 + 0.065 * (s.difficulty - 1);
   switch (e.path) {
-    case 'opening':
-      Object.assign(e, openingPoint(e, t));
-      break;
     case 'cross':
       e.x = e.ox + sign * t * 0.87;
       e.y = e.oy + t * 0.78 * speed;
@@ -329,11 +324,7 @@ function defeat(s, e) {
   s.kills++;
   s.score += e.score;
   burst(s, e.x, e.y, 'pop', 21);
-  if (e.path === 'opening') {
-    const gun = e.dropGun >= 1 && e.dropGun <= 5 ? e.dropGun : 1 + (s.supplyCount++ % 5);
-    drop(s, e.x, Math.max(16, e.y), 'gun' + gun, 0, { isOpening: true });
-    s.score += 600 - e.score;
-  } else if (e.kind === 'courier' || e.kind === 'barge') supply(s, e.x, e.y);
+  if (e.kind === 'courier' || e.kind === 'barge') supply(s, e.x, e.y);
   else if (e.kind !== 'tentacle' && s.kills % 6 === 0) combatDrop(s, e.x, e.y);
   if (s.ricochet) hostile(s, e.x, e.y, aim(s, e.x, e.y), 1.55);
 }
@@ -360,37 +351,45 @@ function nearestTarget(s, x, y) {
 function hits(a, b, extra = 0) {
   return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= (a.r + b.r + extra) ** 2;
 }
+function targetKey(t) {
+  if (t.id != null) return 'e' + t.id;
+  return 'b' + (t.part ?? 0);
+}
+function lockedTarget(s, key) {
+  if (!key) return null;
+  if (key.startsWith('e')) {
+    const id = Number(key.slice(1));
+    return s.enemies.find((e) => e.id === id && enemyOpen(e)) || null;
+  }
+  return bossTargets(s.boss).find((z) => targetKey(z) === key) || null;
+}
 function moveShot(s, b) {
   b.age++;
-  if (b.gun === 3) {
-    // 前几帧保持外展起手弧，随后大弧线回旋追敌，速度缓缓抬升。
-    if (b.flare > 0) b.flare -= 1;
-    if (b.age > 5 && b.flare <= 0) {
-      const goal = nearestTarget(s, b.x, b.y);
-      if (goal) {
-        const old = Math.atan2(b.vy, b.vx),
-          to = Math.atan2(goal.y - b.y, goal.x - b.x);
-        const turn = clamp(Math.atan2(Math.sin(to - old), Math.cos(to - old)), -0.18, 0.18);
-        const angle = old + turn;
-        const v = Math.min(5.2, Math.hypot(b.vx, b.vy) + 0.028);
-        b.vx = Math.cos(angle) * v;
-        b.vy = Math.sin(angle) * v;
-      }
+  if (b.gun === 3 && b.age > 4) {
+    // 先锁住第一只够得到的敌人。它没死就一直跟着；死了也不再去找下一只。
+    if (!b.lock) {
+      const found = nearestTarget(s, b.x, b.y);
+      if (found) b.lock = targetKey(found);
+    }
+    const goal = lockedTarget(s, b.lock);
+    if (goal) {
+      const old = Math.atan2(b.vy, b.vx),
+        to = Math.atan2(goal.y - b.y, goal.x - b.x);
+      const turn = clamp(Math.atan2(Math.sin(to - old), Math.cos(to - old)), -0.26, 0.26);
+      const angle = old + turn;
+      const v = Math.min(4.2, Math.hypot(b.vx, b.vy) + 0.02);
+      b.vx = Math.cos(angle) * v;
+      b.vy = Math.sin(angle) * v;
     }
   }
-  if (b.gun === 4) b.bend = (b.bend || 0) * 0.79 + s.ship.dx * 0.16;
+  if (b.gun === 4) {
+    b.bend = (b.bend || 0) * 0.79 + s.ship.dx * 0.16;
+    const fade = Math.max(0.25, 1 - b.age / Math.max(1, b.life));
+    if (b.baseDamage) b.damage = b.baseDamage * fade;
+    b.span = 6 + fade * 12;
+  }
   b.x += b.vx + (b.bend || 0);
   b.y += b.vy;
-  for (const h of s.hostile) {
-    if (!h.dead && h.breakable && hits(b, h)) {
-      h.breakable -= b.damage;
-      if (h.breakable <= 0) h.dead = true;
-      if (!b.hit) {
-        b.dead = true;
-        return;
-      }
-    }
-  }
   let isImpacted = false;
   for (const e of s.enemies) {
     if (!enemyOpen(e) || !hits(b, e) || b.hit?.includes(e.id)) continue;

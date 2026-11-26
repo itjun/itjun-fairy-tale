@@ -15,7 +15,6 @@ import {
   setFlightWidth,
   shopBuy,
   depart,
-  isSelectingOpeningWeapon,
 } from './flight.js';
 import { createFlightView } from './view.js';
 import { FlightSound } from './sound.js';
@@ -59,25 +58,6 @@ function readRecord() {
     return 0;
   }
 }
-const GUN_ARMORY_CARDS = [
-  { id: 1, tag: '广角清场', desc: '多向扇面齐射，轻松覆盖大片空域' },
-  { id: 2, tag: '范围轰炸', desc: '命中炸开烈焰冲击波，重创扎堆敌群' },
-  { id: 3, tag: '最强王牌', desc: '超大原画弯刀自动追敌、连斩穿透并劈碎敌弹', isBest: true },
-  { id: 4, tag: '持续烈焰', desc: '前方喷吐贯穿火柱，近身持续高伤压制' },
-  { id: 5, tag: '极速贯穿', desc: '多束高速并排激光，瞬间贯穿整列目标' },
-];
-
-function ArmoryGlyph({ id }) {
-  if (id === 3) {
-    return <img className="gn-armory-moonblade" src="./assets/weapon-moonblade.png" alt="" aria-hidden="true" />;
-  }
-  return (
-    <span className={'gn-armory-badge gn-armory-badge-' + id} aria-hidden="true">
-      {id}
-    </span>
-  );
-}
-
 function EndingWingedCraft() {
   const ref = useRef(null);
   useEffect(() => {
@@ -230,12 +210,6 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
             <KeyHint keys={['J', 'Enter']}>购买或出发</KeyHint>
             <KeyHint keys={['Esc']}>保存并回花园</KeyHint>
           </>
-        ) : page === 'armory' ? (
-          <>
-            <KeyHint keys={['WASD']}>挑选武器</KeyHint>
-            <KeyHint keys={['J', 'Enter']}>选定出击</KeyHint>
-            <KeyHint keys={['Esc']}>返回机库</KeyHint>
-          </>
         ) : page === 'pause' ? (
           <>
             <KeyHint keys={['WASD']}>选择</KeyHint>
@@ -281,12 +255,6 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
           <PadHint keys={['A']}>购买或出发</PadHint>
           <PadHint keys={['B']}>保存并回花园</PadHint>
         </>
-      ) : page === 'armory' ? (
-        <>
-          <PadHint keys={['stick']}>挑选武器</PadHint>
-          <PadHint keys={['A']}>选定出击</PadHint>
-          <PadHint keys={['B']}>返回机库</PadHint>
-        </>
       ) : page === 'pause' ? (
         <>
           <PadHint keys={['stick']}>选择</PadHint>
@@ -324,7 +292,6 @@ export default function GunNac({ onExit, isSound, onSound }) {
     [, refresh] = useState(0);
   const [difficulty, setDifficulty] = useState(2),
     [area, setArea] = useState(1),
-    [chosenGun, setChosenGun] = useState(3),
     [soundTest, setSoundTest] = useState(1),
     [ricochet, setRicochet] = useState(false);
   const [parcel, setParcel] = useState(() => Math.min(8, (saved?.area ?? 0) + 1)),
@@ -383,12 +350,11 @@ export default function GunNac({ onExit, isSound, onSound }) {
       show(g.phase);
     }
   }
-  function start(gunId = chosenGun) {
-    setChosenGun(gunId);
+  function start() {
     flight.current = newFlight({
       area: soundTest === 5 ? area : 1,
       difficulty,
-      gun: gunId,
+      gun: 1,
       ricochet,
       seed: crypto.getRandomValues(new Uint32Array(1))[0],
       width: viewWidth.current,
@@ -673,7 +639,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
     <button
       data-gn-first={isFreshStart ? true : undefined}
       disabled={!ready}
-      onClick={() => (s && s.phase !== 'ending' ? show('replace') : show('armory'))}
+      onClick={() => (s && s.phase !== 'ending' ? show('replace') : start())}
     >
       {isFreshStart && padBadge('A')}
       开始游戏
@@ -715,11 +681,6 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   <div className="gn-banner">
                     {AREA_NAMES[s.area]}
                     <small>第 {s.area} 区</small>
-                  </div>
-                )}
-                {s.banner === 0 && isSelectingOpeningWeapon(s) && (
-                  <div className="gn-opening-tip" aria-live="polite">
-                    补给机正逐架送来 1～5 号武器（吃同号直接升级）
                   </div>
                 )}
                 <div className="gn-touch-buttons">
@@ -856,34 +817,10 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   {padBadge('B')}
                   保留进度
                 </button>
-                <button onClick={() => show('armory')}>
+                <button onClick={() => start()}>
                   {padBadge('A')}
-                  去选武器
+                  重新出击
                 </button>
-              </>
-            ) : page === 'armory' ? (
-              <>
-                <h2>选择出击主武器</h2>
-                <p className="gn-armory-sub">不限时慢慢挑，选好直接挂载升空（途中也能随时换枪或同号升级）</p>
-                <div className="gn-armory-grid" role="group" aria-label="五种主武器">
-                  {GUN_ARMORY_CARDS.map((item) => (
-                    <button
-                      key={item.id}
-                      className={'gn-armory-card' + (item.isBest ? ' is-best' : '')}
-                      data-gn-first={item.id === chosenGun ? true : undefined}
-                      onClick={() => start(item.id)}
-                    >
-                      {item.isBest && <em className="gn-armory-crown">最强推荐</em>}
-                      <ArmoryGlyph id={item.id} />
-                      <strong>
-                        {item.id} 号 {GUN_NAMES[item.id - 1]}
-                      </strong>
-                      <span className="gn-armory-tag">{item.tag}</span>
-                      <small>{item.desc}</small>
-                    </button>
-                  ))}
-                </div>
-                {back(() => show('title'), '返回机库')}
               </>
             ) : page === 'pause' ? (
               <>

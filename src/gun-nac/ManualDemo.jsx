@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { paintCrescentBlade, crescentSpin, crescentDrawSize, crescentRadius } from './crescent.js';
 import { makeShipCanvas } from './ship-art.js';
-import { OPENING_LANES } from './stages.js';
 
 const BLUE = '#70dcff';
 const PURPLE = '#dc8cff';
@@ -60,35 +59,12 @@ function drawCraft(g, _img, x, y, isWinged, t = 0) {
   if (!cachedWingedShip) cachedWingedShip = makeShipCanvas(true);
   const pulse = 0.86 + Math.sin(t * 0.42) * 0.18;
   if (isWinged) {
-    paintShape(g, 'flame', FLAME, x - 4.5, y + 28, 6.2, 16.5 * pulse, Math.PI);
-    paintShape(g, 'flame', FLAME, x + 4.5, y + 28, 6.2, 16.5 * pulse, Math.PI);
-    paintShape(g, 'flame', BLUE, x - 20.5, y + 24.5, 5.4, 12.5 * pulse, Math.PI);
-    paintShape(g, 'flame', BLUE, x + 20.5, y + 24.5, 5.4, 12.5 * pulse, Math.PI);
-    const w = 72;
-    const h = 60;
-    g.drawImage(cachedWingedShip, x - w / 2, y - h / 2, w, h);
+    paintShape(g, 'flame', FLAME, x, y + 10, 3, 5 * pulse, Math.PI);
+    g.drawImage(cachedWingedShip, x - 13, y - 8, 26, 16);
   } else {
-    paintShape(g, 'flame', FLAME, x - 3.4, y + 23.5, 5.4, 14 * pulse, Math.PI);
-    paintShape(g, 'flame', FLAME, x + 3.4, y + 23.5, 5.4, 14 * pulse, Math.PI);
-    const w = 50;
-    const h = 52;
-    g.drawImage(cachedBaseShip, x - w / 2, y - h / 2, w, h);
+    paintShape(g, 'flame', FLAME, x, y + 10, 3, 5 * pulse, Math.PI);
+    g.drawImage(cachedBaseShip, x - 8, y - 8, 16, 16);
   }
-}
-
-function drawMoonblade(g, img, x, y, size, rot = 0, alpha = 1) {
-  g.save();
-  g.globalAlpha = alpha;
-  g.translate(x, y);
-  g.rotate(rot);
-  if (img?.complete && img.naturalWidth) {
-    g.drawImage(img, -size / 2, -size / 2, size, size);
-  } else {
-    g.scale(size / 96, size / 96);
-    g.translate(-48, -48);
-    paintCrescentBlade(g, { enemy: false });
-  }
-  g.restore();
 }
 
 function drawEnemy(g, img, x, y, flash, size = 22) {
@@ -192,70 +168,56 @@ function makeGunDemo(gun, level = 4) {
             ...extra,
           });
         };
-        const tier = Math.floor((level - 1) / 2);
         if (gun === 1) {
-          const angles = [-0.07, 0.07];
-          if (level >= 2) angles.push(-0.38, 0.38);
-          if (level >= 4) angles.push(0, -0.74, 0.74);
-          if (level >= 7) angles.push(-2.25, 2.25);
-          angles.forEach((a) => fire(up + a, 6.8, 3.1, 56));
+          const angles = level === 1 ? [0] : level === 2 ? [-0.22, 0, 0.22] : [-0.42, -0.18, 0, 0.18, 0.42];
+          if (level >= 4) angles.push(2.45, -2.45);
+          angles.forEach((a) => fire(up + a, 5.4, 1.6, 48));
           cool = 8;
         } else if (gun === 2) {
-          fire(up, 3.2, 5.6 + tier * 0.5, 72, { blast: 0 });
-          if (level >= 2) {
-            fire(up - 0.52, 3.5, 2.8, 52);
-            fire(up + 0.52, 3.5, 2.8, 52);
-          }
-          if (level >= 5) {
-            fire(up - 2.15, 3.1, 2.6, 44);
-            fire(up + 2.15, 3.1, 2.6, 44);
-          }
-          cool = 16;
+          fire(up, 2.4, 4.2, 70, { blast: 0 });
+          cool = 18;
         } else if (gun === 3) {
-          const count = Math.min(6, Math.max(1, level));
+          const count = level >= 5 ? 3 : level >= 2 ? 2 : 1;
           const r = crescentRadius(level);
           flip = -flip;
           for (let i = 0; i < count; i++) {
             const side = i - (count - 1) / 2;
-            fire(up + side * 0.54, 3.0 + tier * 0.16, r, 165, {
+            fire(up + side * 0.42, 2.6, r, 120, {
               home: true,
-              pierce: 2 + Math.floor(level / 2),
-              hits: new Set(),
               spinDir: side === 0 ? flip : Math.sign(side) || flip,
-              flare: 5,
             });
           }
-          cool = 13;
+          cool = 14;
         } else if (gun === 4) {
-          const count = level >= 7 ? 4 : level >= 4 ? 3 : level >= 2 ? 2 : 1;
-          const reach = 74;
+          const count = level >= 4 ? 3 : level >= 2 ? 2 : 1;
           for (let i = 0; i < count; i++)
-            fire(up + (i - (count - 1) / 2) * 0.15, 4.0, 5.4, reach, { bend: sway * 0.014 });
-          cool = 7;
+            fire(up + (i - (count - 1) / 2) * 0.16, 3.2, 2.4, 64, { bend: sway * 0.012 });
+          cool = 8;
         } else {
-          const count = Math.min(6, 2 + Math.floor(level / 2));
+          const count = Math.min(5, 2 + Math.floor((level - 1) / 2));
+          const gap = 5 + level * 2.2;
           for (let i = 0; i < count; i++)
-            fire(up + (i - (count - 1) / 2) * 0.07, 5.6, 3.2, 80, { x: shipX + (i - (count - 1) / 2) * 5.5 });
+            fire(up, 4.4, 1.6, 70, { x: shipX + (i - (count - 1) / 2) * gap });
           cool = 11;
         }
       }
       for (const s of shots) {
         s.age += 1;
         if (s.home) {
-          if (s.flare > 0) s.flare -= 1;
-          if (s.age > 5 && s.flare <= 0) {
+          if (!s.lock) {
             const goal = nearest(s.x, s.y);
-            if (goal) {
-              const ang = Math.atan2(goal.y - s.y, goal.x - s.x);
-              const cur = Math.atan2(s.vy, s.vx);
-              let d = ang - cur;
-              while (d > Math.PI) d -= Math.PI * 2;
-              while (d < -Math.PI) d += Math.PI * 2;
-              const next = cur + Math.max(-0.18, Math.min(0.18, d));
-              const spd = Math.min(4.8, Math.hypot(s.vx, s.vy) + 0.025);
-              s.vx = Math.cos(next) * spd;
-              s.vy = Math.sin(next) * spd;
-            }
+            if (goal) s.lock = goal;
+          }
+          if (s.lock?.alive) {
+            const ang = Math.atan2(s.lock.y - s.y, s.lock.x - s.x);
+            const cur = Math.atan2(s.vy, s.vx);
+            let d = ang - cur;
+            while (d > Math.PI) d -= Math.PI * 2;
+            while (d < -Math.PI) d += Math.PI * 2;
+            const next = cur + Math.max(-0.26, Math.min(0.26, d));
+            const spd = Math.min(3.6, Math.hypot(s.vx, s.vy) + 0.02);
+            s.vx = Math.cos(next) * spd;
+            s.vy = Math.sin(next) * spd;
           }
         }
         if (s.bend) s.vx += s.bend;
@@ -438,22 +400,14 @@ function makeDropDemo(kind) {
         };
       }
       if (kind === 'courier') {
-        const couriers = [];
-        const cycle = 360;
-        const clock = t % cycle;
-        for (let i = 0; i < 5; i++) {
-          const delay = i * 52;
-          if (clock < delay) continue;
-          const age = clock - delay;
-          const y = 16 + age * 0.62;
-          if (y > H - 62) continue;
-          couriers.push({
-            x: OPENING_LANES[i],
-            y,
-            gun: i + 1,
-          });
-        }
-        return { shipX, shipY, winged: false, couriers };
+        const y = 36 + (t % 180) * 0.7;
+        return {
+          shipX,
+          shipY,
+          winged: false,
+          couriers: y < H - 70 ? [{ x: W * 0.5, y, gun: 1 }] : [],
+          float: { kind: 'money', x: W * 0.5, y: Math.min(H - 80, y + 24) },
+        };
       }
       if (kind === 'money') {
         return {
@@ -523,20 +477,12 @@ function drawBombFx(g, bomb, shipX) {
 }
 
 let sharedCraft;
-let sharedMoonblade;
 function craftImage() {
   if (!sharedCraft) {
     sharedCraft = new Image();
     sharedCraft.src = './gun-nac/craft.webp';
   }
   return sharedCraft;
-}
-function moonbladeImage() {
-  if (!sharedMoonblade) {
-    sharedMoonblade = new Image();
-    sharedMoonblade.src = './assets/weapon-moonblade.png';
-  }
-  return sharedMoonblade;
 }
 
 export function ManualDemo({ tab, item, level = 4 }) {
@@ -558,7 +504,6 @@ export function ManualDemo({ tab, item, level = 4 }) {
     else if (tab === 'drops') demo = makeDropDemo(item.demo || item.sprite || item.tag);
     else demo = makeItemDemo(item.sprite || item.tag);
     const craft = craftImage();
-    const moonblade = moonbladeImage();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * dpr;
     canvas.height = H * dpr;
@@ -590,20 +535,15 @@ export function ManualDemo({ tab, item, level = 4 }) {
           const gun = Number(item.tag);
           if (gun === 3) {
             const size = crescentDrawSize(s.r);
-            for (let i = 0; i < (s.trail?.length || 0) - 1; i++) {
-              const ghost = s.trail[i];
-              const fade = (i + 1) / s.trail.length;
-              const gSize = size * (0.62 + fade * 0.22);
-              drawMoonblade(g, moonblade, ghost.x, ghost.y, gSize, ghost.spin, 0.28 + fade * 0.28);
-            }
-            drawMoonblade(g, moonblade, s.x, s.y, size, crescentSpin(s.age, s.spinDir || 1), 1);
+            paintShape(g, 'blade', BLUE, s.x, s.y, size, size, crescentSpin(s.age, s.spinDir || 1));
             continue;
           }
           const a = Math.atan2(s.vy, s.vx) + Math.PI / 2;
           const shape = ['', 'beam', 'dot', 'blade', 'flame', 'beam'][gun];
           const color = ['', BLUE, PURPLE, BLUE, FLAME, BEAM][gun];
-          const rw = s.blast > 0 ? s.r * 3.4 : s.r * (gun === 4 ? 5.8 : gun === 5 ? 3 : 3.1);
-          const rh = s.blast > 0 ? s.r * 3.4 : gun === 5 ? 22 : gun === 4 ? 32 : gun === 1 ? 14 : s.r * 4;
+          const fade = gun === 4 ? Math.max(0.35, 1 - s.age / Math.max(8, s.life + s.age)) : 1;
+          const rw = s.blast > 0 ? Math.min(28, 8 + s.blast) : gun === 5 ? 2.4 : gun === 1 ? 2 : s.r * 2;
+          const rh = s.blast > 0 ? Math.min(28, 8 + s.blast) : gun === 5 ? 10 : gun === 4 ? 8 + fade * 14 : gun === 1 ? 7 : s.r * 2;
           paintShape(g, shape, color, s.x, s.y, rw, rh, a);
         }
         drawCraft(g, craft, shipX, shipY, winged, t);
@@ -630,9 +570,8 @@ export function ManualDemo({ tab, item, level = 4 }) {
         }
         if (couriers) {
           for (const c of couriers) {
-            drawItemSprite(g, craft, 'courier', c.x, c.y, 20);
-            if (c.gun === 3) drawMoonblade(g, moonblade, c.x, c.y + 18, 22, t * 0.08, 0.95);
-            g.fillStyle = c.gun === 3 ? GOLD : '#aceaf1';
+            drawItemSprite(g, craft, 'courier', c.x, c.y, 16);
+            g.fillStyle = '#aceaf1';
             g.strokeStyle = '#fff6de';
             g.lineWidth = 2;
             g.beginPath();

@@ -16,50 +16,50 @@ export const GUN_NAMES = ['散射', '爆破球', '圆月弯刀', '火龙', '宽�
 export const BOMB_NAMES = { F: '火环', B: '冰壁', T: '雷电', W: '水弹' };
 
 const roads = [
-  ['I V S P G D W C V S G J W P S D V J G W C S V R P W D G V C J P S W G D V C', '!clay'],
+  ['V S P G D W C V S G J W P S D V J G W C S V R P W D G V C J P S W G D V C', '!clay'],
   [
-    'I V S C D V P S W C R G V S D C R P H V C S G R C P H V W R D V C',
+    'V S C D V P S W C R G V S D C R P H V C S G R C P H V W R D V C',
     '!orb',
     'R V G W C H R S P D R C G V W R S C H V G H R W C S R P H G R V',
     '!rabbit',
   ],
   [
-    'I V K S C P M T G M K C S M P W T M C V M K D T S P W K T C M V',
+    'V K S C P M T G M K C S M P W T M C V M K D T S P W K T C M V',
     '!battery',
     'K T M V W C M S G T K P M C W M K T S V T W M G P K M T C D K M W V',
     '!lava',
   ],
   [
-    'I F V L C S F W L P G F C L V F W S L C F V P G L W S F C L W G',
+    'F V L C S F W L P G F C L V F W S L C F V P G L W S F C L W G',
     '!siren',
     'W F L G P F C S L F W F G L C V F P S W L W F G L C W S F L P W',
     '!octopus',
   ],
   [
-    'I S U A C G W P A U V A S C U A W P V U W A C G U S A P V G A W',
+    'S U A C G W P A U V A S C U A W P V U W A C G U S A P V G A W',
     '!acorn',
     'U A W G C A S U P A V G C U A W S A P U G A W C U D A S G P A U W',
     '!tree',
   ],
   [
-    'I O Q V C S O Q P G O W Q C O D Q P V O Q W C D O G P Q V O D',
+    'O Q V C S O Q P G O W Q C O D Q P V O Q W C D O G P Q V O D',
     '!cat',
     'Q D O W P Q C G O D Q S C O G Q O W P D Q G O C W Q P D V O Q G W',
     '!gold',
   ],
   [
-    'I G E J P V C J S E W J P C E J G S W J V G E S C J W E J P D',
+    'G E J P V C J S E W J P C E J G S W J V G E S C J W E J P D',
     '!clay',
     'E J W G C J S E P J D E V C J G W P J S E W J G C E P J V D J W',
     '!tower',
   ],
   [
-    'I Y V Y S C Y G W Y P S Y W C Y V P Y G Y W G Y V Y C S W Y P G Y W',
+    'Y V Y S C Y G W Y P S Y W C Y V P Y G Y W G Y V Y C S W Y P G Y W',
     'Y S G Y W C Y V P Y S Y G W Y P Y C Y V Y W G Y S P Y V Y C Y W',
     '!moon',
   ],
   [
-    'I T X S X C G T P X V T W X G C V T P X W',
+    'T X S X C G T P X V T W X G C V T P X W',
     '!orb',
     'X G T W P X S T C V T X W C S T',
     '!acorn',
@@ -156,14 +156,6 @@ export function spawnFoe(s, kind, x, y, path = 'sine', sign = 1, delay = 0) {
   return enemy;
 }
 
-export const OPENING_LANES = [34, 81, 128, 175, 222];
-
-export function openingPoint(e, t) {
-  return {
-    x: e.ox,
-    y: e.oy + t * 0.58,
-  };
-}
 export function launchWave(s, wave) {
   const { width, left, right } = playBounds(s);
   const sign = random(s) < 0.5 ? -1 : 1;
@@ -176,15 +168,6 @@ export function launchWave(s, wave) {
     for (let i = 0; i < count; i++) spawnFoe(s, kind, start, -8, path, sign, i * interval);
   };
   switch (wave) {
-    case 'I': {
-      // 每关开局按左至右 5 条独立航道单架稀疏入场（前架过半屏再出下一架），绝不扎堆。
-      OPENING_LANES.forEach((laneX, idx) => {
-        const foe = spawnFoe(s, 'courier', laneX, -14, 'opening', 1, idx * 200);
-        foe.hp = 1;
-        foe.dropGun = idx + 1;
-      });
-      break;
-    }
     case 'V':
       for (let i = -2; i <= 2; i++)
         spawnFoe(s, 'scout', center + i * 15, -8 - Math.abs(i) * 11, 'sine', sign);
