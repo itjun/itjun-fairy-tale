@@ -11,7 +11,7 @@ import {
   setFlightWidth,
 } from '../src/gun-nac/flight.js';
 import { BOSS, ROUTES, playBounds, spawnFoe } from '../src/gun-nac/stages.js';
-import { bomb, collect, shoot, supply } from '../src/gun-nac/arsenal.js';
+import { bomb, bombGeometry, bombTouches, collect, shoot, supply } from '../src/gun-nac/arsenal.js';
 import { enterBoss, bossTargets, hitBoss, updateBoss } from '../src/gun-nac/bosses.js';
 import { STAGE_THEMES, BOSS_THEME } from '../src/gun-nac/sound.js';
 import { BASE_SHIP_SIZE, WINGED_SHIP_WIDTH, WINGED_SHIP_HEIGHT } from '../src/gun-nac/ship-art.js';
@@ -84,12 +84,40 @@ test('五种武器、机翼与四档机速通过实际拾取与开火生效', ()
   s.ship.wing = true;
   s.shots = [];
   shoot(s);
-  assert.equal(s.shots.length, 3);
+  assert.equal(s.shots.length, 8);
+  s.ship.gun = 3;
+  s.ship.power = 6;
+  s.shots = [];
+  shoot(s);
+  assert.equal(s.shots.length, 6);
+  collect(s, { kind: 'gun1' });
+  assert.equal(s.ship.gun, 1);
+  assert.equal(s.ship.power, 6);
+  s.shots = [];
+  shoot(s);
+  assert.ok(s.shots.length >= 5);
+  assert.ok(s.shots.every((b) => b.gun === 1));
   s.ship.gun = 3;
   s.ship.power = 4;
   collect(s, { kind: 'gun5' });
   assert.equal(s.ship.gun, 5);
   assert.equal(s.ship.power, 4);
+  s.shots = [];
+  shoot(s);
+  assert.equal(s.shots.length, 5);
+  s.ship.power = 6;
+  collect(s, { kind: 'gun2' });
+  assert.equal(s.ship.gun, 2);
+  assert.equal(s.ship.power, 6);
+  s.shots = [];
+  shoot(s);
+  assert.equal(s.shots.length, 1);
+  assert.ok(s.shots[0].r > 7);
+  collect(s, { kind: 'gun4' });
+  s.shots = [];
+  shoot(s);
+  assert.equal(s.ship.power, 6);
+  assert.equal(s.shots.length, 6);
   s.ship.gun = 5;
   s.ship.power = 1;
   s.ship.wing = false;
@@ -120,7 +148,7 @@ test('五种武器、机翼与四档机速通过实际拾取与开火生效', ()
 });
 test('击落、续关、商店和预送炸弹各结算一次', () => {
   const s = newFlight();
-  assert.equal(s.ship.lives, 3);
+  assert.equal(s.ship.lives, 15);
   assert.equal(s.ship.gun, 1);
   assert.equal(s.ship.power, 1);
   s.ship.cash = 50;
@@ -147,13 +175,13 @@ test('击落、续关、商店和预送炸弹各结算一次', () => {
   assert.equal(s.ship.power, 1);
   assert.equal(continueFlight(s), true);
   assert.equal(continueFlight(s), false);
-  assert.equal(s.ship.lives, 3);
+  assert.equal(s.ship.lives, 15);
   assert.equal(s.area, 3);
   assert.equal(s.ship.turbo, 1);
   assert.equal(s.ship.gun, 1);
   assert.equal(s.ship.power, 1);
 });
-test('卸翼回到 1 级，坠机回到 1 号并钱减半', () => {
+test('卸翼和坠机都留下武器等级，钱在坠机时减半', () => {
   const s = newFlight();
   s.wait = 10000;
   collect(s, { kind: 'gun3' });
@@ -172,16 +200,17 @@ test('卸翼回到 1 级，坠机回到 1 号并钱减半', () => {
   s.hostile.push({ x: s.ship.x, y: s.ship.y, vx: 0, vy: 0, r: 3, age: 0, life: 10 });
   tick(s);
   assert.equal(s.ship.wing, false);
-  assert.equal(s.ship.lives, 3);
+  assert.equal(s.ship.lives, 15);
   assert.equal(s.ship.gun, 3);
-  assert.equal(s.ship.power, 1);
+  assert.equal(s.ship.power, 6);
   assert.equal(s.ship.cash, 40);
   s.ship.inv = 0;
+  s.items.push({ x: s.ship.x, y: s.ship.y, ox: s.ship.x, age: 0, kind: 'gun1', r: 6 });
   s.hostile.push({ x: s.ship.x, y: s.ship.y, vx: 0, vy: 0, r: 3, age: 0, life: 10 });
   tick(s);
-  assert.equal(s.ship.lives, 2);
+  assert.equal(s.ship.lives, 14);
   assert.equal(s.ship.gun, 1);
-  assert.equal(s.ship.power, 1);
+  assert.equal(s.ship.power, 6);
   assert.equal(s.ship.bombPower, 1);
   assert.equal(s.ship.bomb, 'B');
   assert.equal(s.ship.cash, 20);
@@ -194,7 +223,7 @@ test('卸翼回到 1 级，坠机回到 1 号并钱减半', () => {
   tick(s);
   assert.equal(s.phase, 'over');
   assert.equal(continueFlight(s), true);
-  assert.equal(s.ship.lives, 3);
+  assert.equal(s.ship.lives, 15);
   assert.equal(s.ship.gun, 1);
   assert.equal(s.ship.power, 1);
 });
@@ -361,7 +390,7 @@ test('战场固定 4∶3，开局不再白送五种武器', () => {
     const s = newFlight({ area, width: 426 });
     assert.equal(s.width, 256);
     assert.equal(s.ship.gun, 1);
-    assert.equal(s.ship.lives, 3);
+    assert.equal(s.ship.lives, 15);
   }
   const flight = newFlight({ area: 1, width: 426 });
   flight.wait = 10000;
@@ -446,4 +475,11 @@ test('第 0～8 区与首领战各自拥有独立的背景音乐编曲，八关�
   assert.equal(basses.size, 9);
   assert.equal(BOSS_THEME.melody.length, 64);
   assert.ok(!ids.has(BOSS_THEME.id));
+});
+test('F 火环 1 级能张开到大约半个战场', () => {
+  const grown = bombGeometry({ kind: 'F', power: 1, age: 40, x: 100, y: 160 }, { x: 100, y: 160 });
+  assert.ok(grown.ring >= 56 && grown.ring <= 60, grown.ring);
+  assert.equal(grown.x, 100);
+  assert.equal(bombTouches({ kind: 'F', power: 1 }, grown, 100, 160 - grown.ring, 2), true);
+  assert.equal(bombTouches({ kind: 'F', power: 1 }, grown, 100, 160, 2), false);
 });

@@ -28,7 +28,7 @@ import { branchTip, bossTargets, enterBoss, hitBoss, updateBoss } from './bosses
 
 export const SAVE_KEY = 'garden-gun-nac-flight-v1';
 export const RECORD_KEY = 'garden-gun-nac-record-v1';
-const INITIAL_LIVES = 3;
+const INITIAL_LIVES = 15;
 const DOWN = Math.PI / 2;
 export function newFlight({
   area = 1,
@@ -190,14 +190,11 @@ function damageShip(s) {
   s.sounds.push('hurt');
   if (p.wing) {
     p.wing = false;
-    p.power = 1;
     return;
   }
   p.cash = Math.floor(p.cash / 2);
   p.stock = Math.max(4, p.stock);
   p.bombPower = 1;
-  p.gun = 1;
-  p.power = 1;
   if (p.lives <= 0) {
     s.phase = 'over';
     return;
@@ -539,19 +536,6 @@ export function tick(s, input = {}) {
   updateBombs(s);
   for (const b of s.shots) moveShot(s, b);
   const player = { x: p.x, y: p.y, r: p.wing ? 3.4 : 2.5 };
-  for (const h of s.hostile)
-    if (!h.dead && !p.inv && hits(h, player)) {
-      h.dead = true;
-      damageShip(s);
-      break;
-    }
-  if (!p.inv) {
-    if (
-      s.enemies.some((e) => enemyOpen(e) && hits(e, player)) ||
-      bossTargets(s.boss).some((z) => hits(z, player))
-    )
-      damageShip(s);
-  }
   for (const i of s.items) {
     i.age++;
     if (i.age < 0) continue;
@@ -566,6 +550,19 @@ export function tick(s, input = {}) {
       collect(s, i);
       i.dead = true;
     }
+  }
+  for (const h of s.hostile)
+    if (!h.dead && !p.inv && hits(h, player)) {
+      h.dead = true;
+      damageShip(s);
+      break;
+    }
+  if (!p.inv) {
+    if (
+      s.enemies.some((e) => enemyOpen(e) && hits(e, player)) ||
+      bossTargets(s.boss).some((z) => hits(z, player))
+    )
+      damageShip(s);
   }
   for (const f of s.effects) f.age++;
   s.enemies = s.enemies.filter((e) => !e.dead);

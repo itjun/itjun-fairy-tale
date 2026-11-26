@@ -29,7 +29,7 @@ export function ring(s, x, y, count, speed, offset = 0, kind = 'round', options)
 export function shoot(s) {
   const p = s.ship;
   const gun = s.bombs.length ? 1 : p.gun;
-  const level = s.bombs.length ? 1 : p.power;
+  const level = p.power;
   const tier = Math.floor((level - 1) / 2);
   const fire = (angle, speed, damage, r, extra = {}) =>
     s.shots.push({
@@ -46,22 +46,25 @@ export function shoot(s) {
     });
   const up = -Math.PI / 2;
   if (gun === 1) {
-    // 1 级单发，2～3 级只往前散开，4 级起才有后向。单发伤害低。
+    // 1 级单发，2～3 级只往前散开，4 级起才有后向。等级越高，这一发越重。
     const angles =
       level === 1 ? [0] : level === 2 ? [-0.22, 0, 0.22] : [-0.42, -0.18, 0, 0.18, 0.42];
     if (level >= 4) angles.push(2.45, -2.45);
-    angles.forEach((a) => fire(up + a, 9, 1.05, 1.5));
+    angles.forEach((a) => fire(up + a, 9, 1.05 + (level - 1) * 0.28, 1.5 + (level - 1) * 0.12));
   } else if (gun === 2) {
-    // 慢射、单发最重，命中后爆开一块圆形冲击。不追踪、不劈弹。
-    fire(up, 3.1, 6.8 + tier * 1.5, 3.2, { blast: 16 + tier * 3 });
+    // 慢射、始终一发，但等级越高球越大、越重、爆开越广。不追踪、不劈弹。
+    fire(up, 3.1, 6.8 + (level - 1) * 1.4, 3.2 + (level - 1) * 0.85, {
+      blast: 16 + level * 6,
+    });
   } else if (gun === 3) {
-    // 小月牙会拐弯追敌，伤害只比 1 号略高，打中就消失。等级最多再加两枚。
-    const count = level >= 5 ? 3 : level >= 2 ? 2 : 1;
+    // 等级是几就飞出几把，最多 8 把。换枪不改等级。
+    const count = Math.min(level, 8);
     const r = crescentRadius(level);
     s.crescentFlip = -(s.crescentFlip || 1);
+    const step = count <= 3 ? 0.42 : 0.22;
     for (let i = 0; i < count; i++) {
       const side = i - (count - 1) / 2;
-      fire(up + side * 0.42, 3.2, 1.25, r, {
+      fire(up + side * step, 3.2, 1.25, r, {
         life: 150,
         spinDir: side === 0 ? s.crescentFlip : Math.sign(side) || s.crescentFlip,
         flare: 5,
@@ -69,7 +72,7 @@ export function shoot(s) {
     }
   } else if (gun === 4) {
     // 火焰跟随机体左右弯，飞远后变短、伤害下降。
-    const count = level >= 4 ? 3 : level >= 2 ? 2 : 1;
+    const count = Math.min(level, 6);
     const baseDamage = 2.2 + tier * 0.35;
     for (let i = 0; i < count; i++)
       fire(up + (i - (count - 1) / 2) * 0.16, 4.2, baseDamage, 2.4, {
@@ -79,9 +82,9 @@ export function shoot(s) {
         bend: p.dx * 0.36,
       });
   } else {
-    // 细光束穿透敌机。等级越高，束与束的空隙越大。
-    const count = Math.min(5, 2 + Math.floor((level - 1) / 2));
-    const gap = 5 + level * 2.2;
+    // 细光束穿透敌机。等级是几，就多一束，最多 8 束。
+    const count = Math.min(8, level + 1);
+    const gap = 4 + level * 0.7;
     for (let i = 0; i < count; i++)
       fire(up, 6.2, 2.2 + tier * 0.35, 1.4, {
         x: p.x + (i - (count - 1) / 2) * gap,
@@ -114,7 +117,7 @@ export function bombGeometry(b, ship, width = 256) {
     half = width / 2,
     left = 128 - half,
     span = width / 256;
-  if (b.kind === 'F') return { ring: Math.min(t * 1.7, 18 + p * 5), x: b.x, y: b.y };
+  if (b.kind === 'F') return { ring: Math.min(t * 3, 48 + p * 10), x: b.x, y: b.y };
   if (b.kind === 'B') return { x: 128 - (half + 15) * Math.cos(t * 0.048), width: 6 + p * 2 };
   if (b.kind === 'T') {
     const x = ship.x + Math.sin(t * 0.11) * 80 * span;
@@ -149,7 +152,7 @@ export function segmentDistance(x, y, a, b) {
   return Math.hypot(x - a[0] - k * dx, y - a[1] - k * dy);
 }
 export function bombTouches(b, g, x, y, r) {
-  if (b.kind === 'F') return Math.abs(Math.hypot(x - g.x, y - g.y) - g.ring) <= r + 5;
+  if (b.kind === 'F') return Math.abs(Math.hypot(x - g.x, y - g.y) - g.ring) <= r + g.ring * 0.22;
   if (b.kind === 'B') return Math.abs(x - g.x) <= g.width + r;
   if (b.kind === 'T')
     return g.points.some((v, i) => i && segmentDistance(x, y, g.points[i - 1], v) <= g.width + r);
@@ -198,8 +201,13 @@ export function powerUp(p) {
   p.power = Math.max(p.power, Math.min(p.wing ? 8 : 3, p.power + 1));
 }
 export function equip(p, gun) {
-  if (p.gun === gun) powerUp(p);
-  else p.gun = gun;
+  // 同号升级。换成别的号时等级原样带走，不能掉回 1 级。
+  const next = Number(gun);
+  if (!Number.isInteger(next) || next < 1 || next > 5) return;
+  const kept = p.power;
+  if (p.gun === next) powerUp(p);
+  else p.gun = next;
+  if (p.power < kept) p.power = kept;
 }
 export function collect(s, item) {
   const p = s.ship,

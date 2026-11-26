@@ -174,10 +174,10 @@ function makeGunDemo(gun, level = 4) {
           angles.forEach((a) => fire(up + a, 5.4, 1.6, 48));
           cool = 8;
         } else if (gun === 2) {
-          fire(up, 2.4, 4.2, 70, { blast: 0 });
+          fire(up, 2.4, 4.2 + (level - 1) * 0.85, 70, { blast: 0 });
           cool = 18;
         } else if (gun === 3) {
-          const count = level >= 5 ? 3 : level >= 2 ? 2 : 1;
+          const count = Math.min(level, 8);
           const r = crescentRadius(level);
           flip = -flip;
           for (let i = 0; i < count; i++) {
@@ -189,13 +189,13 @@ function makeGunDemo(gun, level = 4) {
           }
           cool = 14;
         } else if (gun === 4) {
-          const count = level >= 4 ? 3 : level >= 2 ? 2 : 1;
+          const count = Math.min(level, 6);
           for (let i = 0; i < count; i++)
             fire(up + (i - (count - 1) / 2) * 0.16, 3.2, 2.4, 64, { bend: sway * 0.012 });
           cool = 8;
         } else {
-          const count = Math.min(5, 2 + Math.floor((level - 1) / 2));
-          const gap = 5 + level * 2.2;
+          const count = Math.min(8, level + 1);
+          const gap = 4 + level * 0.7;
           for (let i = 0; i < count; i++)
             fire(up, 4.4, 1.6, 70, { x: shipX + (i - (count - 1) / 2) * gap });
           cool = 11;
@@ -291,10 +291,10 @@ function makeBombDemo(kind) {
         bomb.age += 1;
         bomb.life -= 1;
         if (bomb.kind === 'F') {
-          const ring = Math.min(bomb.age * 1.5, 22 + bomb.power * 3);
+          const ring = Math.min(bomb.age * 3, 48 + bomb.power * 10);
           for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
-            if (Math.abs(Math.hypot(b.x - bomb.x, b.y - bomb.y) - ring) < 8) bullets.splice(i, 1);
+            if (Math.abs(Math.hypot(b.x - bomb.x, b.y - bomb.y) - ring) < ring * 0.22) bullets.splice(i, 1);
           }
         } else if (bomb.kind === 'B') {
           const x = W * 0.5 - W * 0.55 * Math.cos(bomb.age * 0.05);
@@ -434,8 +434,15 @@ function drawBombFx(g, bomb, shipX) {
   const t = bomb.age,
     p = bomb.power;
   if (bomb.kind === 'F') {
-    const ring = Math.min(t * 1.5, 22 + p * 3);
-    paintShape(g, 'ring', FLAME, bomb.x, bomb.y, ring * 4.2);
+    const ring = Math.min(t * 3, 48 + p * 10);
+    g.strokeStyle = FLAME;
+    g.lineWidth = Math.max(14, ring * 0.28);
+    g.beginPath();
+    g.arc(bomb.x, bomb.y, ring, 0, Math.PI * 2);
+    g.stroke();
+    g.strokeStyle = '#fff6de';
+    g.lineWidth = Math.max(3, ring * 0.06);
+    g.stroke();
   } else if (bomb.kind === 'B') {
     const x = W * 0.5 - W * 0.55 * Math.cos(t * 0.05);
     g.strokeStyle = ICE;

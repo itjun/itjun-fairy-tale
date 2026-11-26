@@ -105,6 +105,15 @@ function inkTexture(shape, color, text = '') {
         g.lineWidth = 6;
         g.stroke();
         return;
+      case 'firering':
+        g.arc(48, 48, 32, 0, Math.PI * 2);
+        g.strokeStyle = color;
+        g.lineWidth = 18;
+        g.stroke();
+        g.strokeStyle = '#fff6de';
+        g.lineWidth = 4;
+        g.stroke();
+        return;
       default:
         g.ellipse(48, 48, 32, 35, 0.15, 0, Math.PI * 2);
     }
@@ -398,7 +407,7 @@ export async function createFlightView(host, onResize) {
     }
     for (const b of s.bombs) {
       const g = bombGeometry(b, p, w);
-      if (b.kind === 'F') draw(symbol('ring', '#ff9732'), g.x, g.y, g.ring * 2.2);
+      if (b.kind === 'F') draw(symbol('firering', '#ff9732'), g.x, g.y, g.ring * 2.34);
       if (b.kind === 'B') line(symbol('beam', '#92e3ff'), g.x, 0, g.x, 240, g.width * 2);
       if (b.kind === 'T')
         g.points.slice(1).forEach((v, i) => line(symbol('beam', GOLD), ...g.points[i], ...v, g.width));

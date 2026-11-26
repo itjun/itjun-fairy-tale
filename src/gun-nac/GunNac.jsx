@@ -44,6 +44,12 @@ const menuMoves = {
   KeyD: 'right',
 };
 const freshInput = () => ({ x: 0, y: 0, fire: false });
+// 方向键和 WASD 慢慢加上去、松开再慢慢停，巡航大约六成机速，不会一下窜满。
+const KEY_CRUISE = 0.58;
+function glideAxis(current, target) {
+  const next = current + (target - current) * 0.16;
+  return Math.abs(next) < 0.012 ? 0 : next;
+}
 function readSaved() {
   try {
     return decodeFlight(localStorage.getItem(SAVE_KEY));
@@ -299,7 +305,8 @@ export default function GunNac({ onExit, isSound, onSound }) {
   const recordRef = useRef(record),
     press = useRef(new Set()),
     pad = useRef(freshInput()),
-    touch = useRef(freshInput());
+    touch = useRef(freshInput()),
+    keyGlide = useRef({ x: 0, y: 0 });
   const bombPending = useRef(false),
     padEdges = useRef({ bomb: false, speed: false, prev: false, next: false }),
     lastVibe = useRef(0),
@@ -309,6 +316,8 @@ export default function GunNac({ onExit, isSound, onSound }) {
     press.current.clear();
     pad.current = freshInput();
     touch.current = freshInput();
+    keyGlide.current.x = 0;
+    keyGlide.current.y = 0;
     bombPending.current = false;
     padEdges.current = { bomb: false, speed: false, prev: false, next: false };
     drag.current = null;
@@ -464,10 +473,15 @@ export default function GunNac({ onExit, isSound, onSound }) {
             carry -= 1000 / 60;
             const k = press.current,
               gamepad = pad.current,
-              finger = touch.current;
+              finger = touch.current,
+              glide = keyGlide.current;
+            const keyX = (Number(k.has('right')) - Number(k.has('left'))) * KEY_CRUISE;
+            const keyY = (Number(k.has('down')) - Number(k.has('up'))) * KEY_CRUISE;
+            glide.x = glideAxis(glide.x, keyX);
+            glide.y = glideAxis(glide.y, keyY);
             tick(g, {
-              x: Number(k.has('right')) - Number(k.has('left')) + gamepad.x + finger.x,
-              y: Number(k.has('down')) - Number(k.has('up')) + gamepad.y + finger.y,
+              x: glide.x + gamepad.x + finger.x,
+              y: glide.y + gamepad.y + finger.y,
               fire: k.has('fire') || gamepad.fire || finger.fire,
               bomb: bombPending.current,
             });
