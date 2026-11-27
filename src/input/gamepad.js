@@ -18,14 +18,25 @@ export function setGamepadSettings(patch) {
   publish(patch);
   try { localStorage.setItem('garden-gamepad-settings-v1', JSON.stringify({ vibration: state.vibration, deadzone: state.deadzone })); } catch { publish({ notice: '手柄设置暂未保存，本次仍可使用。' }); }
 }
-let activePad = null, gameplay = null;
+let activePad = null, secondPad = null, secondConnected = false, gameplay = null;
 export function registerGamepadPlayer(player) {
   gameplay = player;
   return () => { if (gameplay === player) { player.release(); gameplay = null; } };
 }
-export function vibrateGamepad(kind = 'hit') {
+export function readSecondXboxPad(deadzone = state.deadzone) {
+  try {
+    const pads = [...(navigator.getGamepads?.() || [])].filter(pad => pad?.connected && pad.mapping === 'standard');
+    const pad = pads.find(item => item !== activePad) || null;
+    secondPad = pad;
+    return { connected: !!pad, input: readXboxPad(pad, deadzone), pad };
+  } catch {
+    return { connected: false, input: null, pad: null };
+  }
+}
+export function vibrateGamepad(kind = 'hit', playerIndex = 0) {
   if (!state.vibration || state.mode !== 'gamepad' || document.hidden || !document.hasFocus()) return;
-  const actuator = activePad?.vibrationActuator;
+  const targetPad = playerIndex === 1 ? secondPad : activePad;
+  const actuator = targetPad?.vibrationActuator;
   if (!actuator?.playEffect) return;
   const isHurt = kind === 'hurt';
   try { Promise.resolve(actuator.playEffect('dual-rumble', { duration: isHurt ? 160 : 45, strongMagnitude: isHurt ? 0.45 : 0.08, weakMagnitude: isHurt ? 0.3 : 0.18 })).catch(() => {}); } catch { /* 驱动未提供震动时不影响操作。 */ }
@@ -114,6 +125,12 @@ export function startGamepad() {
     const compatible = pads.filter(pad => pad.mapping === 'standard');
     const previous = activePad;
     activePad = compatible.find(pad => `${pad.index}:${pad.id}` === identity) || compatible[0] || null;
+    secondPad = compatible.find(pad => pad !== activePad) || null;
+    if (gameplay?.isActive() && secondConnected && !secondPad) {
+      release(); gameplay?.pause();
+      publish({ notice: '2P 手柄已断开，游戏已暂停；重连后手动继续。' });
+    }
+    secondConnected = !!secondPad;
     const nextIdentity = activePad ? `${activePad.index}:${activePad.id}` : '';
     if (identity !== nextIdentity) {
       if (identity) { release(); gameplay?.pause(); }
@@ -150,7 +167,8 @@ export function startGamepad() {
       // 游玩中 B 不暂停，孩子乱按也不会被打断。
       if (step.pressed.has('pause')) { release(); gameplay.pause(); return; }
       if (step.pressed.has('interact')) { gameplay.interact(); return; }
-      gameplay.input(input);
+      const secondInput = secondPad ? readXboxPad(secondPad, state.deadzone) : null;
+      gameplay.input(input, secondInput);
       return;
     }
     if (isBindings) {
@@ -195,5 +213,5 @@ export function startGamepad() {
     }
   }
   frame = requestAnimationFrame(tick);
-  return () => { cancelAnimationFrame(frame); abort.abort(); release(); activePad = null; };
+  return () => { cancelAnimationFrame(frame); abort.abort(); release(); activePad = null; secondPad = null; secondConnected = false; };
 }
