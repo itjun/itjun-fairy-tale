@@ -17,6 +17,11 @@ import { STAGE_THEMES, BOSS_THEME } from '../src/gun-nac/sound.js';
 import { BASE_SHIP_SIZE, WINGED_SHIP_WIDTH, WINGED_SHIP_HEIGHT } from '../src/gun-nac/ship-art.js';
 import { crescentDrawSize } from '../src/gun-nac/crescent.js';
 import { makePilot } from '../scripts/helpers/gun-nac-pilot.mjs';
+import sharp from 'sharp';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { QUALITY_KEY, readQuality, writeQuality } from '../src/gun-nac/view.js';
+import { SHIP_CANVAS_SIZE } from '../src/gun-nac/ship-art.js';
 
 test('固定输入与战斗中断保存逐帧一致', () => {
   const s = newFlight({ seed: 6 });
@@ -483,3 +488,41 @@ test('F 火环 1 级能张开到大约半个战场', () => {
   assert.equal(bombTouches({ kind: 'F', power: 1 }, grown, 100, 160 - grown.ring, 2), true);
   assert.equal(bombTouches({ kind: 'F', power: 1 }, grown, 100, 160, 2), false);
 });
+
+const GUN_NAC_ART = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'gun-nac');
+test('高清图集：精灵每格 1024，背景 2560×1920，与源图格数一致', async () => {
+  const expected = {
+    'craft.webp': [5120, 4096],
+    'bosses.webp': [4096, 4096],
+    'landmarks.webp': [4096, 4096],
+    'hangar.webp': [2560, 1920],
+  };
+  for (let i = 0; i < 9; i++) expected[`field-${i}.webp`] = [2560, 1920];
+  for (const [file, [width, height]] of Object.entries(expected)) {
+    const meta = await sharp(join(GUN_NAC_ART, file)).metadata();
+    assert.deepEqual([meta.width, meta.height], [width, height], file);
+  }
+  assert.equal(SHIP_CANVAS_SIZE, 512);
+});
+
+test('画质默认最高，手动切到标准写入本机存储，存储不可用时不报错', () => {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+  };
+  try {
+    assert.equal(readQuality(), 'high');
+    writeQuality('standard');
+    assert.equal(store.get(QUALITY_KEY), 'standard');
+    assert.equal(readQuality(), 'standard');
+    writeQuality('anything-else');
+    assert.equal(readQuality(), 'high');
+  } finally {
+    delete globalThis.localStorage;
+  }
+  // 没有存储（例如某些受限环境）时默认最高，且不抛错
+  assert.equal(readQuality(), 'high');
+  assert.doesNotThrow(() => writeQuality('standard'));
+});
+
