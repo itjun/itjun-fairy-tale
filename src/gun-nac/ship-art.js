@@ -1,7 +1,9 @@
 // 彩笔小战斗机：短机身、小三角翼、双垂尾、粗墨线。
 // 画布只做清晰源图，画进 256×240 战场时缩到裸机 16×16、装翼 26×16。
 
-export const SHIP_CANVAS_SIZE = 96;
+// 贴图画布 512（设计坐标仍是 96），战场里缩到 16×16 也不糊；大屏放大时仍然清晰。
+export const SHIP_CANVAS_SIZE = 512;
+const DESIGN_SIZE = 96;
 export const BASE_SHIP_WIDTH = 16;
 export const BASE_SHIP_HEIGHT = 16;
 export const BASE_SHIP_SIZE = BASE_SHIP_WIDTH;
@@ -74,6 +76,8 @@ function paintPods(g) {
 /** 裸机。画布几乎被机体铺满，缩到 16×16 后仍能认出一架小飞机。 */
 export function paintBaseShip(g) {
   g.save();
+  const k = (g.canvas?.width || DESIGN_SIZE) / DESIGN_SIZE;
+  g.scale(k, k);
   g.lineJoin = 'round';
   g.lineCap = 'round';
   g.translate(CX, CX);
@@ -86,6 +90,8 @@ export function paintBaseShip(g) {
 /** 装翼后只在两侧加一对小侧舱，机体本身不再铺开。 */
 export function paintWingedShip(g) {
   g.save();
+  const k = (g.canvas?.width || DESIGN_SIZE) / DESIGN_SIZE;
+  g.scale(k, k);
   g.lineJoin = 'round';
   g.lineCap = 'round';
   paintPods(g);

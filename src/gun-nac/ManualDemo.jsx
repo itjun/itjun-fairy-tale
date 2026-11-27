@@ -511,10 +511,13 @@ export function ManualDemo({ tab, item, level = 4 }) {
     else if (tab === 'drops') demo = makeDropDemo(item.demo || item.sprite || item.tag);
     else demo = makeItemDemo(item.sprite || item.tag);
     const craft = craftImage();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // 高清图集缩到说明书小格时保持平滑，不出锯齿。
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
 
     const loop = () => {
       if (!isAlive) return;

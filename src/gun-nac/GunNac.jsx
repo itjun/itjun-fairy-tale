@@ -16,7 +16,7 @@ import {
   shopBuy,
   depart,
 } from './flight.js';
-import { createFlightView } from './view.js';
+import { createFlightView, readQuality } from './view.js';
 import { FlightSound } from './sound.js';
 import { FlightManual } from './Manual.jsx';
 import { SHIP_CANVAS_SIZE, paintBaseShip, paintWingedShip } from './ship-art.js';
@@ -300,6 +300,8 @@ export default function GunNac({ onExit, isSound, onSound }) {
     [area, setArea] = useState(1),
     [soundTest, setSoundTest] = useState(1),
     [ricochet, setRicochet] = useState(false);
+  // 画质默认「最高」，只在手动切换时改变；存在本机，不会自动降档。
+  const [quality, setQualityState] = useState(readQuality);
   const [parcel, setParcel] = useState(() => Math.min(8, (saved?.area ?? 0) + 1)),
     [shopNotice, setShopNotice] = useState('');
   const recordRef = useRef(record),
@@ -818,6 +820,15 @@ export default function GunNac({ onExit, isSound, onSound }) {
                     </select>
                   </span>
                 </label>
+                <button
+                  onClick={() => {
+                    const next = quality === 'high' ? 'standard' : 'high';
+                    setQualityState(next);
+                    view.current?.setQuality(next);
+                  }}
+                >
+                  画质　{quality === 'high' ? '最高' : '标准'}
+                </button>
                 <button onClick={swapSound}>
                   {isSound ? <SpeakerHigh /> : <SpeakerSlash />} 游戏声音　{isSound ? '开' : '关'}
                 </button>

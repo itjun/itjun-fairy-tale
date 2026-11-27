@@ -37,6 +37,9 @@ export function paintCrescentBlade(g, options = {}) {
   const ink = isEnemy ? '#7a3a12' : '#15245e';
 
   g.save();
+  // 整套坐标按 96 设计；高清贴图由调用方传入 scale（默认 1，说明书演示已先做好变换）。
+  const k = options.scale ?? 1;
+  g.scale(k, k);
   g.lineJoin = 'round';
   g.lineCap = 'round';
 
@@ -100,12 +103,12 @@ export function paintCrescentBlade(g, options = {}) {
   g.restore();
 }
 
-/** 生成可复用的 Canvas / ImageBitmap 源（96×96）。 */
-export function makeCrescentCanvas(options = {}) {
+/** 生成可复用的 Canvas 源（默认 256×256，高清贴图）。 */
+export function makeCrescentCanvas(options = {}, size = 256) {
   const c = typeof document !== 'undefined' ? document.createElement('canvas') : null;
   if (!c) return null;
-  c.width = c.height = SIZE;
-  paintCrescentBlade(c.getContext('2d'), options);
+  c.width = c.height = size;
+  paintCrescentBlade(c.getContext('2d'), { ...options, scale: size / SIZE });
   return c;
 }
 

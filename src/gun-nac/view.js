@@ -54,9 +54,30 @@ const BLUE = '#70dcff',
   HOT = '#ff643c',
   GOLD = '#ffd442',
   INK = '#192047';
-function textureFrom(paint, size = 96) {
+
+// 画质：默认「最高」（像素比最高 3、全部特效）；「标准」只在个别机器掉帧时手动降档，从不自动降。
+// 标准档只降像素比与火花粒子数，画面结构与玩法不变。
+export const QUALITY_KEY = 'garden-gun-nac-quality';
+export function readQuality() {
+  try {
+    return localStorage.getItem(QUALITY_KEY) === 'standard' ? 'standard' : 'high';
+  } catch {
+    return 'high';
+  }
+}
+export function writeQuality(q) {
+  try {
+    localStorage.setItem(QUALITY_KEY, q === 'standard' ? 'standard' : 'high');
+  } catch {
+    /* 存储不可用时只在本次生效 */
+  }
+}
+
+// 贴图按设计坐标绘制，画布尺寸决定清晰度；paint 内部自行按画布尺寸放大。
+function textureFrom(paint, size = 256, height = size) {
   const c = document.createElement('canvas');
-  c.width = c.height = size;
+  c.width = size;
+  c.height = height;
   const ctx = c.getContext('2d');
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -65,16 +86,56 @@ function textureFrom(paint, size = 96) {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
-function inkTexture(shape, color, text = '') {
+function radialTexture(stops, size = 128) {
+  return textureFrom((g) => {
+    const half = size / 2;
+    const grad = g.createRadialGradient(half, half, 0, half, half, half);
+    for (const [offset, color] of stops) grad.addColorStop(offset, color);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+  }, size);
+}
+// 星点贴图：128×240，与战场一个区块同比例，首尾相接；种子固定，画面可重现。
+function starTexture() {
+  const W = 128,
+    H = 240;
+  return textureFrom(
+    (g) => {
+      let seed = 7;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i < 46; i++) {
+        const x = rnd() * W,
+          y = rnd() * H,
+          r = 0.5 + rnd() * 1.1,
+          a = 0.25 + rnd() * 0.55;
+        for (const dx of [-W, 0, W])
+          for (const dy of [-H, 0, H]) {
+            const px = x + dx,
+              py = y + dy;
+            if (px < -3 || px > W + 3 || py < -3 || py > H + 3) continue;
+            g.fillStyle = `rgba(232, 246, 255, ${a})`;
+            g.beginPath();
+            g.arc(px, py, r, 0, Math.PI * 2);
+            g.fill();
+          }
+      }
+    },
+    W,
+    H,
+  );
+}
+function inkTexture(shape, color, text = '', size = 256) {
   return textureFrom((g) => {
     if (shape === 'blade') {
-      paintCrescentBlade(g, { enemy: false });
+      paintCrescentBlade(g, { enemy: false, scale: size / 96 });
       return;
     }
     if (shape === 'crescent') {
-      paintCrescentBlade(g, { enemy: true });
+      paintCrescentBlade(g, { enemy: true, scale: size / 96 });
       return;
     }
+    // 设计坐标仍按 96 画，贴图按 size 放大，线宽和字号同比例。
+    g.scale(size / 96, size / 96);
     g.strokeStyle = '#fff6de';
     g.lineWidth = 9;
     g.fillStyle = color;
@@ -129,20 +190,25 @@ function inkTexture(shape, color, text = '') {
       g.fillStyle = 'rgba(255,255,255,.75)';
       g.fillRect(36, 27, 10, 6);
     }
-  });
+  }, size);
 }
 
-export async function createFlightView(host, onResize) {
+export async function createFlightView(host, onResize, options = {}) {
+  let quality = options.quality ?? readQuality();
+  const reduceMotionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  const motionOn = () => !reduceMotionQuery?.matches;
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
     alpha: false,
-    powerPreference: 'low-power',
+    powerPreference: 'high-performance',
     preserveDrawingBuffer: false,
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const pixelRatio = (q) => Math.min(window.devicePixelRatio || 1, q === 'high' ? 3 : 1.5);
+  renderer.setPixelRatio(pixelRatio(quality));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.setAttribute('aria-label', '加纳战机飞行战场');
   host.append(renderer.domElement);
+  const maxAnisotropy = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
   let viewWidth = 256;
   const scene = new THREE.Scene(),
     camera = new THREE.OrthographicCamera(0, 256, 240, 0, 0.1, 20);
@@ -154,6 +220,11 @@ export async function createFlightView(host, onResize) {
     meshes = [];
   function own(tex) {
     tex.colorSpace = THREE.SRGBColorSpace;
+    // 大屏放大时保持贴图清晰：mipmap 与各向异性过滤，不用最近邻。
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.anisotropy = maxAnisotropy;
     textures.add(tex);
     return tex;
   }
@@ -204,7 +275,55 @@ export async function createFlightView(host, onResize) {
     if (!materials.has(key)) material(key, own(inkTexture(shape, color, text)));
     return key;
   }
+  // 加色光晕：白色径向贴图乘以颜色，叠加在画面上，像彩笔高光与火光。
+  const glowTex = own(
+    radialTexture([
+      [0, 'rgba(255,255,255,1)'],
+      [0.35, 'rgba(255,255,255,0.55)'],
+      [1, 'rgba(255,255,255,0)'],
+    ]),
+  );
+  function glow(color) {
+    const key = 'glow' + color;
+    if (!materials.has(key)) {
+      const m = new THREE.MeshBasicMaterial({
+        map: glowTex,
+        color,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+      });
+      materials.set(key, m);
+    }
+    return key;
+  }
+  // 地面软阴影：深紫半透明径向渐变，画在角色与敌人下方一点点。
+  material(
+    'shadow',
+    own(
+      radialTexture([
+        [0, 'rgba(14, 10, 40, 0.46)'],
+        [0.6, 'rgba(14, 10, 40, 0.24)'],
+        [1, 'rgba(14, 10, 40, 0)'],
+      ]),
+    ),
+    true,
+  );
   const fields = [];
+  const starTex = own(starTexture());
+  materials.set(
+    'stars',
+    new THREE.MeshBasicMaterial({
+      map: starTex,
+      color: '#ffffff',
+      transparent: true,
+      opacity: 0.7,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
   let observer;
   function dispose() {
     observer?.disconnect();
@@ -275,6 +394,8 @@ export async function createFlightView(host, onResize) {
   const dot = symbol('dot', HOT),
     ring = symbol('ring', BLUE),
     laser = symbol('beam', '#ff4e6b');
+  // 火花数量：高画质满额，标准档减半；减少动态效果时不放火花。
+  const sparkCount = (n) => (quality === 'high' ? n : Math.max(1, Math.round(n / 2)));
   function frame(s) {
     used = 0;
     const w = playBounds(s).width || viewWidth;
@@ -307,6 +428,12 @@ export async function createFlightView(host, onResize) {
       tileField(s.area, (s.scroll - edge) / 240);
       draw('field' + s.area, 128, edge - 120, w, 240);
     }
+    // 远景星点：比地面慢一档滚动，形成视差；减少动态效果时固定不动。
+    if (field !== 7 && !arriving) {
+      starTex.repeat.set(w / 128, 1);
+      starTex.offset.set(0, motionOn() ? (s.scroll * 0.55) / 240 : 0);
+      draw('stars', 128, 120, w, 240);
+    }
     for (const m of visibleTerrain(s.area, s.scroll, s.areaTick, w))
       draw('t' + m.tile, m.x, m.y, m.width, m.width, m.turn);
     for (const h of s.hazards) {
@@ -316,6 +443,16 @@ export async function createFlightView(host, onResize) {
       } else if (h.kind === 'pillar') {
         line(laser, h.x, 0, h.x, 240, 4);
       } else draw(symbol('shard', '#d78e53'), h.x, h.y, 10 + h.age * 0.22);
+    }
+    // 影子先画，角色压在上面：从左上方打光，影子落在右下一点。
+    for (const e of s.enemies) {
+      if (e.age < 0 || (e.path === 'surface' && e.age < 34)) continue;
+      const size = e.r * (e.kind === 'barge' ? 3.4 : 3);
+      draw('shadow', e.x + 3, e.y - 4, size * 0.86, size * 0.3);
+    }
+    if (s.boss && (s.boss.open || !['octopus', 'burrow', 'tower'].includes(s.boss.kind))) {
+      const size = s.boss.kind === 'rabbit' ? 94 : s.boss.r * 3.65;
+      draw('shadow', s.boss.x + 6, s.boss.y - 8, size * 0.9, size * 0.3);
     }
     for (const e of s.enemies) {
       if (e.age < 0) continue;
@@ -336,6 +473,7 @@ export async function createFlightView(host, onResize) {
         } else draw(ring, b.x, b.y, 26 + Math.sin(b.age * 0.08) * 7, 9);
       } else {
         const size = b.kind === 'rabbit' ? 94 : b.r * 3.65;
+        if (b.flash > 0 && motionOn()) draw(glow(GOLD), b.x, b.y, size * 0.9);
         draw('b' + BOSSES[b.kind], b.x, b.y, size, size);
         if (b.kind === 'rabbit')
           [-1, 1].forEach((side, i) => {
@@ -357,6 +495,9 @@ export async function createFlightView(host, onResize) {
     for (const i of s.items) {
       if (i.age < 0) continue;
       const id = { life: 19, money: 17, wing: 18 }[i.kind];
+      // 拾取物底下加一圈暖光，远远就能认出来。
+      const halo = { life: '#ff8fb5', money: '#ffe27a', wing: '#8ff0ff' }[i.kind] || '#cdf6ff';
+      if (motionOn()) draw(glow(halo), i.x, i.y, 22);
       if (id != null) draw('c' + id, i.x, i.y, i.kind === 'wing' ? 18 : 15);
       else {
         const tag = i.kind.startsWith('gun')
@@ -379,6 +520,7 @@ export async function createFlightView(host, onResize) {
       if (shot.gun === 3) {
         const spin = crescentSpin(shot.age, shot.spinDir || 1);
         const size = crescentDrawSize(shot.r);
+        if (motionOn()) draw(glow('#7ad8ff'), shot.x, shot.y, size * 1.5);
         draw(symbol('blade', '#7ad8ff'), shot.x, shot.y, size, size, spin);
         continue;
       }
@@ -386,12 +528,16 @@ export async function createFlightView(host, onResize) {
       const shape = ['', 'beam', 'dot', 'blade', 'flame', 'beam'][shot.gun],
         color = ['', BLUE, '#dc8cff', '#38c6ff', '#ffad22', '#66ffd9'][shot.gun];
       const height = shot.gun === 4 ? shot.span || 12 : shot.gun === 5 ? 9 : shot.gun === 1 ? 6 : shot.r * 2.4;
+      if (motionOn()) draw(glow(color), shot.x, shot.y, shot.r * 4.4, height * 1.7, a);
       draw(symbol(shape, color), shot.x, shot.y, shot.gun === 5 ? 2.2 : shot.r * 2, height, a);
     }
     const p = s.ship;
     if (p.inv <= 0 || Math.floor(p.inv / 6) % 2 === 0) {
       const tilt = p.dx * 0.045;
       const pulse = 0.86 + Math.sin(s.frame * 0.48) * 0.2;
+      // 机身下方的软阴影，离地面越远越淡。
+      draw('shadow', p.x + 3, p.y - 6, p.wing ? WINGED_SHIP_WIDTH * 1.05 : BASE_SHIP_WIDTH * 1.05, 6);
+      if (motionOn()) draw(glow('#ff9c24'), p.x, p.y + 9, 9, 12 * pulse);
       draw(symbol('flame', '#ff9c24'), p.x, p.y + 8, 2.2, 4.2 * pulse, Math.PI + tilt);
       if (p.wing) draw('shipWinged', p.x, p.y, WINGED_SHIP_WIDTH, WINGED_SHIP_HEIGHT, tilt);
       else draw('shipBase', p.x, p.y, BASE_SHIP_WIDTH, BASE_SHIP_HEIGHT, tilt);
@@ -424,9 +570,25 @@ export async function createFlightView(host, onResize) {
         f.y,
         (large ? 8 : 3) + f.age * (f.kind === 'clear' ? 14 : large ? 1.35 : 0.52),
       );
+      // 火花从中心向外散开，只由 age 决定位置，暂停时自然冻结。
+      if (motionOn()) {
+        const n = sparkCount(large ? 8 : 4);
+        const spread = f.age * (large ? 1.7 : 0.9) + 3;
+        const size = Math.max(0.5, (large ? 3.6 : 2.2) * (1 - f.age / 28));
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + 0.4;
+          draw(glow(large ? GOLD : '#e6faff'), f.x + Math.cos(a) * spread, f.y + Math.sin(a) * spread, size * 2);
+        }
+      }
     }
     for (let i = used; i < meshes.length; i++) meshes[i].visible = false;
     renderer.render(scene, camera);
   }
-  return { frame, dispose, getWidth: () => viewWidth };
+  function setQuality(next) {
+    quality = next === 'standard' ? 'standard' : 'high';
+    writeQuality(quality);
+    renderer.setPixelRatio(pixelRatio(quality));
+    resize();
+  }
+  return { frame, dispose, getWidth: () => viewWidth, setQuality, getQuality: () => quality };
 }
