@@ -15,6 +15,7 @@ import { readAdventure, clearAdventure } from './game/save.js';
 import { queueRun, flushScores } from './scores/client.js';
 const ScoreHistory = lazy(() => import('./scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
 const GunNac = lazy(() => import('./gun-nac/GunNac.jsx'));
+const SnowSisters = lazy(() => import('./snow-sisters/SnowSisters.jsx'));
 const PlatformGame = lazy(() => import('./game/PlatformGame.jsx').then(module => ({ default: module.PlatformGame })));
 import { useEffect, useRef, useState } from 'react';
 import { Flower, Rainbow, IceCream, Heart, Star, Sparkle, ArrowRight, ArrowLeft, SpeakerHigh, X, Check, PaintBrush, ArrowCounterClockwise, DownloadSimple, Play, Drop, Flag, Butterfly, Trophy, Airplane, Snowflake } from '@phosphor-icons/react';
@@ -180,6 +181,7 @@ export function App() {
   if (activeQuest) return <Suspense fallback={<div className="loading-adventure">正在打开小冒险…</div>}><MiniGame session={progress.miniGames[activeQuest.id]} onChange={saveMiniSession} onExit={() => { setMode(questReturnMode.current); window.speechSynthesis?.cancel(); }} onReplay={() => openQuest(activeQuest.id)} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} onChime={chime} isSaved={isSaved} /></Suspense>;
   if (isScores) return <Suspense fallback={<div className="loading-adventure">正在翻开成绩本…</div>}><ScoreHistory onClose={() => setIsScores(false)} /></Suspense>;
   if (mode === 'gun-nac') return <Suspense fallback={<div className="loading-adventure">正在进入机库…</div>}><GunNac isSound={isSound} onSound={() => setIsSound(value => !value)} onExit={() => setMode(gunNacReturn.current)} /></Suspense>;
+  if (mode === 'snow-sisters') return <Suspense fallback={<div className="loading-adventure">正在打开雪人高塔…</div>}><SnowSisters isSound={isSound} onSound={() => setIsSound(value => !value)} onExit={() => setMode('retro')} /></Suspense>;
   if (adventureEntry) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame entry={adventureEntry} initialSound={isSound} onExit={() => { setAdventureEntry(null); setSavedAdventure(readAdventure()); }} /></Suspense>;
   return <div className={isGarden ? 'app-shell' : 'app-shell home-shell'}>
     <DesktopRestState />
@@ -218,7 +220,7 @@ export function App() {
       <p className="modal-subtitle">一款一款慢慢做。能玩的现在就能进，还在画的先放在这里。</p>
       <div className="quest-list">
         <button className="quest-card pink" onClick={() => { gunNacReturn.current = 'retro'; setMode('gun-nac'); }}><span className="quest-icon"><Icon as={Airplane} size={34} /></span><span className="quest-copy"><strong>加纳战机</strong><span>驾驶小飞机，飞过一座座关</span></span><Icon as={ArrowRight} size={22} /></button>
-        <button className="quest-card blue" disabled><span className="quest-icon"><Icon as={Snowflake} size={34} /></span><span className="quest-copy"><strong>小雪人姐妹</strong><span>还在画，以后再来玩</span></span></button>
+        <button className="quest-card blue" onClick={() => setMode('snow-sisters')}><span className="quest-icon"><Icon as={Snowflake} size={34} /></span><span className="quest-copy"><strong>小雪人姐妹</strong><span>1P/2P 彩笔堆雪球，闯过 50 层高塔</span></span><Icon as={ArrowRight} size={22} /></button>
       </div>
     </HomePage>}
     {mode === 'mini-games' && <HomePage title="小游戏" onBack={closeModal} className="home-games">
