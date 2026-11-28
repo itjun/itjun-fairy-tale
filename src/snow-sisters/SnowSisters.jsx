@@ -913,10 +913,9 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
                   第 {s.floor} 层　1P {s.players[0].score} 分
                   {s.players[1].active ? ` · 2P ${s.players[1].score} 分` : ''}
                 </p>
-                <p>剩余共享续关：{s.continues} 次</p>
-                <button data-sn-first disabled={s.continues <= 0} onClick={handleContinue}>
+                <button data-sn-first onClick={handleContinue}>
                   {padBadge('A')}
-                  投币续关（从第 {s.floor} 层继续）
+                  从第 {s.floor} 层继续
                 </button>
                 <button onClick={() => startRun(s.mode)}>从第 1 层重新开始</button>
                 {back(leave, '回怀旧游戏')}

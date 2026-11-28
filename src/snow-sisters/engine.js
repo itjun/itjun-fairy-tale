@@ -17,8 +17,7 @@ import { createBossForFloor, hitBossWithBall, hitBossWithShot, isBossDefeated, u
 export const SAVE_KEY = 'garden-snow-sisters-v1';
 export const RECORD_KEY = 'garden-snow-sisters-record-v1';
 export const FIXED_DT = 1000 / 60;
-export const INITIAL_LIVES = 3;
-export const INITIAL_CONTINUES = 9;
+export const INITIAL_LIVES = 5;
 
 function makePlayer(id, active, x = 104, y = 224) {
   return {
@@ -125,7 +124,6 @@ export function newSnowGame({
     sweepSerial: 0,
     frame: 0,
     hiScore: Math.max(0, hiScore | 0),
-    continues: INITIAL_CONTINUES,
     players: [makePlayer(1, true), makePlayer(2, numPlayers === 2)],
     enemies: [],
     snowballs: [],
@@ -169,17 +167,13 @@ export function joinSecondPlayer(s) {
 }
 
 export function continueSnowGame(s) {
-  if (!s || s.phase !== 'over' || s.continues <= 0) return false;
-  s.continues--;
+  if (!s || s.phase !== 'over') return false;
   const f = getFloor(s.floor);
   s.players.forEach((p, idx) => {
     if (p.active || idx === 0) {
       const sp = f.playerSpawns[idx];
       p.active = true;
       p.lives = INITIAL_LIVES;
-      p.score = 0;
-      p.nextExtend = 100000;
-      p.letters = [];
       p.potions = { speed: false, power: false, range: false };
       p.giantTimer = 0;
       p.invuln = 150;
@@ -599,7 +593,7 @@ export function decodeSnowGame(raw) {
       return null;
     }
     const okNum = (n) => Number.isFinite(n);
-    if (!okNum(s.seed) || !okNum(s.frame) || !okNum(s.hiScore) || !okNum(s.continues)) return null;
+    if (!okNum(s.seed) || !okNum(s.frame) || !okNum(s.hiScore)) return null;
     for (const p of s.players) {
       if (
         !p ||
@@ -618,6 +612,7 @@ export function decodeSnowGame(raw) {
     for (const k of ['enemies', 'snowballs', 'shots', 'items', 'hazards', 'popups']) {
       if (!Array.isArray(s[k])) return null;
     }
+    delete s.continues;
     // 旧存档的连锁球颜色名是 blue / red，按推球者衣服颜色改成 p1 / p2。
     for (const ball of s.snowballs) {
       if (ball.color === 'blue') ball.color = 'p1';

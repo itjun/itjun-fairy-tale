@@ -17,7 +17,6 @@ import {
 } from '../src/snow-sisters/items.js';
 import { TIME_CODE, matchTimeCode, startSlotBonus } from '../src/snow-sisters/bonus.js';
 import {
-  INITIAL_CONTINUES,
   INITIAL_LIVES,
   continueSnowGame,
   decodeSnowGame,
@@ -350,11 +349,14 @@ test('五大Boss配置、2P血量平衡、50层尖刺与Time模式倒计时', ()
   assert.equal(tm.phase, 'over');
 });
 
-test('超时刷出南瓜头与幽灵、2P中途加入以及9次共享续关', () => {
+test('超时刷出南瓜头与幽灵、2P中途加入以及命用完后继续', () => {
   const s = newSnowGame({ players: 1, skipIntro: true });
+  assert.equal(INITIAL_LIVES, 5);
+  assert.equal(s.players[0].lives, 5);
   assert.equal(s.players[1].active, false);
   tickSnow(s, { p2: { join: true } });
   assert.equal(s.players[1].active, true);
+  assert.equal(s.players[1].lives, 5);
   assert.equal(s.mode, 2);
 
   // 推进超时刷出南瓜头
@@ -362,14 +364,22 @@ test('超时刷出南瓜头与幽灵、2P中途加入以及9次共享续关', ()
   tickSnow(s, {});
   assert.ok(s.enemies.some((e) => e.kind === 'pumpkin'), '超时后应出现南瓜头');
 
-  // 全灭进入 over 并使用共享续关
+  // 全灭后从本层继续，再给 5 条命，分数和字母留着，可以一直继续
   s.phase = 'over';
-  assert.equal(s.continues, INITIAL_CONTINUES);
+  s.players[0].score = 17900;
+  s.players[0].letters = ['S', 'N'];
+  s.players[1].score = 800;
   assert.equal(continueSnowGame(s), true);
-  assert.equal(s.continues, INITIAL_CONTINUES - 1);
   assert.equal(s.phase, 'play');
-  assert.equal(s.players[0].lives, INITIAL_LIVES);
-  assert.equal(s.players[1].lives, INITIAL_LIVES);
+  assert.equal(s.players[0].lives, 5);
+  assert.equal(s.players[1].lives, 5);
+  assert.equal(s.players[0].score, 17900);
+  assert.deepEqual(s.players[0].letters, ['S', 'N']);
+  assert.equal(s.players[1].score, 800);
+  s.phase = 'over';
+  assert.equal(continueSnowGame(s), true);
+  assert.equal(s.players[0].lives, 5);
+  assert.equal(s.players[0].score, 17900);
 
   // 12 首原声曲目检查
   assert.equal(SNOW_TRACKS.length, 12);
