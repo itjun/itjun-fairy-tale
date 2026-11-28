@@ -206,7 +206,7 @@ export async function createFlightView(host, onResize, options = {}) {
   const pixelRatio = (q) => Math.min(window.devicePixelRatio || 1, q === 'high' ? 3 : 1.5);
   renderer.setPixelRatio(pixelRatio(quality));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.domElement.setAttribute('aria-label', '加纳战机飞行战场');
+  renderer.domElement.setAttribute('aria-label', '彩笔战机飞行战场');
   host.append(renderer.domElement);
   const maxAnisotropy = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
   let viewWidth = 256;

@@ -81,7 +81,12 @@ test('加纳战机 2880 宽战场持续射击，帧时间中位数与 95% 分位
           await wait(700);
         };
         localStorage.setItem('garden-gun-nac-quality', 'high');
-        await click('怀旧游戏'); await click('加纳战机'); await click('开始游戏');
+        await click('世界地图');
+        const airbase = document.querySelector('[data-world="airbase"]');
+        if (!airbase) throw new Error('找不到空军基地地标');
+        airbase.click();
+        await wait(700);
+        await click('开始游戏');
         const key = (code, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code, bubbles: true }));
         key('KeyJ', true); key('KeyA', true);
         await wait(1500);

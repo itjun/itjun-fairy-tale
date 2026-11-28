@@ -111,12 +111,20 @@ try {
   await until(() => evaluate('document.documentElement.dataset.inputMode === "keyboard"'), '选地图切到键盘');
   assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".atlas-page button kbd")).filter(key => key.checkVisibility()).map(key => key.textContent)'), ['B', 'A'], '用键盘也能看见返回和确认的手柄键');
   const themes = await evaluate('Array.from(document.querySelectorAll("[data-world]"), button => button.dataset.world)');
-  assert.equal(themes.length, 9);
+  assert.equal(themes.length, 10);
   for (const theme of themes) {
     await evaluate(`reach("[data-world=${theme}]")`);
     assert.equal(await evaluate('document.activeElement.getAttribute("aria-pressed")'), 'true', theme);
     assert.ok(await evaluate('document.activeElement.querySelector(".atlas-marker svg")?.checkVisibility()'), '方向图标跟随当前地标');
   }
+  await evaluate('choose("[data-world=snow]")');
+  await until(() => evaluate('document.querySelector(".sn-page h1")?.textContent === "小雪人姐妹"'), '北方雪山进入小雪人姐妹');
+  await evaluate('tap(1)');
+  await until(() => evaluate('document.activeElement?.dataset.world === "snow"'), '从小雪人姐妹返回地图并保持雪山焦点');
+  await evaluate('choose("[data-world=airbase]")');
+  await until(() => evaluate('document.querySelector(".gn-page h1")?.textContent === "彩笔战机"'), '空军基地进入彩笔战机');
+  await evaluate('tap(1)');
+  await until(() => evaluate('document.activeElement?.dataset.world === "airbase"'), '从彩笔战机返回地图并保持空军基地焦点');
   await evaluate('choose("[data-world=rainbow]")');
   await until(() => evaluate('!!document.querySelector(".family-grid")'), '选角');
   for (const id of ['dad', 'mom', 'sister', 'little']) {

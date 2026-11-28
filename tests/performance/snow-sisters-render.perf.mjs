@@ -87,7 +87,12 @@ test('2880×2160 画布（1080p 窗口 2 倍像素比）打 Boss 战，帧时间
           b.click();
           await wait(600);
         };
-        await click('怀旧游戏'); await click('小雪人姐妹'); await click('继续');
+        await click('世界地图');
+        const snow = document.querySelector('[data-world="snow"]');
+        if (!snow) throw new Error('找不到北方雪山地标');
+        snow.click();
+        await wait(700);
+        await click('继续');
         const key = (code, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code, key: code, bubbles: true }));
         key('KeyD', true); key('KeyJ', true);
         await wait(2500);

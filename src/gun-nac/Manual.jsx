@@ -230,7 +230,7 @@ export function FlightManual({ isGamepad, backLabel, onBack }) {
   return (
     <div className="gn-manual-shell">
       <div className="gn-manual-head">
-        <h2>加纳战机说明书</h2>
+        <h2>彩笔战机说明书</h2>
         <div className="gn-manual-tabs" role="tablist" aria-label="说明书章节" data-gamepad-tabs="切页">
           {TABS.map((entry, idx) => (
             <button

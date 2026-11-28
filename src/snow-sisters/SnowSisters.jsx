@@ -199,7 +199,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
           <>
             <KeyHint keys={['WASD']}>选择</KeyHint>
             <KeyHint keys={['J', 'Enter']}>确定</KeyHint>
-            <KeyHint keys={['Esc']}>回怀旧游戏</KeyHint>
+            <KeyHint keys={['Esc']}>回世界地图</KeyHint>
           </>
         ) : page === 'manual' ? (
           <>
@@ -217,7 +217,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
           <>
             <KeyHint keys={['WASD']}>选择</KeyHint>
             <KeyHint keys={['J', 'Enter']}>确定</KeyHint>
-            <KeyHint keys={['Esc']}>{page === 'config' ? '回标题页' : '回怀旧游戏'}</KeyHint>
+            <KeyHint keys={['Esc']}>{page === 'config' ? '回标题页' : '回世界地图'}</KeyHint>
           </>
         )}
       </div>
@@ -241,7 +241,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
         <>
           <PadHint keys={['stick']}>选择</PadHint>
           <PadHint keys={['A']}>确定</PadHint>
-          <PadHint keys={['B']}>{page === 'config' ? '回标题页' : '回怀旧游戏'}</PadHint>
+          <PadHint keys={['B']}>{page === 'config' ? '回标题页' : '回世界地图'}</PadHint>
         </>
       )}
     </div>
@@ -780,7 +780,7 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
                   {padBadge('A')}
                   重新打开舞台
                 </button>
-                {back(leave, '回怀旧游戏')}
+                {back(leave, '回世界地图')}
               </>
             ) : page === 'title' ? (
               <>
@@ -803,7 +803,7 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
                   </button>
                   <button onClick={() => show('config')}>塔楼与声音设置</button>
                   <button onClick={() => openManual('title')}>图文说明书</button>
-                  {back(leave, '回怀旧游戏')}
+                  {back(leave, '回世界地图')}
                 </nav>
                 <div className="sn-help">
                   {isPadUi ? (
@@ -904,7 +904,7 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
                   {isSound ? <SpeakerHigh /> : <SpeakerSlash />} 游戏声音　{isSound ? '开' : '关'}
                 </button>
                 <button onClick={swapQuality}>画质　{quality === 'high' ? '最高' : '标准'}</button>
-                <button onClick={leave}>保存并回怀旧游戏</button>
+                <button onClick={leave}>保存并回世界地图</button>
               </>
             ) : page === 'over' ? (
               <>
@@ -918,7 +918,7 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
                   从第 {s.floor} 层继续
                 </button>
                 <button onClick={() => startRun(s.mode)}>从第 1 层重新开始</button>
-                {back(leave, '回怀旧游戏')}
+                {back(leave, '回世界地图')}
               </>
             ) : (
               <>
@@ -948,7 +948,7 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
                   {padBadge('A')}
                   回标题页
                 </button>
-                {back(leave, '回怀旧游戏')}
+                {back(leave, '回世界地图')}
               </>
             )}
 

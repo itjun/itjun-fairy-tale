@@ -196,7 +196,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
         <div className="gn-pad-bar" aria-label="键盘操作提示">
           <KeyHint keys={['WASD']}>选择</KeyHint>
           <KeyHint keys={['J', 'Enter']}>确定</KeyHint>
-          <KeyHint keys={['Esc']}>回花园</KeyHint>
+          <KeyHint keys={['Esc']}>回世界地图</KeyHint>
         </div>
       );
     }
@@ -219,7 +219,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
           <>
             <KeyHint keys={['WASD']}>选择</KeyHint>
             <KeyHint keys={['J', 'Enter']}>购买或出发</KeyHint>
-            <KeyHint keys={['Esc']}>保存并回花园</KeyHint>
+            <KeyHint keys={['Esc']}>保存并回世界地图</KeyHint>
           </>
         ) : page === 'pause' ? (
           <>
@@ -231,7 +231,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
           <>
             <KeyHint keys={['WASD']}>选择</KeyHint>
             <KeyHint keys={['J', 'Enter']}>确定</KeyHint>
-            <KeyHint keys={['Esc']}>{page === 'replace' ? '保留进度' : '回花园'}</KeyHint>
+            <KeyHint keys={['Esc']}>{page === 'replace' ? '保留进度' : '回世界地图'}</KeyHint>
           </>
         )}
       </div>
@@ -242,7 +242,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
       <div className="gn-pad-bar" aria-label="Xbox 手柄操作提示">
         <PadHint keys={['stick']}>选择</PadHint>
         <PadHint keys={['A']}>确定</PadHint>
-        <PadHint keys={['B']}>回花园</PadHint>
+        <PadHint keys={['B']}>回世界地图</PadHint>
       </div>
     );
   }
@@ -264,7 +264,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
         <>
           <PadHint keys={['stick']}>选项目 / 左右选区</PadHint>
           <PadHint keys={['A']}>购买或出发</PadHint>
-          <PadHint keys={['B']}>保存并回花园</PadHint>
+          <PadHint keys={['B']}>保存并回世界地图</PadHint>
         </>
       ) : page === 'pause' ? (
         <>
@@ -276,7 +276,7 @@ function MenuControlBar({ page, isGamepad, loadError, manualBackLabel }) {
         <>
           <PadHint keys={['stick']}>选择</PadHint>
           <PadHint keys={['A']}>确定</PadHint>
-          <PadHint keys={['B']}>{page === 'replace' ? '保留进度' : '回花园'}</PadHint>
+          <PadHint keys={['B']}>{page === 'replace' ? '保留进度' : '回世界地图'}</PadHint>
         </>
       )}
     </div>
@@ -739,12 +739,12 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   {padBadge('A')}
                   重新打开画面
                 </button>
-                {back(leave, '回花园')}
+                {back(leave, '回世界地图')}
               </>
             ) : page === 'title' ? (
               <>
                 <p className="gn-best">最高分　{String(record).padStart(6, '0')}</p>
-                <h1>加纳战机</h1>
+                <h1>彩笔战机</h1>
                 <nav>
                   {s && s.phase !== 'ending' && (
                     <button data-gn-first disabled={!ready} onClick={resume}>
@@ -755,7 +755,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   {launchButton}
                   <button onClick={() => show('config')}>飞行设置</button>
                   <button onClick={() => openManual('title')}>游戏说明书</button>
-                  {back(leave, '回花园')}
+                  {back(leave, '回世界地图')}
                 </nav>
                 <div className="gn-help" aria-label={isPadUi ? 'Xbox 手柄操控说明' : '键盘操控说明'}>
                   {isPadUi ? (
@@ -876,7 +876,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                 </button>
                 <button onClick={() => openManual('pause')}>游戏说明书</button>
                 <button onClick={swapSound}>{isSound ? <SpeakerHigh /> : <SpeakerSlash />} 游戏声音</button>
-                <button onClick={leave}>保存并回花园</button>
+                <button onClick={leave}>保存并回世界地图</button>
               </>
             ) : page === 'shop' ? (
               <>
@@ -938,7 +938,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                     {padBadge('A')}
                     飞往第 {s.area + 1} 区
                   </button>
-                  {back(leave, '保存并回花园')}
+                  {back(leave, '保存并回世界地图')}
                 </div>
               </>
             ) : page === 'over' ? (
@@ -951,7 +951,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   {padBadge('A')}
                   从本区续关
                 </button>
-                {back(leave, '回花园')}
+                {back(leave, '回世界地图')}
               </>
             ) : (
               <>
@@ -962,7 +962,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                   {padBadge('A')}
                   回机库
                 </button>
-                {back(leave, '回花园')}
+                {back(leave, '回世界地图')}
               </>
             )}
             <MenuControlBar

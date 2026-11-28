@@ -21,6 +21,7 @@ import { COLLECTIBLES } from './collectibles.js';
 import { RewardPanel } from './AdventurePanels.jsx';
 import './adventure.css';
 import { PLAYABLE_WORLDS as WORLD_ACTS, findStage } from '../../shared/levels.js';
+import { ADVENTURE_WORLDS, isLastAdventureWorld, nextAdventureWorld } from '../../shared/world-atlas.js';
 import { carryToNextWorld } from '../../shared/adventure-cycle.js';
 import { queueRun, flushScores, saveOnLeave } from '../scores/client.js';
 import './game.css';
@@ -34,11 +35,12 @@ function restStatus(game) {
   if (game.combatLoot.pendingId !== null) return 'life-loot';
   return game.isCompleted ? 'completed' : 'paused';
 }
-export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }) {
+export function PlatformGame({ onExit, onBackToWorlds, onLaunchGame, initialSound = true, entry = 'continue' }) {
   const gamepadState = useGamepad();
   const host = useRef(null), engine = useRef(null), menu = useRef(null), audio = useRef(null);
+  const picked = typeof entry === 'object' && entry?.kind === 'pick' ? entry : null;
   const [initialSaved] = useState(readAdventure);
-  const saved = useRef(entry === 'continue' ? initialSaved : null);
+  const saved = useRef(picked ? (picked.saved || null) : entry === 'continue' ? initialSaved : null);
   const carriedAdventure = useRef(null), carriedSurvival = useRef(null);
   const [character, setCharacter] = useState(() => saved.current?.state.survival?.character || 'sister');
   const [starterBuilds,setStarterBuilds]=useState(()=>{
@@ -52,12 +54,12 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
   const [optionsCategory, setOptionsCategory] = useState('game');
   const [albumNotice, setAlbumNotice] = useState(null);
   useEffect(()=>{try { localStorage.setItem('garden-starter-builds-v2',JSON.stringify(starterBuilds)); } catch {}},[starterBuilds]);
-  const isAutoStart = useRef(false), isResumeSaved = useRef(true);
-  const sound = useRef(initialSound), run = useRef(null), statusRef = useRef('loading'), isMounted = useRef(true), enterCamp = useRef(false);
+  const isAutoStart = useRef(!!picked?.saved), isResumeSaved = useRef(true);
+  const sound = useRef(initialSound), run = useRef(null), statusRef = useRef('loading'), isMounted = useRef(true), enterCamp = useRef(!!picked && !picked.saved);
   const [isSound, setIsSound] = useState(initialSound);
   const [map, setMap] = useState(() => ({
     seed: saved.current?.run.seed ?? makeSeed(),
-    levelId: initialSaved?.run.levelId || WORLD_ACTS[0].id,
+    levelId: picked?.level?.id || initialSaved?.run.levelId || ADVENTURE_WORLDS[0].id,
   }));
   const { seed, levelId } = map;
   const count = 1;
@@ -261,16 +263,19 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     changeStatus('loading');
     setMap({ ...map });
   }
-  function restart(index) {
+  function restart(target) {
     enterCamp.current = false;
     if (statusRef.current === 'loading') return;
+    const nextLevel = typeof target === 'number' ? WORLD_ACTS[target] : target;
     const isContinuing = statusRef.current === 'completed';
-    carriedAdventure.current = isContinuing ? carryToNextWorld(engine.current.exportAdventure(), levelIndex, WORLD_ACTS.length) : null;
+    carriedAdventure.current = isContinuing
+      ? carryToNextWorld(engine.current.exportAdventure(), isLastAdventureWorld(level) ? ADVENTURE_WORLDS.length - 1 : 0, ADVENTURE_WORLDS.length)
+      : null;
     carriedSurvival.current = isContinuing ? structuredClone(engine.current.survival) : null;
     saved.current = null;
     isAutoStart.current = true;
     changeStatus('loading');
-    setMap({ levelId: WORLD_ACTS[index].id, seed: makeSeed(seed) });
+    setMap({ levelId: nextLevel.id, seed: makeSeed(seed) });
   }
   useEffect(() => registerGamepadPlayer({
     isActive: () => statusRef.current === 'playing' && !engine.current?.isPaused,
@@ -287,7 +292,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     };
   }
   const isResult = status === 'completed';
-  const isCycleComplete = isResult && levelIndex === WORLD_ACTS.length - 1;
+  const isCycleComplete = isResult && isLastAdventureWorld(level);
   const isPickingWorld = status === 'ready' || status === 'worlds';
   const isPauseBook = status === 'paused';
   const isAdventureDialog = isPickingWorld || isPauseBook || ['reward','camp','life-loot','fallen','ended','overview','options','weapon-bindings'].includes(status);
@@ -340,8 +345,8 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
     {status === 'playing' && stats.guide && <div className="treasure-guide"><img src="./assets/collectible-star.png" alt=""/>{stats.guide.direction}</div>}
     {!isPauseBook && stats.message && stats.message !== stats.rooms?.forest?.hint && !stats.boss?.warning && !stats.boss?.casting && <div className="adventure-message" role="status">{stats.message}</div>}
     {status === 'reward' && stats.pendingReward && <RewardPanel key={`${stats.pendingReward.id}:${stats.pendingReward.player}:${stats.pendingReward.rerolls || 0}`} reward={stats.pendingReward} adventure={stats.adventure} onChoose={selectReward} onRecycle={recyclePending} onReroll={rerollPending} onExit={exit}/>}
-    {isPickingWorld && <WorldPicker levelIndex={levelIndex} isSwitching={status === 'worlds'} freshOnly={entry === 'new' && status === 'ready'} onChoose={chooseWorld} onBack={backFromWorldPicker} />}
-    {status === 'camp' && <CharacterCamp character={character} build={starterBuild} locked={locked} isSound={isSound} onBuild={build=>setStarterBuilds(previous=>({...previous,[character]:build}))} onSelect={id => { setCharacter(id); engine.current.selectCharacter(id); }} onBack={() => { enterCamp.current = false; changeStatus(pickerOrigin.current ? 'worlds' : 'ready'); }} onStart={()=>{if(engine.current.configureStarter(starterBuild,getPlaySettings().difficulty,locked))start();}}/>}
+    {isPickingWorld && <WorldPicker levelIndex={levelIndex} isSwitching={status === 'worlds'} freshOnly={entry === 'new' && status === 'ready'} onChoose={chooseWorld} onLaunchGame={landmark => onLaunchGame ? onLaunchGame(landmark) : false} onBack={backFromWorldPicker} />}
+    {status === 'camp' && <CharacterCamp character={character} build={starterBuild} locked={locked} isSound={isSound} onBuild={build=>setStarterBuilds(previous=>({...previous,[character]:build}))} onSelect={id => { setCharacter(id); engine.current.selectCharacter(id); }} onBack={() => { enterCamp.current = false; if (!pickerOrigin.current && picked && onBackToWorlds) onBackToWorlds(level.themeId); else changeStatus(pickerOrigin.current ? 'worlds' : 'ready'); }} onStart={()=>{if(engine.current.configureStarter(starterBuild,getPlaySettings().difficulty,locked))start();}}/>}
     {status==='life-loot'&&stats.pendingLifeLoot!==null&&<LifeLootPanel key={stats.pendingLifeLoot} enemyId={stats.pendingLifeLoot} adventure={stats.adventure} survival={stats.survival} onChoose={chooseLifeLoot} onLeave={leaveLifeLoot} onExit={exit}/>}
     {['fallen','ended'].includes(status) && stats.survival && <DeathPanel survival={stats.survival} heldKeys={engine.current?.heldKeys || []} onContinue={()=>{if(!engine.current.revive())return false;start();return true;}} onRestart={()=>{
       const game=engine.current;
@@ -349,7 +354,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
       restartDifficulty.current=game.adventure?.difficulty || null;
       setCharacter(game.survival.character);
       if(run.current){const record=snapshotRun(game.snapshot(),'paused');if(record)queueRun({...record,status:'ended',revision:record.revision+1});}
-      restart(0);return true;
+      restart(ADVENTURE_WORLDS[0]);return true;
     }}/>}
     {isPauseBook && <PauseBook game={engine.current} focusOnOpen={pauseFocus}
       hasAdventure={!!stats.adventure} error={pauseSaveError} onResume={start} onWorlds={openWorldPicker}
@@ -364,7 +369,7 @@ export function PlatformGame({ onExit, initialSound = true, entry = 'continue' }
       {isCycleComplete && <p>已获得的 {stats.adventure.weapons.length} 种武器和攻击键位都会带到下一轮。</p>}
       <div className="adventure-menu-actions">
         {status === 'fallen' && <button className="primary-button" onClick={() => { if (engine.current.revive()) start(); }}>从这里继续</button>}
-        {isResult && <button className="primary-button" onClick={() => restart((levelIndex + 1) % WORLD_ACTS.length)}>{isCycleComplete ? `进入第 ${stats.adventure.cycle + 1} 轮` : '去下一关'}<ArrowRight size={20}/></button>}
+        {isResult && <button className="primary-button" onClick={() => restart(nextAdventureWorld(level))}>{isCycleComplete ? `进入第 ${stats.adventure.cycle + 1} 轮` : '去下一关'}<ArrowRight size={20}/></button>}
         {status === 'error' && <button className="primary-button" onClick={retryLoad}>重新打开</button>}
         <button className="text-button" data-gamepad-back onClick={exit}><House size={18}/>回到我的花园</button>
       </div>

@@ -52,7 +52,7 @@ function ScoreChart({ data, view }) {
 }
 // 三个游戏的累计游玩时长，只算正在游玩的时间，不受下方日期筛选影响。
 function PlaytimeSummary({ adventureSeconds }) {
-  const rows = [['冒险', adventureSeconds], ['加纳战机', flightPlaytime()], ['小雪人姐妹', snowPlaytime()]];
+  const rows = [['冒险', adventureSeconds], ['彩笔战机', flightPlaytime()], ['小雪人姐妹', snowPlaytime()]];
   return <section className="score-playtime" aria-label="游玩时长">
     <h2>游玩时长<small>只算正在游玩的时间，暂停不计</small></h2>
     <div>{rows.map(([label, seconds]) => <div key={label}><span>{label}</span><strong>{typeof seconds === 'number' ? formatPlaytime(seconds) : '读取中'}</strong></div>)}</div>

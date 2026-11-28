@@ -11,14 +11,16 @@ import { earnedQuests } from './garden-progress.js';
 import { readMiniGames, STAMP_TYPES } from './garden-backup.js';
 import { createMiniSession, isMiniComplete } from './mini-games/session.js';
 const MiniGame = lazy(() => import('./mini-games/MiniGame.jsx').then(module => ({ default: module.MiniGame })));
-import { readAdventure, clearAdventure } from './game/save.js';
+import { readAdventure, clearAdventure, parkActiveAdventure } from './game/save.js';
+import { WorldPicker } from './game/WorldPicker.jsx';
+import { findStage } from '../shared/levels.js';
 import { queueRun, flushScores } from './scores/client.js';
 const ScoreHistory = lazy(() => import('./scores/ScoreHistory.jsx').then(module => ({ default: module.ScoreHistory })));
 const GunNac = lazy(() => import('./gun-nac/GunNac.jsx'));
 const SnowSisters = lazy(() => import('./snow-sisters/SnowSisters.jsx'));
 const PlatformGame = lazy(() => import('./game/PlatformGame.jsx').then(module => ({ default: module.PlatformGame })));
 import { useEffect, useRef, useState } from 'react';
-import { Flower, Rainbow, IceCream, Heart, Star, Sparkle, ArrowRight, ArrowLeft, SpeakerHigh, X, Check, PaintBrush, ArrowCounterClockwise, DownloadSimple, Play, Drop, Flag, Butterfly, Trophy, Airplane, Snowflake } from '@phosphor-icons/react';
+import { Flower, Rainbow, IceCream, Heart, Star, Sparkle, ArrowRight, ArrowLeft, SpeakerHigh, X, Check, PaintBrush, ArrowCounterClockwise, DownloadSimple, Play, Drop, Flag, Butterfly, Trophy } from '@phosphor-icons/react';
 
 const asset = (path) => window.__GAME_ASSETS__?.[path] || `./${path}`;
 const quests = [
@@ -62,6 +64,7 @@ export function App() {
   const [optionsCategory, setOptionsCategory] = useState('game');
   const [isGarden, setIsGarden] = useState(false);
   const [adventureEntry, setAdventureEntry] = useState(null);
+  const [worldPicker, setWorldPicker] = useState({ landmark: 'rainbow', freshOnly: false });
   const [savedAdventure,setSavedAdventure] = useState(readAdventure);
   const [isScores, setIsScores] = useState(false);
   useEffect(() => { flushScores(); }, []);
@@ -82,7 +85,6 @@ export function App() {
   const soundContext = useRef(null);
   const noticeTimer = useRef(null);
   const questReturnMode = useRef(null);
-  const gunNacReturn = useRef(null);
   const achievements = earnedQuests(progress);
   const completed = quests.map(({ id }) => achievements[id]);
   const total = completed.filter(Boolean).length;
@@ -176,21 +178,52 @@ export function App() {
     } catch (error) { console.warn('保存花园失败', error); tell('照片还没准备好，请再试一次。'); }
     finally { isExportingRef.current = false; setIsExporting(false); }
   }
-  const isHomePage = ['options', 'mini-games', 'gallery', 'collection', 'album', 'retro'].includes(mode);
+  function openWorlds(options = {}) {
+    window.speechSynthesis?.cancel();
+    const active = readAdventure();
+    setSavedAdventure(active);
+    const defaultLandmark = active ? findStage(active.run.levelId)?.themeId : 'rainbow';
+    setWorldPicker({ landmark: options.landmark || defaultLandmark || 'rainbow', freshOnly: !!options.freshOnly });
+    setMode('worlds');
+  }
+  function launchStandaloneGame(landmark) {
+    window.speechSynthesis?.cancel();
+    setAdventureEntry(null);
+    setSavedAdventure(readAdventure());
+    setWorldPicker(prev => ({ ...prev, landmark: landmark.id, freshOnly: false }));
+    setMode(landmark.game);
+    return true;
+  }
+  function choosePlatformFromWorlds({ level, saved }) {
+    try { parkActiveAdventure(saved?.run.id); } catch { return false; }
+    setWorldPicker(prev => ({ ...prev, landmark: level.themeId }));
+    setMode(null);
+    setAdventureEntry({ kind: 'pick', level, saved, freshOnly: worldPicker.freshOnly });
+    return true;
+  }
+  const isHomePage = ['options', 'mini-games', 'gallery', 'collection', 'album'].includes(mode);
   const activeQuest = quests.find(q => q.id === mode);
   if (activeQuest) return <Suspense fallback={<div className="loading-adventure">正在打开小冒险…</div>}><MiniGame session={progress.miniGames[activeQuest.id]} onChange={saveMiniSession} onExit={() => { setMode(questReturnMode.current); window.speechSynthesis?.cancel(); }} onReplay={() => openQuest(activeQuest.id)} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} onChime={chime} isSaved={isSaved} /></Suspense>;
   if (isScores) return <Suspense fallback={<div className="loading-adventure">正在翻开成绩本…</div>}><ScoreHistory onClose={() => setIsScores(false)} /></Suspense>;
-  if (mode === 'gun-nac') return <Suspense fallback={<div className="loading-adventure">正在进入机库…</div>}><GunNac isSound={isSound} onSound={() => setIsSound(value => !value)} onExit={() => setMode(gunNacReturn.current)} /></Suspense>;
-  if (mode === 'snow-sisters') return <Suspense fallback={<div className="loading-adventure">正在打开雪人高塔…</div>}><SnowSisters isSound={isSound} onSound={() => setIsSound(value => !value)} onExit={() => setMode('retro')} /></Suspense>;
-  if (adventureEntry) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame entry={adventureEntry} initialSound={isSound} onExit={() => { setAdventureEntry(null); setSavedAdventure(readAdventure()); }} /></Suspense>;
+  if (mode === 'gun-nac') return <Suspense fallback={<div className="loading-adventure">正在进入机库…</div>}><GunNac isSound={isSound} onSound={() => setIsSound(value => !value)} onExit={() => { setSavedAdventure(readAdventure()); setMode('worlds'); }} /></Suspense>;
+  if (mode === 'snow-sisters') return <Suspense fallback={<div className="loading-adventure">正在打开雪人高塔…</div>}><SnowSisters isSound={isSound} onSound={() => setIsSound(value => !value)} onExit={() => { setSavedAdventure(readAdventure()); setMode('worlds'); }} /></Suspense>;
+  if (mode === 'worlds') return <div className="atlas-standalone">
+    <DesktopRestState />
+    <WorldPicker initialLandmark={worldPicker.landmark} freshOnly={worldPicker.freshOnly}
+      onChoose={choosePlatformFromWorlds} onLaunchGame={launchStandaloneGame}
+      onBack={() => { setSavedAdventure(readAdventure()); setMode(null); }} />
+  </div>;
+  if (adventureEntry) return <Suspense fallback={<div className="loading-adventure">正在打开彩笔世界…</div>}><PlatformGame entry={adventureEntry} initialSound={isSound}
+    onExit={() => { setAdventureEntry(null); setSavedAdventure(readAdventure()); }}
+    onBackToWorlds={landmark => { setAdventureEntry(null); setSavedAdventure(readAdventure()); setWorldPicker(prev => ({ ...prev, landmark })); setMode('worlds'); }}
+    onLaunchGame={launchStandaloneGame} /></Suspense>;
   return <div className={isGarden ? 'app-shell' : 'app-shell home-shell'}>
     <DesktopRestState />
     <div hidden={isHomePage}>
     {!isGarden ? <HomeMenu savedAdventure={savedAdventure} isActive={!mode}
       onAdventure={() => { window.speechSynthesis?.cancel(); setAdventureEntry('continue'); }}
-      onChooseWorld={() => { window.speechSynthesis?.cancel(); setAdventureEntry('worlds'); }}
+      onChooseWorld={() => openWorlds()}
       onNewAdventure={() => { isStartingAdventureRef.current = false; setMode('new-adventure'); }}
-      onRetro={() => setMode('retro')}
       onAlbum={() => setMode('album')}
       onMiniGames={() => setMode('mini-games')}
       onOptions={() => setMode('options')} /> : <>
@@ -216,13 +249,6 @@ export function App() {
     </div>
     {mode === 'options' && <OptionsPage category={optionsCategory} onCategory={setOptionsCategory} onBack={closeModal} isSound={isSound} onSound={() => { setIsSound(!isSound); window.speechSynthesis?.cancel(); }} progress={progress} onImport={setProgress} onScores={() => setIsScores(true)} onGallery={() => setMode('gallery')} onCollection={() => setMode('collection')} />}
     {mode === 'album' && <AlbumPage onBack={closeModal} />}
-    {mode === 'retro' && <HomePage title="怀旧游戏" onBack={closeModal} className="home-games home-retro-page">
-      <p className="modal-subtitle">一款一款慢慢做。能玩的现在就能进，还在画的先放在这里。</p>
-      <div className="quest-list">
-        <button className="quest-card pink" onClick={() => { gunNacReturn.current = 'retro'; setMode('gun-nac'); }}><span className="quest-icon"><Icon as={Airplane} size={34} /></span><span className="quest-copy"><strong>加纳战机</strong><span>驾驶小飞机，飞过一座座关</span></span><Icon as={ArrowRight} size={22} /></button>
-        <button className="quest-card blue" onClick={() => setMode('snow-sisters')}><span className="quest-icon"><Icon as={Snowflake} size={34} /></span><span className="quest-copy"><strong>小雪人姐妹</strong><span>1P/2P 彩笔堆雪球，闯过 50 层高塔</span></span><Icon as={ArrowRight} size={22} /></button>
-      </div>
-    </HomePage>}
     {mode === 'mini-games' && <HomePage title="小游戏" onBack={closeModal} className="home-games">
       <div className="quest-list">{quests.map((quest, i) => <button className={`quest-card ${quest.color}`} key={quest.id} onClick={() => openQuest(quest.id)}><span className="quest-icon"><Icon as={quest.icon} size={34} /></span><span className="quest-copy"><strong>{quest.title}</strong><span>{completed[i] ? '再来一次' : quest.hint}</span></span><Icon as={ArrowRight} size={22} /></button>)}</div>
       <button className="quiet-button" onClick={() => { closeModal(); setIsGarden(true); }}><Icon as={Flower} />我的花园</button>
@@ -233,7 +259,7 @@ export function App() {
         if (!savedAdventure || isStartingAdventureRef.current) return;
         isStartingAdventureRef.current = true;
         queueRun({ ...savedAdventure.run, status: 'ended', revision: savedAdventure.run.revision + 1 });
-        clearAdventure(); setSavedAdventure(null); closeModal(); setAdventureEntry('new');
+        clearAdventure(); setSavedAdventure(null); openWorlds({ landmark: 'rainbow', freshOnly: true });
       }}>开始新冒险</button></div>
     </Modal>}
     {!isSaved && <p role="alert" className="home-save-warning">这次进度暂时无法保存，请先到选项备份花园。</p>}

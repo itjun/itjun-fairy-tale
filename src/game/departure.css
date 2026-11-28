@@ -1,3 +1,4 @@
+.atlas-standalone { position: fixed; inset: 0; z-index: 40; }
 .departure-page {
   position: absolute;
   inset: 0;
@@ -88,6 +89,15 @@ body:has(.atlas-page, .family-page, .saves-page) .gamepad-guide { display: none;
   mask-image: linear-gradient(to right, transparent, black 3%, black 97%, transparent),
               linear-gradient(to bottom, transparent, black 3%, black 97%, transparent);
   mask-composite: intersect;
+  pointer-events: none;
+}
+.atlas-overlay-art {
+  position: absolute;
+  left: var(--x); top: var(--y);
+  width: 13.5%;
+  height: auto;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: multiply;
   pointer-events: none;
 }
 #root .atlas-mark {
@@ -215,5 +225,6 @@ body:has(.atlas-page, .family-page, .saves-page) .gamepad-guide { display: none;
 
 @media (max-aspect-ratio: 1/1) {
   .atlas-sheet { width: min(100cqw, calc(100cqh * .75)); aspect-ratio: 3 / 4; }
+  .atlas-overlay-art { left: var(--portrait-x); top: var(--portrait-y); width: 21%; }
   #root .atlas-mark { left: var(--portrait-x); top: var(--portrait-y); width: max(44px, 17%); height: max(44px, 10%); }
 }
