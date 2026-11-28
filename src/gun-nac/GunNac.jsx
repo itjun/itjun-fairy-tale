@@ -17,6 +17,7 @@ import {
   depart,
 } from './flight.js';
 import { createFlightView, readQuality } from './view.js';
+import { applyPose, capturePose } from './pose.js';
 import { FLIGHT_PLAYTIME_KEY, bankSession, formatPlaytime, frameSeconds, recordSession } from '../playtime.js';
 import { FlightSound } from './sound.js';
 import { FlightManual } from './Manual.jsx';
@@ -446,6 +447,8 @@ export default function GunNac({ onExit, isSound, onSound }) {
       last = 0,
       carry = 0,
       lastStill = null,
+      // 上一步逻辑开始前各物体的位置，用于画面插值（见 pose.js）。
+      prevPose = null,
       lastBossKey = '';
     setReady(false);
     setLoadError('');
@@ -469,6 +472,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
           if (pageRef.current !== 'flight' || !g) {
             carry = 0;
             last = now;
+            prevPose = null;
             if (g && g !== lastStill && ['pause', 'over', 'ending', 'shop'].includes(pageRef.current)) {
               v.frame(g);
               lastStill = g;
@@ -488,6 +492,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
             const keyY = (Number(k.has('down')) - Number(k.has('up'))) * KEY_CRUISE;
             glide.x = glideAxis(glide.x, keyX);
             glide.y = glideAxis(glide.y, keyY);
+            prevPose = capturePose(g);
             tick(g, {
               x: glide.x + gamepad.x + finger.x,
               y: glide.y + gamepad.y + finger.y,
@@ -521,7 +526,11 @@ export default function GunNac({ onExit, isSound, onSound }) {
               refresh((n) => n + 1);
             }
           }
+          // 两步之间按剩余时间比例取位置；渲染后还原，逻辑不受影响。
+          const alpha = g.phase === 'flight' ? carry / (1000 / 60) : 1;
+          const restore = applyPose(g, prevPose, alpha);
           v.frame(g);
+          restore();
         };
         raf = requestAnimationFrame(loop);
       })

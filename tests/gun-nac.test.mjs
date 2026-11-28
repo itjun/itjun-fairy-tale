@@ -22,6 +22,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { QUALITY_KEY, readQuality, writeQuality } from '../src/gun-nac/view.js';
 import { SHIP_CANVAS_SIZE } from '../src/gun-nac/ship-art.js';
+import { applyPose, capturePose } from '../src/gun-nac/pose.js';
 
 test('固定输入与战斗中断保存逐帧一致', () => {
   const s = newFlight({ seed: 6 });
@@ -526,3 +527,38 @@ test('画质默认最高，手动切到标准写入本机存储，存储不可�
   assert.doesNotThrow(() => writeQuality('standard'));
 });
 
+test('画面插值：按时间比例取位置，渲染后还原，瞬移与换区不插值', () => {
+  const s = newFlight({ seed: 9 });
+  s.ship.x = 100;
+  s.ship.y = 100;
+  s.scroll = 10;
+  const enemy = { x: 50, y: 150, age: 1 };
+  s.enemies.push(enemy);
+  const prev = capturePose(s);
+  // 一步逻辑之后：飞机右移 4，敌人下移 10，背景滚动 0.54
+  s.ship.x = 104;
+  s.enemies[0].y = 140;
+  s.scroll = 10.54;
+  // 半步时画面应显示中间位置
+  const restore = applyPose(s, prev, 0.5);
+  assert.equal(s.ship.x, 102);
+  assert.equal(s.enemies[0].y, 145);
+  assert.ok(Math.abs(s.scroll - 10.27) < 1e-9);
+  restore();
+  // 还原后逻辑位置不变
+  assert.equal(s.ship.x, 104);
+  assert.equal(s.enemies[0].y, 140);
+  assert.equal(s.scroll, 10.54);
+  // alpha 为 1 时不改位置
+  const same = applyPose(s, prev, 1);
+  assert.equal(s.ship.x, 104);
+  same();
+  // 瞬移（超过阈值）直接显示当前位置
+  s.ship.x = 200;
+  const jump = applyPose(s, prev, 0.5);
+  assert.equal(s.ship.x, 200);
+  jump();
+  assert.equal(s.ship.x, 200);
+  // 没有上一步记录时什么都不做
+  assert.doesNotThrow(() => applyPose(s, null, 0.3)());
+});
