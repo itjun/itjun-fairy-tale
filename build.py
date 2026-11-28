@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop this game's old processes, build, install locally and launch."""
+"""Stop this game's old processes, package this OS and chip, install and launch."""
 import argparse
 import json
 import os
@@ -105,11 +105,76 @@ def trash_mac_bundle(bundle):
     print('构建副本移到废纸篓：', destination, flush=True)
 
 
+def is_apple_silicon():
+    # 硬件芯片。Rosetta 下 Python 的 platform.machine() 会报成 x86_64。
+    try:
+        arm = subprocess.check_output(['sysctl', '-n', 'hw.optional.arm64'], text=True, stderr=subprocess.DEVNULL).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        arm = ''
+    if arm == '1': return True
+    try:
+        brand = subprocess.check_output(['sysctl', '-n', 'machdep.cpu.brand_string'], text=True, stderr=subprocess.DEVNULL).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return False
+    return brand.startswith('Apple')
+
+
+def windows_os_arch():
+    # x64 版 Python 跑在 ARM Windows 上时，进程环境仍是 AMD64，要问系统自己的架构。
+    script = '[System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()'
+    try:
+        output = subprocess.check_output(['powershell.exe', '-NoProfile', '-Command', script], text=True, encoding='utf-8-sig', stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return ''
+    return output.strip().lower()
+
+
+def host_arch():
+    machine = platform.machine().lower()
+    if machine in ('arm64', 'aarch64'): return 'arm64'
+    if sys.platform == 'darwin': return 'arm64' if is_apple_silicon() else 'x64'
+    if sys.platform == 'win32':
+        reported = (os.environ.get('PROCESSOR_ARCHITEW6432') or os.environ.get('PROCESSOR_ARCHITECTURE') or '').lower()
+        if reported in ('arm64', 'aarch64') or windows_os_arch() == 'arm64': return 'arm64'
+    if machine in ('x86_64', 'amd64', 'x64'): return 'x64'
+    raise RuntimeError(f'认不出这块芯片：{platform.machine()}')
+
+
+def host_label(os_name, arch):
+    system = 'macOS' if os_name == 'darwin' else 'Windows'
+    return f'{system} {arch}'
+
+
+def package_args(os_name, arch):
+    if arch not in ('arm64', 'x64'): raise RuntimeError(f'不支持的芯片：{arch}')
+    # 配置里两种芯片都写了。命令行不写明目标时，electron-builder 会两份都打。
+    # 这里写明目标和芯片，只打当前这一份。
+    if os_name == 'darwin': return ['--mac', 'dmg', 'zip', '--' + arch, '--publish', 'never']
+    if os_name == 'win32': return ['--win', 'nsis', '--' + arch, '--publish', 'never']
+    raise RuntimeError('本机安装仅支持 macOS / Windows')
+
+
+def mac_unpacked_app(arch):
+    folder = 'mac-arm64' if arch == 'arm64' else 'mac'
+    return ROOT / 'release' / folder / f'{NAME}.app'
+
+
+def mac_binary_arch(app):
+    binary = app / 'Contents' / 'MacOS' / NAME
+    output = subprocess.check_output(['/usr/bin/lipo', '-archs', str(binary)], text=True)
+    found = output.split()
+    if found == ['arm64']: return 'arm64'
+    if found == ['x86_64']: return 'x64'
+    raise RuntimeError(f'安装包芯片和本机不一致：{output.strip()}')
+
+
 def finish_mac_install(source, target, previous, arch):
     version = json.loads((ROOT / 'package.json').read_text())['version']
     archive = ROOT / 'release' / f'GardenKingdom-{version}-mac-{arch}.zip'
-    run(['/usr/bin/ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', source, archive])
-    # 压缩包用于分发；本机只登记正式安装，不留下构建/备份应用入口。
+    image = ROOT / 'release' / f'GardenKingdom-{version}-mac-{arch}.dmg'
+    if not archive.is_file() or not image.is_file():
+        raise RuntimeError(f'缺少本机安装包：{archive.name}、{image.name}')
+    # 安装包留在 release/；本机只登记正式安装，不留下构建/备份应用入口。
     trash_mac_bundle(source)
     trash_mac_bundle(previous)
     register = Path('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister')
@@ -117,28 +182,42 @@ def finish_mac_install(source, target, previous, arch):
         run([register, '-f', target])
         for helper in target.glob('Contents/Frameworks/*.app'):
             subprocess.run([str(register), '-u', str(helper)], check=False, capture_output=True)
-    print('安装包：', archive, flush=True)
+    print('安装包：', image, flush=True)
+    print('更新包：', archive, flush=True)
+
+
+def argument_parser():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--no-launch', action='store_true', help='构建安装，但不启动游戏')
+    parser.add_argument('--test', action='store_true', help='打包前先跑 npm test')
+    return parser
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--no-launch', action='store_true', help='构建安装，但不启动游戏')
-    args = parser.parse_args()
+    args = argument_parser().parse_args()
     if sys.platform not in ('darwin', 'win32'): raise RuntimeError('本机安装仅支持 macOS / Windows')
     if not shutil.which('node') or not shutil.which('npm'): raise RuntimeError('开发构建需要先安装 .nvmrc 中指定的 Node LTS；普通玩家请下载安装包')
     npm = shutil.which('npm.cmd' if sys.platform == 'win32' else 'npm')
     required = (ROOT / '.nvmrc').read_text().strip()
     actual = subprocess.check_output(['node', '-p', 'process.versions.node'], text=True).strip()
     if not version_at_least(actual, required): raise RuntimeError(f'请使用不低于 {required} 的 Node，当前是 {actual}')
-    arch = 'arm64' if platform.machine().lower() in ('arm64','aarch64') else 'x64'
+    arch = host_arch()
+    launch = '' if args.no_launch else '，装好后启动'
+    print(f'识别到本机是 {host_label(sys.platform, arch)}，只打包这一份{launch}。', flush=True)
     stop_running()
     run([npm, 'ci'])
     run([npm, 'run', 'build'])
-    run([npm, 'test'])
+    if args.test:
+        run([npm, 'test'])
+    else:
+        print('跳过测试，直接打包。需要先测试时加上 --test。', flush=True)
     builder = ROOT / 'node_modules/electron-builder/cli.js'
+    run(['node', builder, *package_args(sys.platform, arch)])
     if sys.platform == 'darwin':
-        run(['node', builder, '--mac', '--dir', '--' + arch, '--publish', 'never'])
-        source = ROOT / 'release' / ('mac-arm64' if arch == 'arm64' else 'mac') / f'{NAME}.app'
+        source = mac_unpacked_app(arch)
+        if not source.exists(): raise RuntimeError(f'打包完成但找不到 {source}')
+        built = mac_binary_arch(source)
+        if built != arch: raise RuntimeError(f'打出来的是 {built}，本机是 {arch}')
         parent = Path('/Applications') if os.access('/Applications', os.W_OK) else Path.home() / 'Applications'
         parent.mkdir(parents=True, exist_ok=True)
         target = parent / f'{NAME}.app'
@@ -157,7 +236,6 @@ def main():
         if not args.no_launch: run(['/usr/bin/open', target])
     else:
         # A stable per-user directory also permits unattended future NSIS updates.
-        run(['node', builder, '--win', '--' + arch, '--publish', 'never'])
         version = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['version']
         installer = ROOT / 'release' / f'GardenKingdom-{version}-win-{arch}.exe'
         target = Path(os.environ['LOCALAPPDATA']) / 'Programs' / 'GardenKingdom'

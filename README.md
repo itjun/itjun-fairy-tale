@@ -133,9 +133,11 @@ python build.py
 python3 build.py
 # 只构建安装，不启动：
 python3 build.py --no-launch
+# 打包前先跑测试：
+python3 build.py --test
 ```
 
-脚本先让本游戏旧进程保存退出，等待 15 秒后仅强制结束仍存活的项目进程，再执行 `npm ci`、构建、测试、按本机架构打包并安装。macOS 安装到可写的 `/Applications`，否则使用 `~/Applications`；Windows 使用当前用户的 `%LOCALAPPDATA%/Programs/GardenKingdom`。成功后按当前显示模式启动游戏。macOS 成功安装后同时生成 ZIP，将旧程序和构建副本移到废纸篓并取消其应用登记，只保留正式安装入口。用户数据目录不会被覆盖。Node 版本不匹配时会提前停止，不修改全局 Node。
+脚本先认出本机系统和芯片：macOS 在 Rosetta 下仍按 Apple 芯片打包，Windows 即使用 x64 版 Python 也会认到 ARM 芯片。配置里虽然写了两种芯片，这里只打当前这一份。接着让本游戏旧进程保存退出，等待 15 秒后仅强制结束仍存活的项目进程，再执行 `npm ci`、构建、打包并安装。默认不跑测试；加上 `--test` 才会在打包前执行 `npm test`。macOS 生成当前芯片的 DMG 和 ZIP，安装到可写的 `/Applications`，否则使用 `~/Applications`；Windows 生成当前芯片的安装程序，静默装到 `%LOCALAPPDATA%/Programs/GardenKingdom`。成功后按当前显示模式启动游戏。macOS 安装后把构建副本和旧程序移到废纸篓并取消其应用登记，只保留正式安装入口；DMG 和 ZIP 留在 `release/`。用户数据目录不会被覆盖。Node 版本不匹配时会提前停止，不修改全局 Node。
 
 ## 发布新版与自动更新
 
