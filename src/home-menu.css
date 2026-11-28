@@ -11,7 +11,9 @@
 }
 .home-title { position:absolute; top:clamp(28px,7vh,80px); left:clamp(28px,6vw,100px); }
 .home-retro { position:absolute; top:clamp(28px,7vh,80px); right:clamp(28px,6vw,100px); z-index:1; }
-#root .home-menu-button.home-retro { min-width:0; text-align:center; background:#fffaf1e8; border-radius:6px; }
+#root .home-menu-button.home-retro { min-width:0; text-align:center; background:none; }
+#root .home-menu-button.home-retro:hover,
+#root .home-menu-button.home-retro:focus-visible { background:none; }
 .home-title h1 { font-size:clamp(40px,5.3vw,76px); font-weight:400; color:#a83e66; letter-spacing:.12em; margin:0; }
 .home-title p { margin:12px 0 0; font-size:clamp(14px,1.4vw,20px); color:#685d50; letter-spacing:.1em; }
 .home-navigation { position:absolute; left:clamp(28px,6vw,100px); bottom:clamp(38px,9vh,100px); display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
