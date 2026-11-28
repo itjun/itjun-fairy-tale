@@ -265,22 +265,27 @@ function buildEnemiesCells() {
   );
 }
 
-// 设计稿的平台：彩笔砖块加白色雪顶，4∶1 纹理按宽度平铺（每块 36 × 9 世界单位）。
+// 平台：大块彩笔冰块加雪顶，4∶1 纹理按宽度平铺（每段 36 × 9 世界单位）。
 function buildBrickBankSvg() {
-  const bricks = [];
-  for (let row = 0; row < 4; row++) {
-    const y = 104 + row * 46;
-    const off = row % 2 ? 72 : 0;
-    for (let x = -144 + off; x < 1152; x += 144) {
-      const fill = row % 2 ? '#d98a4e' : '#c7733c';
-      bricks.push(`<rect x="${x + 4}" y="${y + 3}" width="136" height="40" rx="8" fill="${fill}" stroke="${INK}" stroke-width="5"/>`);
-    }
-  }
-  let snow = 'M0 100 L0 52';
-  for (let x = 0; x < 1152; x += 144) snow += ` Q${x + 36} 14 ${x + 72} 52 Q${x + 108} 16 ${x + 144} 52`;
-  snow += ' L1152 100 L0 100 Z';
+  const blocks = [
+    { x: 6, fill: '#d4f0ff', shade: '#8ec8ee' },
+    { x: 292, fill: '#e7f8ff', shade: '#a9d8f6' },
+    { x: 578, fill: '#c5e7fb', shade: '#7eb8e4' },
+    { x: 864, fill: '#e3f6ff', shade: '#9fd0f2' },
+  ];
+  const ice = blocks
+    .map(
+      (b) => `<rect x="${b.x}" y="112" width="280" height="158" rx="36" fill="${b.fill}" stroke="${INK}" stroke-width="9"/>
+        <path d="M${b.x + 36} 148 H${b.x + 168}" stroke="#ffffff" stroke-width="12" opacity="0.9"/>
+        <path d="M${b.x + 44} 214 H${b.x + 230}" stroke="${b.shade}" stroke-width="16" opacity="0.95"/>
+        <path d="M${b.x + 28} 248 Q${b.x + 140} 268 ${b.x + 252} 246" stroke="${b.shade}" stroke-width="10" fill="none"/>`,
+    )
+    .join('');
+  let snow = 'M0 124 L0 86';
+  for (let x = 0; x < 1152; x += 192) snow += ` Q${x + 46} 6 ${x + 96} 78 Q${x + 146} 16 ${x + 192} 86`;
+  snow += ' L1152 124 L0 124 Z';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1152" height="288"><defs>${CRAYON_FILTER}</defs>
-    ${W(0, 0, `${bricks.join('')}<rect x="0" y="84" width="1152" height="22" fill="#bfe3ff"/><path d="${snow}" fill="#ffffff" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>`)}
+    ${W(0, 0, `${ice}<path d="${snow}" fill="#fffef8" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>`)}
   </svg>`;
 }
 

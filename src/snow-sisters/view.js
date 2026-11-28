@@ -685,9 +685,21 @@ export async function createSnowView(host, onResize) {
       draw(bankKeyOf(pl.x2 - pl.x1), (pl.x1 + pl.x2) / 2, pl.y + 3.5, pl.x2 - pl.x1, 11);
     }
 
-    // 斜坡滑道
+    // 斜坡：厚冰坡贴在落脚线下方，雪沿留在可踩的那一侧。
     for (const sl of fDef.slopes) {
-      drawLine(bankKeyOf(Math.hypot(sl.x2 - sl.x1, sl.y2 - sl.y1)), sl.x1, sl.y1 + 3, sl.x2, sl.y2 + 3, 7);
+      const dx = sl.x2 - sl.x1;
+      const dy = sl.y2 - sl.y1;
+      const len = Math.hypot(dx, dy) || 1;
+      let px = -dy;
+      let py = dx;
+      if (py < 0) {
+        px = -px;
+        py = -py;
+      }
+      const n = Math.hypot(px, py) || 1;
+      const ox = (px / n) * 5;
+      const oy = (py / n) * 5;
+      drawLine(bankKeyOf(len), sl.x1 + ox, sl.y1 + oy, sl.x2 + ox, sl.y2 + oy, 13);
     }
 
     // 开场过场：阿奇奇大魔王掠走双胞胎公主
@@ -811,6 +823,9 @@ export async function createSnowView(host, onResize) {
       draw('p18', shot.x, shot.y, sz, sz, s.frame * 0.2);
     }
 
+    // 近景雪花先画。盖在脸上会让姐妹看起来一闪一闪。
+    if (motionOn()) drawFlakes(s.frame, true);
+
     // 玩家 1P 姐姐（红裙）& 2P 妹妹（紫裙）
     for (const p of s.players) {
       if (!p.active || p.state === 'dead') continue;
@@ -837,14 +852,13 @@ export async function createSnowView(host, onResize) {
       }
     }
 
-    // 特效粒子与近景雪花
+    // 特效粒子留在角色前面，落地和击倒的雪团仍能看见。
     if (motionOn()) {
       for (const pt of particles) {
         const t = pt.life / pt.max;
         const size = Math.max(0.5, pt.size * (1 + pt.grow * (1 - t)));
         draw(fadedKey(pt.key, Math.min(1, t * 2)), pt.x, pt.y, size, size, pt.rot);
       }
-      drawFlakes(s.frame, true);
     }
 
     // 加分/奖命/提示飘字

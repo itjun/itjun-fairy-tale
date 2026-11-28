@@ -59,6 +59,97 @@ test('50 层塔楼、五大主题、Boss、循环坑与隐藏彩蛋完整且平�
   }
 });
 
+test('折线坡落到左右落脚台', () => {
+  for (const floor of [4, 14, 21, 31, 44]) {
+    const f = getFloor(floor);
+    assert.equal(findSupportY(f, 36, 170, 200, true), 188, `第 ${floor} 层左坡应落到左台`);
+    assert.equal(findSupportY(f, 220, 170, 200, true), 188, `第 ${floor} 层右坡应落到右台`);
+    assert.equal(findSupportY(f, 128, 140, 160, true), 152, `第 ${floor} 层中层平台仍可站`);
+  }
+});
+
+test('贴身推动静止雪球会顺着方向滚起来', () => {
+  const s = newSnowGame({ players: 1, skipIntro: true });
+  s.enemies = [];
+  const p = s.players[0];
+  p.x = 100;
+  p.y = 224;
+  p.dir = 1;
+  p.onGround = true;
+  s.snowballs = [
+    {
+      id: 1,
+      x: 114,
+      y: 224,
+      vx: 0,
+      vy: 0,
+      state: 'still',
+      color: 'white',
+      owner: 1,
+      chain: 0,
+      bounces: 0,
+      thaw: 420,
+      riders: [],
+      sweepGroup: 0,
+    },
+  ];
+  tickSnow(s, { right: true });
+  const ball = s.snowballs[0];
+  assert.equal(ball.state, 'rolling', '推到雪球上应开始滚动');
+  assert.ok(ball.vx > 2, `雪球应向右滚，实际 vx=${ball.vx}`);
+  assert.ok(ball.x > 114, '雪球应离开原来的位置');
+});
+
+test('斜坡槽可以进去，也能从槽底掉到下层平台', () => {
+  for (const floor of [3, 11, 19, 37]) {
+    const f = getFloor(floor);
+    assert.equal(findSupportY(f, 128, 88, 100, true), null, `第 ${floor} 层槽口不应被顶盖挡住`);
+    assert.equal(findSupportY(f, 70, 70, 86, true), 80, `第 ${floor} 层应能落在槽顶左侧`);
+    assert.equal(findSupportY(f, 128, 140, 160, true), 152, `第 ${floor} 层应从槽底掉到下层平台`);
+  }
+
+  const s = newSnowGame({ players: 1, startFloor: 3, skipIntro: true });
+  s.enemies = [];
+  const p = s.players[0];
+  p.x = 70;
+  p.y = 80;
+  p.vx = 0;
+  p.vy = 0;
+  p.invuln = 0;
+  p.onGround = true;
+  let escaped = false;
+  for (let i = 0; i < 160; i++) {
+    tickSnow(s, { right: true });
+    if (p.y >= 150) {
+      escaped = true;
+      break;
+    }
+  }
+  assert.equal(escaped, true, `姐姐应沿斜坡走出槽口，实际停在 (${p.x.toFixed(1)}, ${p.y.toFixed(1)})`);
+  assert.ok(p.y >= 150 && p.y <= 156);
+
+  const ballGame = newSnowGame({ players: 1, startFloor: 3, skipIntro: true });
+  ballGame.enemies = [];
+  ballGame.snowballs.push({
+    id: 1,
+    x: 128,
+    y: 96,
+    vx: 0,
+    vy: 0,
+    state: 'still',
+    color: 'white',
+    owner: 1,
+    chain: 0,
+    bounces: 0,
+    thaw: 420,
+    riders: [],
+  });
+  for (let i = 0; i < 90; i++) tickSnow(ballGame, {});
+  const ball = ballGame.snowballs[0];
+  assert.ok(ball, '雪球不应在槽里消失');
+  assert.equal(ball.y, 152, `雪球应从槽底掉到下层，实际 y=${ball.y}`);
+});
+
 test('状态序列化与中断后逐帧确定性回放一致', () => {
   const s = newSnowGame({ players: 2, seed: 0x12345678, skipIntro: true });
   for (let i = 0; i < 180; i++) {
@@ -267,7 +358,7 @@ test('超时刷出南瓜头与幽灵、2P中途加入以及9次共享续关', ()
   assert.equal(s.mode, 2);
 
   // 推进超时刷出南瓜头
-  s.stageTimer = 2099;
+  s.stageTimer = 4799;
   tickSnow(s, {});
   assert.ok(s.enemies.some((e) => e.kind === 'pumpkin'), '超时后应出现南瓜头');
 

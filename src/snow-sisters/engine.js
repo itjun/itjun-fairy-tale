@@ -278,18 +278,18 @@ function stepPlayer(s, p, inp, floorDef) {
   if (p.giantTimer > 0) {
     p.x = Math.max(WALL_LEFT + 12, Math.min(WALL_RIGHT - 12, p.x + moveDir * 2.35));
     const vMove = (inp.down ? 1 : 0) - (inp.up || inp.jump ? 1 : 0);
-    p.y = Math.max(36, Math.min(224, p.y + vMove * 2.1));
-    p.vx = moveDir * 2.35;
-    p.vy = vMove * 2.1;
+    p.y = Math.max(36, Math.min(224, p.y + vMove * 1.45));
+    p.vx = moveDir * 1.6;
+    p.vy = vMove * 1.45;
     p.onGround = p.y >= 224;
     if (shootEdge || (shootNow && p.cooldown === 0)) fireSnowShot(s, p);
     return;
   }
 
-  const moveSpeed = p.potions.speed ? 2.15 : 1.55;
+  const moveSpeed = p.potions.speed ? 1.5 : 1.05;
   p.vx = moveDir * moveSpeed;
 
-  // 水平移动并推动静止雪球
+  // 贴身推静止雪球：顺着这一步的方向滚起来，不再只挪几个像素。
   const prevX = p.x;
   let nextX = p.x + p.vx;
   const wallRes = resolveWallX(floorDef, nextX, p.y, 7);
@@ -298,10 +298,11 @@ function stepPlayer(s, p, inp, floorDef) {
   if (moveDir !== 0) {
     for (const ball of s.snowballs) {
       if (ball.state !== 'still') continue;
-      if (Math.abs(p.y - ball.y) < 12 && Math.abs(nextX - ball.x) < 13) {
-        const pushRes = resolveWallX(floorDef, ball.x + moveDir * 0.95, ball.y, 8);
-        ball.x = pushRes.x;
-        nextX = prevX + moveDir * 0.85;
+      if (Math.abs(p.y - ball.y) < 14 && Math.abs(nextX - ball.x) < 16) {
+        kickSnowball(s, ball, p);
+        p.kickGrace = 12;
+        nextX = prevX;
+        break;
       }
     }
   }

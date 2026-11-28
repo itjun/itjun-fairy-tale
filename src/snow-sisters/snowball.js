@@ -58,13 +58,13 @@ export function createSnowballFromEnemy(s, enemy, owner = 1) {
   return ball;
 }
 
-export function kickSnowball(s, ball, player) {
+function beginRoll(s, ball, dir, owner) {
   if (!ball || ball.state !== 'still') return false;
-  const dir = player.dir || (ball.x >= player.x ? 1 : -1);
+  const d = dir || 1;
   ball.state = 'rolling';
-  ball.vx = dir * 4.2;
+  ball.vx = d * 4.2;
   ball.vy = 0;
-  ball.owner = player.id;
+  ball.owner = owner || ball.owner || 1;
   ball.color = 'white';
   ball.bounces = 0;
   ball.chain = 0;
@@ -72,6 +72,11 @@ export function kickSnowball(s, ball, player) {
   s.sweepCounts[ball.sweepGroup] = 0;
   s.sounds.push('kick');
   return true;
+}
+
+export function kickSnowball(s, ball, player) {
+  const dir = player.dir || (ball.x >= player.x ? 1 : -1);
+  return beginRoll(s, ball, dir, player.id);
 }
 
 export function bounceSnowballUp(s, ball) {
@@ -230,6 +235,9 @@ export function updateSnowballs(s, floorDef, onBallHitBoss) {
       }
       const wallRes = resolveWallX(floorDef, ball.x, ball.y, 8);
       ball.x = wallRes.x;
+      // 停在斜坡上的雪球自己往低处滚，不用先踢一脚。
+      const sl = slopeAt(floorDef, ball.x, ball.y);
+      if (sl && ball.vy === 0) beginRoll(s, ball, sl.downDir, ball.owner);
       keepBalls.push(ball);
       continue;
     }

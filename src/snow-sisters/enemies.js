@@ -68,24 +68,24 @@ export function updateEnemies(s, floorDef, onPlayerHit) {
 
     // 蓝蝙蝠、旋风状态、幽灵、南瓜头使用空中移动
     if (e.kind === 'blueBat') {
-      e.x += e.dir * 0.85 * speedScale;
-      e.y += Math.sin(e.aiTimer * 0.08) * 0.65;
+      e.x += e.dir * 0.5 * speedScale;
+      e.y += Math.sin(e.aiTimer * 0.08) * 0.4;
       if (e.x <= WALL_LEFT + 8 || e.x >= WALL_RIGHT - 8) e.dir = -e.dir;
       e.y = Math.max(36, Math.min(212, e.y));
     } else if (e.kind === 'ghost') {
       const dx = target.x - e.x;
       const dy = target.y - e.y;
       const len = Math.hypot(dx, dy) || 1;
-      e.x += (dx / len) * 0.82;
-      e.y += (dy / len) * 0.82;
+      e.x += (dx / len) * 0.48;
+      e.y += (dy / len) * 0.48;
     } else if (e.kind === 'pumpkin') {
       const dx = target.x - e.x;
       const dy = target.y - e.y;
       const len = Math.hypot(dx, dy) || 1;
-      const spd = Math.min(1.35, 0.72 + s.pumpkinElapsed * 0.0004);
+      const spd = Math.min(0.78, 0.4 + s.pumpkinElapsed * 0.00012);
       e.x += (dx / len) * spd;
       e.y += (dy / len) * spd;
-      if (e.aiTimer % 220 === 0 && s.enemies.filter((m) => m.kind === 'ghost').length < 6) {
+      if (e.aiTimer % 480 === 0 && s.enemies.filter((m) => m.kind === 'ghost').length < 6) {
         s.enemies.push(makeEnemy(s, 'ghost', e.x, e.y, 1));
       }
     } else if (e.kind === 'sumo') {
@@ -109,17 +109,17 @@ export function updateEnemies(s, floorDef, onPlayerHit) {
       const dx = target.x - e.x;
       const dy = target.y - e.y;
       const len = Math.hypot(dx, dy) || 1;
-      e.x += (dx / len) * 1.25;
-      e.y += (dy / len) * 1.05;
+      e.x += (dx / len) * 0.75;
+      e.y += (dy / len) * 0.62;
       e.x = Math.max(WALL_LEFT + 8, Math.min(WALL_RIGHT - 8, e.x));
       e.y = Math.max(36, Math.min(224, e.y));
     } else {
       // 地面平台寻路与动作
-      let moveSpd = 0.72 * speedScale;
-      if (e.kind === 'ogre') moveSpd = e.chargeTimer > 0 ? 1.85 : 0.92;
+      let moveSpd = 0.42 * speedScale;
+      if (e.kind === 'ogre') moveSpd = e.chargeTimer > 0 ? 1.1 : 0.55;
       if (e.kind === 'goblin' && e.rollTimer > 0) {
         e.rollTimer--;
-        moveSpd = 1.65;
+        moveSpd = 1.0;
       }
       if (e.kind === 'bombJoe') {
         e.fuseTimer--;
@@ -286,7 +286,7 @@ export function updateEnemies(s, floorDef, onPlayerHit) {
 export function spawnPumpkinIfTimedOut(s) {
   if (s.floor % 10 === 0 || s.snowHeadTimer > 0) return;
   s.stageTimer++;
-  const limit = s.timeMode ? 1200 : 2100;
+  const limit = s.timeMode ? 2700 : 4800;
   if (s.stageTimer === limit && !s.enemies.some((e) => e.kind === 'pumpkin')) {
     s.enemies.push(makeEnemy(s, 'pumpkin', 128, 36, 1));
     s.sounds.push('pumpkin');
