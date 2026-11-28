@@ -17,6 +17,7 @@ import {
   depart,
 } from './flight.js';
 import { createFlightView, readQuality } from './view.js';
+import { FLIGHT_PLAYTIME_KEY, bankSession, formatPlaytime, frameSeconds, recordSession } from '../playtime.js';
 import { FlightSound } from './sound.js';
 import { FlightManual } from './Manual.jsx';
 import { SHIP_CANVAS_SIZE, paintBaseShip, paintWingedShip } from './ship-art.js';
@@ -118,6 +119,9 @@ function RailLeft({ state }) {
   return (
     <aside className="gn-rail gn-rail-left" aria-label="飞行成绩">
       <strong className="gn-rail-score">{String(state.score).padStart(6, '0')}</strong>
+      <span className="gn-rail-time" aria-label={'本局已玩 ' + formatPlaytime(frameSeconds(state.frame))}>
+        <small>已玩</small> {formatPlaytime(frameSeconds(state.frame))}
+      </span>
       <span aria-label={'备用战机 ' + p.lives}>
         <ShipLifeIcon /> ×{p.lives}
       </span>
@@ -335,6 +339,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
     if (!game) return true;
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(game));
+      recordSession(FLIGHT_PLAYTIME_KEY, frameSeconds(game.frame));
       if (game.score > recordRef.current) {
         localStorage.setItem(RECORD_KEY, String(game.score));
         recordRef.current = game.score;
@@ -362,6 +367,8 @@ export default function GunNac({ onExit, isSound, onSound }) {
     }
   }
   function start() {
+    // 新开一局前，把上一局的游玩时间并入累计。
+    bankSession(FLIGHT_PLAYTIME_KEY, frameSeconds(flight.current?.frame));
     flight.current = newFlight({
       area: soundTest === 5 ? area : 1,
       difficulty,
@@ -853,6 +860,7 @@ export default function GunNac({ onExit, isSound, onSound }) {
                 <p>
                   第 {s.area} 区　{AREA_NAMES[s.area]}
                 </p>
+                <p className="gn-playtime">本局已玩 {formatPlaytime(frameSeconds(s.frame))}</p>
                 <button data-gn-first data-gamepad-resume data-gamepad-back onClick={resume}>
                   {padBadge('menu')}
                   继续飞行

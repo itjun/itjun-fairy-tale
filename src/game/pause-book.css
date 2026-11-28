@@ -117,6 +117,7 @@ html[data-input-mode="gamepad"] #root .pause-actions button:focus {
   color: #fffef3;
 }
 html[data-input-mode="gamepad"] #root .pause-book button:focus { outline: 3px solid #315b39; outline-offset: 3px; }
+.pause-playtime { margin: .5em 0 0; padding-left: .3em; color: #5d6b45; font-size: clamp(16px, min(2vw, 3.4vh), 32px); font-weight: bold; letter-spacing: .04em; }
 .pause-error { margin: .7em 0 0; color: #842f22; font-size: clamp(16px, 1.6vw, 23px); }
 @media (max-aspect-ratio: 9/10) {
   .pause-book {

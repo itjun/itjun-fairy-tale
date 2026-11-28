@@ -9,6 +9,7 @@ import { DIFFICULTIES } from './difficulty.js';
 import { SETS, SET_STEPS } from './sets.js';
 import { ATTACK_KEYS, attackBindings, attackItem } from './attack-bindings.js';
 import { AttackSlotContent } from './AttackSlots.jsx';
+import { formatPlaytime } from '../playtime.js';
 import './rooms.css';
 
 // 进度条上每间房用一个字，孩子一眼能认出来。
@@ -66,6 +67,7 @@ export function RoomHud({ stats, person, isGamepad, isPlaying, warning, onPause,
     <aside className="room-hud-side" aria-label="碎片和积分">
       <span><img src="./assets/upgrade-recycle.png" alt="" />碎片 <b>{stats.adventure?.resources?.balance || 0}</b></span>
       <span>积分 <b key={stats.score} className="score-total">{stats.score}</b></span>
+      <span className="room-hud-playtime">已玩 <b>{formatPlaytime(stats.seconds)}</b></span>
       {rooms.combo >= 2 && <span key={rooms.combo} className="room-hud-combo">连击 {rooms.combo}</span>}
       {warning && <small className="save-pending">{warning}</small>}
       <button aria-label="暂停探险" disabled={!isPlaying} onClick={onPause}>{isGamepad ? <PadKey name="menu" /> : <Pause size={24} weight="fill" />}</button>

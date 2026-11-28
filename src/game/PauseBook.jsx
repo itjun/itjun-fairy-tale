@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { GearSix, House, ListBullets, MapTrifold, Play, Sword } from '@phosphor-icons/react';
 import { navigate } from '../input/gamepad.js';
 import { trapFocus } from './AdventurePanels.jsx';
+import { formatPlaytime } from '../playtime.js';
 import './pause-book.css';
 
 export function PauseBook({ game, focusOnOpen, hasAdventure, error, onResume, onWorlds, onGarden, onTool }) {
@@ -55,6 +56,7 @@ export function PauseBook({ game, focusOnOpen, hasAdventure, error, onResume, on
         {hasAdventure && <button data-pause-action="overview" onClick={() => onTool('overview')}><ListBullets />本领一览</button>}
         <button data-pause-action="options" onClick={() => onTool('options')}><GearSix />选项</button>
       </div>
+      <p className="pause-playtime">这一关已玩 {formatPlaytime(game.elapsed)}</p>
       {error && <p className="pause-error" role="alert">{error}</p>}
     </div>
   </section>;

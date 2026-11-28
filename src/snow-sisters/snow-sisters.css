@@ -204,6 +204,22 @@
   color: #fff9dc;
   white-space: nowrap;
 }
+.sn-rail-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.2em 0.4em;
+  border-radius: 12px;
+  background: #3d78c9;
+  border: 2px solid #cfe3ff;
+  color: #f4f9ff;
+  font-size: 0.9em;
+  text-align: center;
+}
+.sn-rail-time small {
+  font-size: 0.8em;
+  opacity: 0.92;
+}
 .sn-time-pill {
   padding: 0.15em 0.55em;
   border-radius: 8px;

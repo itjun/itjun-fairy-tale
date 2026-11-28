@@ -18,6 +18,7 @@ import {
 import { createSnowView, readQuality } from './view.js';
 import { SNOW_TRACKS, SnowSound } from './sound.js';
 import { SnowManual } from './Manual.jsx';
+import { SNOW_PLAYTIME_KEY, bankSession, formatPlaytime, frameSeconds, recordSession } from '../playtime.js';
 import './snow-sisters.css';
 
 const MENU_MOVES = {
@@ -148,6 +149,10 @@ function RailRight({ state, isGamepad, onPause, onJoinP2 }) {
       <span className="sn-hud-floor">
         第 {state.floor} 层
         <small>{fDef.world.name}</small>
+      </span>
+      <span className="sn-rail-time" aria-label={'本局已玩 ' + formatPlaytime(frameSeconds(state.frame))}>
+        <small>已玩</small>
+        {formatPlaytime(frameSeconds(state.frame))}
       </span>
       {state.timeMode && <span className="sn-time-pill">TIME {formatClock(state.timeLeft)}</span>}
       {p2.active ? (
@@ -301,6 +306,7 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
     if (!g) return true;
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(g));
+      recordSession(SNOW_PLAYTIME_KEY, frameSeconds(g.frame));
       const best = Math.max(g.hiScore || 0, g.players[0]?.score || 0, g.players[1]?.score || 0);
       if (best > recordRef.current) {
         localStorage.setItem(RECORD_KEY, String(best));
@@ -332,6 +338,8 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
   }
 
   function startRun(playerCount) {
+    // 新开一局前，把上一局的游玩时间并入累计。
+    bankSession(SNOW_PLAYTIME_KEY, frameSeconds(gameRef.current?.frame));
     gameRef.current = newSnowGame({
       players: playerCount,
       timeMode,
@@ -876,6 +884,7 @@ export default function SnowSisters({ onExit, isSound, onSound }) {
                 <p>
                   第 {s.floor} 层　{getFloor(s.floor).world.name}
                 </p>
+                <p className="sn-playtime">本局已玩 {formatPlaytime(frameSeconds(s.frame))}</p>
                 <button data-sn-first data-gamepad-resume data-gamepad-back onClick={resume}>
                   {padBadge('menu')}
                   继续冒险

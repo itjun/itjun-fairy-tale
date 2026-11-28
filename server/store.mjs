@@ -142,7 +142,9 @@ export function openStore(path) {
         day.total += row.score; day.sessions++; days.set(key, day);
       }
       const points = summary.sessions <= 1000 ? db.prepare(`SELECT id, startedAt, levelId, score, status FROM runs WHERE ${where} ORDER BY startedAt, id`).all(...params) : [];
-      return { summary, levels, records, points, days: [...days.values()].map(day => ({ ...day, average: Math.round(day.total / day.sessions * 10) / 10 })), isDailyOnly: summary.sessions > 1000, timezone, offset };
+      // 冒险累计游玩时长不受日期和关卡筛选影响。
+      const { lifetimeSeconds } = db.prepare('SELECT COALESCE(SUM(seconds),0) AS lifetimeSeconds FROM runs').get();
+      return { summary, lifetimeSeconds, levels, records, points, days: [...days.values()].map(day => ({ ...day, average: Math.round(day.total / day.sessions * 10) / 10 })), isDailyOnly: summary.sessions > 1000, timezone, offset };
     },
     importRuns(rows) {
       // A malformed/conflicting backup must not leave a partially imported history.

@@ -92,6 +92,18 @@
   color: #ffdf7b;
   letter-spacing: 0.04em;
 }
+.gn-rail-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.3em;
+  font-size: 0.8em;
+  color: #c8d6ef;
+}
+.gn-rail-time small {
+  font-size: 0.85em;
+  color: #9be8fa;
+}
 .gn-rail-bomb {
   display: flex;
   align-items: baseline;

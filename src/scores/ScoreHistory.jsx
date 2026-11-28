@@ -3,6 +3,7 @@ import { Chart, LineController, LineElement, PointElement, LinearScale, Tooltip,
 import { ArrowLeft, ArrowRight, Trophy, Flower, CalendarBlank, ArrowsClockwise } from '@phosphor-icons/react';
 import { LEVELS as WORLDS, STAGES, WORLD_MAPS } from '../../shared/levels.js';
 import { flushScores, pendingCount } from './client.js';
+import { flightPlaytime, formatPlaytime, snowPlaytime } from '../playtime.js';
 import './scores.css';
 Chart.register(LineController, LineElement, PointElement, LinearScale, Tooltip, Legend, Filler);
 Chart.defaults.font.family = "GardenHand, KaiTi, serif";
@@ -49,6 +50,14 @@ function ScoreChart({ data, view }) {
     </div>
   </div>;
 }
+// 三个游戏的累计游玩时长，只算正在游玩的时间，不受下方日期筛选影响。
+function PlaytimeSummary({ adventureSeconds }) {
+  const rows = [['冒险', adventureSeconds], ['加纳战机', flightPlaytime()], ['小雪人姐妹', snowPlaytime()]];
+  return <section className="score-playtime" aria-label="游玩时长">
+    <h2>游玩时长<small>只算正在游玩的时间，暂停不计</small></h2>
+    <div>{rows.map(([label, seconds]) => <div key={label}><span>{label}</span><strong>{typeof seconds === 'number' ? formatPlaytime(seconds) : '读取中'}</strong></div>)}</div>
+  </section>;
+}
 export function ScoreHistory({ onClose }) {
   const [preset, setPreset] = useState('7');
   const [dates, setDates] = useState(() => presetDates('7'));
@@ -85,6 +94,7 @@ export function ScoreHistory({ onClose }) {
   return <div className="score-screen"><div className="score-shell">
     <header className="score-header"><button className="quiet-button" data-gamepad-back onClick={onClose}><ArrowLeft size={21} />返回</button><span>花园王国 / 我的成绩本</span><button className="quiet-button" disabled={isLoading} onClick={() => setRefresh(v => v + 1)}><ArrowsClockwise size={20} />刷新</button></header>
     <div className="score-heading"><div><small>每一次探索，都留下小小足迹</small><h1>我的探险成绩本</h1><p>看看收集了多少快乐，也看看每一次的进步。</p></div><Trophy size={60} weight="duotone" /></div>
+    <PlaytimeSummary adventureSeconds={data?.lifetimeSeconds} />
     <section className="score-filters" aria-label="成绩筛选"><div className="score-presets">{[['today','今天'],['7','近 7 天'],['30','近 30 天'],['all','全部']].map(([id,label]) => <button key={id} aria-pressed={preset===id} onClick={() => choosePreset(id)}>{label}</button>)}</div><div className="score-date-range"><label>关卡<select value={level} onChange={e => { setLevel(e.target.value); setOffset(0); }}><option value="">全部关卡</option>{LEVELS.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div></section>
     {syncNote && <p className="score-warning" role="status">{syncNote} 待补存 {pendingCount()} 次。</p>}
     {error ? <div className="score-empty" role="alert"><h2>成绩还在路上</h2><p>{error}</p><button className="primary-button" onClick={()=>setRefresh(v=>v+1)}>再试一次</button></div> : isLoading ? <div className="score-empty" role="status">正在翻开成绩本…</div> : data && <>
